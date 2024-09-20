@@ -121,6 +121,13 @@ add_library(gfx-gltf INTERFACE)
 target_sources(gfx-gltf PUBLIC $<TARGET_OBJECTS:gfx-gltf-obj>)
 target_link_libraries(gfx-gltf INTERFACE gfx-gltf-obj)
 
+add_library(gfx-data-format-obj OBJECT formats/bfmt.cpp)
+target_link_libraries(gfx-data-format-obj Boost::uuid gfx-core-obj tinygltf Tracy::Client)
+
+add_library(gfx-data-format INTERFACE)
+target_sources(gfx-data-format PUBLIC $<TARGET_OBJECTS:gfx-data-format-obj>)
+target_link_libraries(gfx-data-format INTERFACE gfx-data-format-obj)
+
 option(GFX_USE_DATA_PATH "Uses build tree paths to find data (dev only)" ON)
 
 if(NOT EMSCRIPTEN AND(CMAKE_BUILD_TYPE MATCHES Debug))
