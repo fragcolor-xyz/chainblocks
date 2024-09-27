@@ -9,7 +9,27 @@
 #include <type_traits>
 #include <shards/shardwrapper.hpp>
 
-// Template helpers for setParam/getParam
+// Shards parameter Macros
+// The general usage will be:
+//   struct MyShard {
+//     PARAM_PARAMVAR(_varNameToDefine, "PublicName", "Help text", {shards::CoreInfo::StringType, OtherTypes... })
+//     PARAM_IMPL(PARAM_IMPL_FOR(_varNameToDefine))
+//
+//     PARAM_REQUIRED_VARIABLES();
+//     SHTypeInfo compose(SHInstanceData &data) {
+//       PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+//       return outputTypes().elements[0];
+//     }
+//     void warmup(SHContext *ctx) {
+//       PARAM_WARMUP(ctx);
+//     }
+//     void cleanup(SHContext *ctx) {
+//       PARAM_CLEANUP(ctx);
+//     }
+//   };
+// CAUTION: 
+//  - If you use PARAM_PARAMVAR, you must also add the compose(), warmup() and cleanup() functions
+
 namespace shards {
 #define PARAM_EXT(_type, _name, _paramInfo)                              \
   static inline shards::ParameterInfo _name##ParameterInfo = _paramInfo; \
@@ -20,6 +40,9 @@ namespace shards {
   _type _name{};
 
 #define PARAM_VAR(_name, _displayName, _help, ...) PARAM(shards::OwnedVar, _name, _displayName, _help, __VA_ARGS__)
+
+// Defines a ParamVar variable
+// CAUTION: you must manually add the Var type to the list of supported types (e.g. CoreInfo::StringVarType)
 #define PARAM_PARAMVAR(_name, _displayName, _help, ...) PARAM(shards::ParamVar, _name, _displayName, _help, __VA_ARGS__)
 
 struct IterableParam {
