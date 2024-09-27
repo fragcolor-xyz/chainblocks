@@ -230,6 +230,24 @@ public:
 };
 #endif
 
+template<typename TObjectType, int32_t _ObjectId, int32_t _VendorId, const char* _Name>
+struct TObjectTypeInfo {
+  static inline int32_t ObjectId = _ObjectId;
+  static inline ::shards::Type Type = ::shards::Type::Object(_VendorId, _ObjectId);
+  static inline SHTypeInfo RawType = Type;
+  static inline ::shards::Type VarType = ::shards::Type::VariableOf(Type);
+
+  static inline shards::ObjectVar<TObjectType, nullptr, nullptr, nullptr, true> ObjectVar{_Name, RawType.object.vendorId, RawType.object.typeId};
+
+  static TObjectType& fromVarChecked(const SHVar& var) {
+    return shards::varAsObjectChecked<TObjectType>(var, RawType);
+  }
+
+  static shards::OwnedVar newOwnedVar() {
+    return std::get<1>(ObjectVar.NewOwnedVar());
+  }
+};
+
 }; // namespace shards
 
 #endif /* C599F883_4CF5_416C_AC0D_AF07729F5C2B */
