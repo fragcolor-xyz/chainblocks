@@ -49,14 +49,14 @@ static FontMap::Ptr loadDefaultFontmap() {
 
   // SDL_Surface *fontMapSurf = SDL_CreateSurface(256, 256, SDL_PIXELFORMAT_ARGB32);
   TexturePtr fontMapTexture = std::make_shared<Texture>();
-  TextureDesc textureDesc{
+  TextureDescCPUCopy textureDesc{
       .format =
           TextureFormat{
+              .resolution = int2(256, 256),
               .pixelFormat = WGPUTextureFormat_RGBA8Unorm,
           },
-      .resolution = int2(256, 256),
   };
-  int2 &res = textureDesc.resolution;
+  int2 &res = textureDesc.format.resolution;
 
   stbtt_pack_context pctx{};
 
@@ -93,11 +93,10 @@ static FontMap::Ptr loadDefaultFontmap() {
     }
   }
 
-  textureDesc.source = TextureSource{
-      .numChannels = 4,
-      .rowStride = imageDataRowStride,
-      .data = ImmutableSharedBuffer(std::move(imageData)),
-  };
+  textureDesc.sourceData = ImmutableSharedBuffer(std::move(imageData));
+  textureDesc.sourceChannels = 4;
+  textureDesc.sourceRowStride = imageDataRowStride;
+  
   fontMapTexture->init(textureDesc)
       .initWithSamplerState(SamplerState{
           .addressModeU = WGPUAddressMode_ClampToEdge,

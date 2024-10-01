@@ -46,7 +46,10 @@ void RenderGraphEvaluator::getFrameTextures(shards::pmr::vector<ResolvedFrameTex
         if (expectedSize.isAutoSize) {
           // Auto-size the texture
           int2 targetSize = resolvedBinding.subResource.getResolutionFromMipResolution(expectedSize.size);
-          resolvedBinding.subResource.texture->initWithResolution(targetSize);
+          auto& texture = resolvedBinding.subResource.texture;
+          auto desc =  texture->getDesc();
+          desc.getFormat().resolution = targetSize;
+          texture->init(desc);
         } else {
           shassert(resolvedBinding.subResource.getResolution() == expectedSize.size &&
                    "Manually sized texture does not have it's expected size, this should not happen");

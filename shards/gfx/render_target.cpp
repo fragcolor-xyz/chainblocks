@@ -12,7 +12,11 @@ int2 RenderTarget::resizeConditional(int2 referenceSize) {
   computedSize = computeSize(referenceSize);
   for (auto &it : attachments) {
     int2 actualSize = it.second.getResolutionFromMipResolution(computedSize);
-    it.second.texture->initWithResolution(actualSize);
+    auto desc = it.second.texture->getDesc();
+    if (desc.getFormat().resolution != actualSize) {
+      desc.getFormat().resolution = actualSize;
+      it.second.texture->init(desc);
+    }
   }
   return computedSize;
 }

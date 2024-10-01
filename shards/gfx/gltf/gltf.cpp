@@ -25,17 +25,10 @@
 #include <string>
 #include <filesystem>
 #include <regex>
+#include <fstream>
+#include <iostream>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-#define STB_IMAGE_STATIC
-#define STB_IMAGE_IMPLEMENTATION
-#define TINYGLTF_NO_STB_IMAGE_WRITE
-#define TINYGLTF_IMPLEMENTATION
-#define TINYGLTF_ENABLE_DRACO
-#include <tinygltf/tiny_gltf.h>
-using namespace tinygltf;
-#pragma GCC diagnostic pop
+#include "impl.hpp"
 
 namespace gfx {
 
@@ -420,34 +413,34 @@ struct Loader {
       const tinygltf::Texture &gltfTexture = model.textures[i];
       const tinygltf::Image &gltfImage = model.images[gltfTexture.source];
 
-      TextureKey cacheKey{.imageIndex = gltfTexture.source, .samplerIndex = gltfTexture.sampler};
-      auto itCached = textureLookup.find(cacheKey);
-      if (itCached != textureLookup.end()) {
-        textureMap[i] = itCached->second;
-        continue;
-      } else {
-        TexturePtr &texture = textureMap[i];
-        texture = std::make_shared<Texture>();
+      // TextureKey cacheKey{.imageIndex = gltfTexture.source, .samplerIndex = gltfTexture.sampler};
+      // auto itCached = textureLookup.find(cacheKey);
+      // if (itCached != textureLookup.end()) {
+      //   textureMap[i] = itCached->second;
+      //   continue;
+      // } else {
+      //   TexturePtr &texture = textureMap[i];
+      //   texture = std::make_shared<Texture>();
 
-        SamplerState samplerState{};
-        if (gltfTexture.sampler >= 0) {
-          samplerState = convertSampler(model.samplers[gltfTexture.sampler]);
-        }
+      //   SamplerState samplerState{};
+      //   if (gltfTexture.sampler >= 0) {
+      //     samplerState = convertSampler(model.samplers[gltfTexture.sampler]);
+      //   }
 
-        int2 resolution(gltfImage.width, gltfImage.height);
-        texture
-            ->init(TextureDesc{
-                .format = convertTextureFormat(gltfImage, false),
-                .resolution = resolution,
-                .source =
-                    TextureSource{
-                        .data = ImmutableSharedBuffer(gltfImage.image.data(), gltfImage.image.size()),
-                    },
-            })
-            .initWithSamplerState(samplerState);
+      //   int2 resolution(gltfImage.width, gltfImage.height);
+      //   texture
+      //       ->init(TextureDesc{
+      //           .format = convertTextureFormat(gltfImage, false),
+      //           .resolution = resolution,
+      //           .source =
+      //               TextureSource{
+      //                   .data = ImmutableSharedBuffer(gltfImage.image.data(), gltfImage.image.size()),
+      //               },
+      //       })
+      //       .initWithSamplerState(samplerState);
 
-        textureLookup[cacheKey] = texture;
-      }
+      //   textureLookup[cacheKey] = texture;
+      // }
     }
   }
 
@@ -469,8 +462,9 @@ struct Loader {
           material->parameters.set(name, TextureParameter(texture, textureInfo.texCoord));
 
           // Update texture format to apply srgb/gamma hint from usage
-          WGPUTextureFormat targetFormat = convertTextureFormat(gltfImage, asSrgb).pixelFormat;
-          texture->initWithPixelFormat(targetFormat);
+          // WGPUTextureFormat targetFormat = convertTextureFormat(gltfImage, asSrgb).pixelFormat;
+          // TODO
+          // texture->initWithPixelFormat(targetFormat);
         }
       };
 
@@ -610,7 +604,7 @@ struct Loader {
 
       for (auto &gltfChannel : gltfAnimation.channels) {
         auto track = loadAnimationTrack(gltfAnimation, gltfChannel);
-        if(track.target != animation::BuiltinTarget::None)
+        if (track.target != animation::BuiltinTarget::None)
           animation.tracks.emplace_back(std::move(track));
       }
     }
@@ -837,79 +831,80 @@ bool isBinaryFile(const std::string &inputPath) {
 }
 
 std::vector<uint8_t> convertToGlb(const std::string &inputPath) {
-  tinygltf::Model model;
-  tinygltf::TinyGLTF loader;
-  std::string err;
-  std::string warn;
+  // tinygltf::Model model;
+  // tinygltf::TinyGLTF loader;
+  // std::string err;
+  // std::string warn;
 
-  std::filesystem::path input(inputPath);
-  bool isBinary = isBinaryFile(inputPath);
+  // std::filesystem::path input(inputPath);
+  // bool isBinary = isBinaryFile(inputPath);
 
-  // Get the directory of the input file
-  std::filesystem::path baseDir = input.parent_path();
+  // // Get the directory of the input file
+  // std::filesystem::path baseDir = input.parent_path();
 
-  std::unordered_map<int, ImageData> bufferMap;
+  // std::unordered_map<int, ImageData> bufferMap;
 
-  // Load input file without loading external images
-  tinygltf::LoadImageDataFunction loadImageData = [](tinygltf::Image *image, const int image_idx, std::string *err,
-                                                     std::string *warn, int req_width, int req_height, const unsigned char *bytes,
-                                                     int size, void *user_data) {
-    std::unordered_map<int, ImageData> *bufferMap = static_cast<std::unordered_map<int, ImageData> *>(user_data);
-    ImageData imgData;
-    imgData.mimeType = image->mimeType;
-    imgData.data.assign(bytes, bytes + size);
-    bufferMap->emplace(image_idx, imgData);
-    return true;
-  };
-  loader.SetImageLoader(loadImageData, &bufferMap);
+  // // Load input file without loading external images
+  // tinygltf::LoadImageDataFunction loadImageData = [](tinygltf::Image *image, const int image_idx, std::string *err,
+  //                                                    std::string *warn, int req_width, int req_height, const unsigned char *bytes,
+  //                                                    int size, void *user_data) {
+  //   std::unordered_map<int, ImageData> *bufferMap = static_cast<std::unordered_map<int, ImageData> *>(user_data);
+  //   ImageData imgData;
+  //   imgData.mimeType = image->mimeType;
+  //   imgData.data.assign(bytes, bytes + size);
+  //   bufferMap->emplace(image_idx, imgData);
+  //   return true;
+  // };
+  // loader.SetImageLoader(loadImageData, &bufferMap);
 
-  bool ret = isBinary ? loader.LoadBinaryFromFile(&model, &err, &warn, inputPath)
-                      : loader.LoadASCIIFromFile(&model, &err, &warn, inputPath);
+  // bool ret = isBinary ? loader.LoadBinaryFromFile(&model, &err, &warn, inputPath)
+  //                     : loader.LoadASCIIFromFile(&model, &err, &warn, inputPath);
 
-  if (!ret) {
-    std::cerr << "Failed to load input file: " << err << std::endl;
-    throw std::runtime_error("Failed to load input file: " + inputPath);
-  }
+  // if (!ret) {
+  //   std::cerr << "Failed to load input file: " << err << std::endl;
+  //   throw std::runtime_error("Failed to load input file: " + inputPath);
+  // }
 
-  if (!warn.empty()) {
-    SPDLOG_WARN("Warnings while loading input file: {}", warn);
-  }
+  // if (!warn.empty()) {
+  //   SPDLOG_WARN("Warnings while loading input file: {}", warn);
+  // }
 
-  // Embed all external buffers
-  embedBuffers(model, baseDir);
+  // // Embed all external buffers
+  // embedBuffers(model, baseDir);
 
-  // Embed all images
-  embedImages(model, baseDir, bufferMap);
+  // // Embed all images
+  // embedImages(model, baseDir, bufferMap);
 
-  // Verify all URIs have been cleared
-  for (const auto &buffer : model.buffers) {
-    if (!buffer.uri.empty()) {
-      throw std::runtime_error("Buffer URI not cleared after embedding: " + buffer.uri);
-    }
-  }
-  for (const auto &image : model.images) {
-    if (!image.uri.empty()) {
-      throw std::runtime_error("Image URI not cleared after embedding: " + image.uri);
-    }
-  }
+  // // Verify all URIs have been cleared
+  // for (const auto &buffer : model.buffers) {
+  //   if (!buffer.uri.empty()) {
+  //     throw std::runtime_error("Buffer URI not cleared after embedding: " + buffer.uri);
+  //   }
+  // }
+  // for (const auto &image : model.images) {
+  //   if (!image.uri.empty()) {
+  //     throw std::runtime_error("Image URI not cleared after embedding: " + image.uri);
+  //   }
+  // }
 
-  // Write to a temporary GLB file
-  // std::filesystem::path tempOutputPath = std::filesystem::temp_directory_path() / "temp_output.glb";
-  std::filesystem::path tempOutputPath = "temp_output.glb";
-  tinygltf::TinyGLTF writer;
-  if (!writer.WriteGltfSceneToFile(&model, tempOutputPath.string(), true, true, false, true)) {
-    throw std::runtime_error("Failed to write glTF to .glb");
-  }
+  // // Write to a temporary GLB file
+  // // std::filesystem::path tempOutputPath = std::filesystem::temp_directory_path() / "temp_output.glb";
+  // std::filesystem::path tempOutputPath = "temp_output.glb";
+  // tinygltf::TinyGLTF writer;
+  // if (!writer.WriteGltfSceneToFile(&model, tempOutputPath.string(), true, true, false, true)) {
+  //   throw std::runtime_error("Failed to write glTF to .glb");
+  // }
 
-  // Read the temporary GLB file into memory
-  std::vector<uint8_t> glbData;
-  if (!readFile(tempOutputPath, glbData)) {
-    throw std::runtime_error("Failed to read temporary GLB file");
-  }
+  // // Read the temporary GLB file into memory
+  // std::vector<uint8_t> glbData;
+  // if (!readFile(tempOutputPath, glbData)) {
+  //   throw std::runtime_error("Failed to read temporary GLB file");
+  // }
 
-  // Delete the temporary GLB file
-  std::filesystem::remove(tempOutputPath);
+  // // Delete the temporary GLB file
+  // std::filesystem::remove(tempOutputPath);
 
-  return glbData;
+  // return glbData;
+  throw std::runtime_error("TODO");
 }
 } // namespace gfx

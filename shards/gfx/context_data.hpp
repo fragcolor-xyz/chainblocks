@@ -22,6 +22,11 @@ struct ContextData {
 #endif
 };
 
+struct ContextDataRequest {
+  size_t version = ~0;
+  size_t lastTouched = ~0;
+};
+
 template <typename T>
 concept TContextData = std::is_base_of_v<ContextData, T>;
 
@@ -29,6 +34,12 @@ template <typename T>
 concept TWithContextDataKeepAlive = requires(T t, typename T::ContextDataType &cd) {
   { cd.keepAliveRef } -> std::assignable_from<std::shared_ptr<T>>;
   { t.keepAlive() } -> std::convertible_to<bool>;
+};
+
+template <typename T>
+concept TAsyncContextData = requires(T t) {
+  { t.isLoadedAsync() } -> std::convertible_to<bool>;
+  { t.pollAsync() } -> std::convertible_to<bool>;
 };
 
 // This is the source of the context data on the client side that provides

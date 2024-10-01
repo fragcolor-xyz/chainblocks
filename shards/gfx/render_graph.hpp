@@ -97,9 +97,7 @@ struct RenderTextureCache {
     }
   }
 
-  void clear() {
-    bins.clear();
-  }
+  void clear() { bins.clear(); }
 
   void reset() {
     for (auto &bin : bins) {
@@ -118,14 +116,14 @@ struct RenderTextureCache {
     if (!bin.getItem(texture, frameCounter)) {
       (*texture) = std::make_shared<Texture>();
       (*texture)
-          ->init(TextureDesc{
+          ->init(TextureDescGPUOnly{
               .format =
                   TextureFormat{
+                      .resolution = format.size,
                       .dimension = TextureDimension::D2,
                       .flags = TextureFormatFlags::RenderAttachment,
                       .pixelFormat = format.format,
                   },
-              .resolution = format.size,
           })
           .initWithLabel("auto");
     }

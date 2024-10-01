@@ -10,18 +10,21 @@
 #include "fwd.hpp"
 #include "enums.hpp"
 #include "log.hpp"
+#include "data_cache/data_cache.hpp"
 #include <compare>
 #include <variant>
 #include <optional>
 #include <string>
 #include <boost/container_hash/hash_fwd.hpp>
+#include <boost/tti/has_member_data.hpp>
+#include <shards/core/serialization/generic.hpp>
 
 namespace gfx {
 struct SamplerState {
-  WGPUAddressMode addressModeU = WGPUAddressMode::WGPUAddressMode_Repeat;
-  WGPUAddressMode addressModeV = WGPUAddressMode::WGPUAddressMode_Repeat;
-  WGPUAddressMode addressModeW = WGPUAddressMode::WGPUAddressMode_Repeat;
-  WGPUFilterMode filterMode = WGPUFilterMode::WGPUFilterMode_Linear;
+  WGPUAddressMode addressModeU : 8 = WGPUAddressMode::WGPUAddressMode_Repeat;
+  WGPUAddressMode addressModeV : 8 = WGPUAddressMode::WGPUAddressMode_Repeat;
+  WGPUAddressMode addressModeW : 8 = WGPUAddressMode::WGPUAddressMode_Repeat;
+  WGPUFilterMode filterMode : 8 = WGPUFilterMode::WGPUFilterMode_Linear;
 
   template <typename T> void getPipelineHash(T &hasher) const {
     hasher(addressModeU);
@@ -33,16 +36,13 @@ struct SamplerState {
   std::strong_ordering operator<=>(const SamplerState &) const = default;
 
   friend size_t hash_value(SamplerState const &v) {
-    size_t result{};
-    boost::hash_combine(result, uint32_t(v.addressModeU));
-    boost::hash_combine(result, uint32_t(v.addressModeV));
-    boost::hash_combine(result, uint32_t(v.addressModeW));
-    boost::hash_combine(result, uint32_t(v.filterMode));
-    return result;
+    static_assert(sizeof(SamplerState) == sizeof(uint32_t), "SamplerState is not the same size as uint32_t");
+    return reinterpret_cast<const uint32_t &>(v);
   }
 };
 
 struct TextureFormat {
+  int2 resolution;
   TextureDimension dimension = TextureDimension::D2;
   TextureFormatFlags flags = TextureFormatFlags::AutoGenerateMips;
   WGPUTextureFormat pixelFormat = WGPUTextureFormat::WGPUTextureFormat_Undefined;
@@ -50,6 +50,8 @@ struct TextureFormat {
 
   bool hasMips() { return mipLevels > 1; }
   std::strong_ordering operator<=>(const TextureFormat &other) const = default;
+
+  static TextureFormat deriveFrom(size_t numComponents, StorageType storageType, bool preferSrgb);
 };
 
 struct InputTextureFormat {
@@ -60,7 +62,6 @@ struct InputTextureFormat {
 /// <div rustbindgen opaque></div>
 struct TextureContextData : public ContextData {
   std::weak_ptr<Texture> keepAliveRef;
-
   TextureFormat format{};
   // Only set for managed textures
   WgpuHandle<WGPUTexture> texture{};
@@ -94,28 +95,60 @@ struct TextureContextData : public ContextData {
 #endif
 };
 
-struct TextureSource {
-  uint8_t numChannels = 4;
-  uint32_t rowStride{};
-  ImmutableSharedBuffer data;
-
-  std::strong_ordering operator<=>(const TextureSource &other) const = default;
-};
-
-/// <div rustbindgen opaque></div>
-struct TextureDesc {
+// Describes an asset loaded from the asset cache
+struct TextureDescAsset {
   TextureFormat format;
-  int2 resolution;
-  TextureSource source;
-
-  // Can wrap an already existing texture if this is passed
-  // it will not be released when the texture object is destroyed
-  std::optional<WGPUTexture> externalTexture;
-
-  static TextureDesc getDefault();
-
-  std::strong_ordering operator<=>(const TextureDesc &other) const = default;
+  data::AssetKey key;
+  std::strong_ordering operator<=>(const TextureDescAsset &other) const = default;
 };
+
+// Describes a texture that is initialized from a CPU copy of the texture data
+struct TextureDescCPUCopy {
+  TextureFormat format;
+  uint8_t sourceChannels = 4;
+  uint32_t sourceRowStride{};
+  ImmutableSharedBuffer sourceData;
+
+  std::strong_ordering operator<=>(const TextureDescCPUCopy &other) const = default;
+};
+
+// Describes texture data that is kept on the GPU side only
+struct TextureDescGPUOnly {
+  TextureFormat format;
+
+  std::strong_ordering operator<=>(const TextureDescGPUOnly &other) const = default;
+  static TextureDescGPUOnly getDefault();
+};
+
+// Describes an external WGPUTexture object
+struct TextureDescExternal {
+  TextureFormat format;
+  std::optional<WGPUTexture> externalTexture;
+  std::strong_ordering operator<=>(const TextureDescExternal &other) const = default;
+};
+
+/// <div rustbindgen hide></div>
+struct TextureDesc : public std::variant<TextureDescGPUOnly, TextureDescCPUCopy, TextureDescAsset, TextureDescExternal> {
+  using variant::variant;
+
+  bool isExternal() const { return std::holds_alternative<TextureDescExternal>(*this); }
+  bool isAsset() const { return std::holds_alternative<TextureDescAsset>(*this); }
+  bool isGPUOnly() const { return std::holds_alternative<TextureDescGPUOnly>(*this); }
+  bool isCPUCopy() const { return std::holds_alternative<TextureDescCPUCopy>(*this); }
+
+  const TextureFormat &getFormat() const {
+    return std::visit([](auto &arg) -> const TextureFormat & { return arg.format; }, *this);
+  }
+
+  TextureFormat &getFormat() {
+    return std::visit([](auto &arg) -> TextureFormat & { return arg.format; }, *this);
+  }
+
+  int2 getResolution() const { return getFormat().resolution; }
+  WGPUTextureFormat getPixelFormat() const { return getFormat().pixelFormat; }
+};
+
+std::vector<uint8_t> convertToRGBA(const TextureDescCPUCopy &desc);
 
 /// <div rustbindgen opaque></div>
 struct Texture final {
@@ -123,7 +156,7 @@ struct Texture final {
 
 private:
   UniqueId id = getNextId();
-  TextureDesc desc = TextureDesc::getDefault();
+  TextureDesc desc = TextureDescGPUOnly::getDefault();
   SamplerState samplerState{};
   std::string label;
   size_t version{};
@@ -135,26 +168,26 @@ public:
   Texture(std::string &&label) : label(label) {}
 
 #if SH_GFX_CONTEXT_DATA_LOG_LIFETIME
-  ~Texture() {
-    SPDLOG_LOGGER_DEBUG(getContextDataLogger(), "Texture {} ({}) destroyed", label, id);
-  }
+  ~Texture() { SPDLOG_LOGGER_DEBUG(getContextDataLogger(), "Texture {} ({}) destroyed", label, id); }
 #endif
 
   // Creates a texture
   Texture &init(const TextureDesc &desc);
   Texture &initWithSamplerState(const SamplerState &samplerState);
-  Texture &initWithResolution(int2 resolution);
-  Texture &initWithFlags(TextureFormatFlags formatFlags);
-  Texture &initWithPixelFormat(WGPUTextureFormat format);
   /// <div rustbindgen hide></div>
   Texture &initWithLabel(std::string &&label);
 
   SamplerState &getSamplerState() { return samplerState; }
   const std::string &getLabel() const { return label; }
   const TextureDesc &getDesc() const { return desc; }
-  TextureSource getSource() const { return desc.source; }
-  const TextureFormat &getFormat() const { return desc.format; }
-  int2 getResolution() const { return desc.resolution; }
+
+  /// <div rustbindgen hide></div>
+  const TextureFormat &getFormat() const { return desc.getFormat(); }
+  int2 getResolution() const { return getFormat().resolution; }
+  WGPUTextureFormat getPixelFormat() const { return getFormat().pixelFormat; }
+
+  // Causes an update of renderer side data
+  void update();
 
   TexturePtr clone() const;
 
@@ -171,13 +204,20 @@ public:
 
 protected:
   static UniqueId getNextId();
-
-private:
-  void update();
 };
 
 static_assert(TWithContextDataKeepAlive<Texture>, "");
 
 } // namespace gfx
+
+namespace shards {
+template <SerializerStream T, typename V> void serde(T &stream, gfx::TextureFormat &v) {
+  serde(stream, v.resolution);
+  serdeAs<uint8_t>(stream, v.dimension);
+  serdeAs<uint8_t>(stream, v.flags);
+  serdeAs<uint32_t>(stream, v.pixelFormat);
+  serdeAs<uint8_t>(stream, v.mipLevels);
+}
+} // namespace shards
 
 #endif // GFX_TEXTURE

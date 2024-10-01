@@ -67,7 +67,7 @@ struct TextureManager {
   std::map<uint64_t, TexturePtr> textures;
 
   TexturePtr get(const egui::RenderOutput &output, const egui::TextureId &id) const {
-    if (id.managed) { 
+    if (id.managed) {
       auto it = textures.find(id.id);
       if (it != textures.end())
         return it->second;
@@ -132,11 +132,11 @@ struct TextureManager {
         .filterMode = WGPUFilterMode_Linear,
     };
 
-    ImmutableSharedBuffer currentData = texture->getSource().data;
+    TextureDescCPUCopy desc = std::get<TextureDescCPUCopy>(texture->getDesc());
     std::vector<uint8_t> imageData;
-    if (set.subRegion && currentData.getLength() > 0) {
-      imageData.resize(currentData.getLength());
-      memcpy(imageData.data(), currentData.getData(), currentData.getLength());
+    if (set.subRegion && desc.sourceData.getLength() > 0) {
+      imageData.resize(desc.sourceData.getLength());
+      memcpy(imageData.data(), desc.sourceData.getData(), desc.sourceData.getLength());
     } else {
       if (set.subRegion)
         throw std::logic_error("Can not update a sub-region on a non-existing texture");
@@ -161,12 +161,10 @@ struct TextureManager {
       imageCopy(fmt.pixelFormat, srcFormat, imageData.data(), set.pixels, size.x * size.y);
     }
 
-    texture
-        ->init(TextureDesc{
-            .format = fmt,
-            .resolution = size,
-            .source = TextureSource{.data = std::move(imageData)},
-        })
+    desc.sourceData = std::move(imageData);
+    desc.format = fmt;
+    desc.format.resolution = size;
+    texture->init(desc)
         .initWithSamplerState(sampler)
 #if SH_GFX_CONTEXT_DATA_LABELS
         .initWithLabel(fmt::format("egui_texture_{}", set.id.id))

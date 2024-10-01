@@ -23,8 +23,8 @@ struct PlaceholderTexture {
       }
     };
 
-    TextureDesc desc{};
-    desc.resolution = resolution;
+    TextureDescCPUCopy desc{};
+    desc.format.resolution = resolution;
     desc.format.pixelFormat = WGPUTextureFormat_RGBA8UnormSrgb;
     desc.format.dimension = dimension;
     switch (dimension) {
@@ -40,7 +40,7 @@ struct PlaceholderTexture {
     } break;
     }
 
-    desc.source.data = std::move(data);
+    desc.sourceData = std::move(data);
 
     TexturePtr texture = std::make_shared<Texture>();
     texture->init(desc);

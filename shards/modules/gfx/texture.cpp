@@ -265,23 +265,18 @@ struct TextureShard {
       break;
     }
 
+    format.resolution = int2(image.width, image.height);
+
     if (format.pixelFormat == WGPUTextureFormat_Undefined)
       throw TextureFormatException(componentType, asType);
 
-    auto &inputFormat = getTextureFormatDescription(format.pixelFormat);
-    size_t imageSize = inputFormat.pixelSize * image.width * image.height;
-
     // Copy the data since we can't keep a reference to the image variable
     ImmutableSharedBuffer isb(std::make_shared<ImageRefTextureBuffer>(const_cast<SHImage *>(&image)));
-    texture->init(TextureDesc{
+    texture->init(TextureDescCPUCopy{
         .format = format,
-        .resolution = int2(image.width, image.height),
-        .source =
-            TextureSource{
-                .numChannels = image.channels,
-                .rowStride = image.rowStride,
-                .data = std::move(isb),
-            },
+        .sourceChannels = image.channels,
+        .sourceRowStride = image.rowStride,
+        .sourceData = std::move(isb),
     });
   }
 
@@ -293,19 +288,19 @@ struct TextureShard {
     // NOTE: Use existing resolution if unspecified here to avoid resetting the texture
     int2 resolution = !resolutionVar.isNone() ? (int2)toInt2(resolutionVar) : int2(0);
     if (resolutionVar.isNone())
-      resolution = texture->getDesc().resolution;
+      resolution = texture->getResolution();
 
     uint8_t mipLevels = uint8_t(!mipLevelsVar.isNone() ? int(mipLevelsVar) : 1);
 
-    texture->init(TextureDesc{
+    texture->init(TextureDescGPUOnly{
         .format =
             TextureFormat{
+                .resolution = resolution,
                 .dimension = getTextureDimension(),
                 .flags = TextureFormatFlags::RenderAttachment,
                 .pixelFormat = (WGPUTextureFormat)formatVar.payload.enumValue,
                 .mipLevels = mipLevels,
             },
-        .resolution = resolution,
     });
 
     Var &labelVar = (Var &)_label.get();
@@ -325,9 +320,13 @@ struct TextureShard {
       if (seq.len >= 3) {
         throw formatException("Number of texture addressing modes are too many ({}, max: 3)", seq.len);
       }
-      for (size_t i = 0; i < seq.len; i++) {
-        (&samplerState.addressModeU)[i] = WGPUAddressMode(seq.elements[i].payload.enumValue);
-      }
+
+      if (seq.len > 0)
+        samplerState.addressModeU = WGPUAddressMode(seq.elements[0].payload.enumValue);
+      if (seq.len > 1)
+        samplerState.addressModeV = WGPUAddressMode(seq.elements[1].payload.enumValue);
+      if (seq.len > 2)
+        samplerState.addressModeW = WGPUAddressMode(seq.elements[2].payload.enumValue);
     } else if (!addressingModes.isNone()) {
       samplerState.addressModeU = WGPUAddressMode(addressingModes.payload.enumValue);
       samplerState.addressModeV = samplerState.addressModeU;

@@ -1,0 +1,9 @@
+Sequence(models Type: @type([@type(GLTF.Read)]))
+
+"data/kenney-space-station-kit" | FS.Iterate(Recursive: false)
+ForEach({
+  When({String.Ends(".glb")} {
+    Log("Reading")
+    GLTF.Read >> models
+  })
+})

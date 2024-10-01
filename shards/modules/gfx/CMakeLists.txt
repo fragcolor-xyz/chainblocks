@@ -15,6 +15,7 @@ set(SOURCES
   shader/wire_shards.cpp
   shader/flow_shards.cpp
   gltf.cpp
+  gltf_data_shards.cpp
   camera.cpp
   texture.cpp
   view.cpp
@@ -24,6 +25,7 @@ set(SOURCES
   gizmos/gizmos.cpp
   gizmos/highlight.cpp
   gizmos/shapes.cpp
+  data_cache.cpp
 )
 
 if(HAS_WGPU_NATIVE)
@@ -34,7 +36,7 @@ else()
 endif()
 
 add_shards_module(gfx SOURCES ${SOURCES}
-  REGISTER_SHARDS gfx gizmos buffer
+  REGISTER_SHARDS gfx gizmos buffer gltf_data
   RUST_TARGETS ${RUST_TARGETS}
 )
 
@@ -42,6 +44,6 @@ target_link_libraries(shards-module-gfx stb)
 
 # Link object libraries since they depend on rust code
 # and will be combined into the union lib
-target_link_libraries(shards-module-gfx gfx-core gfx-gltf)
+target_link_libraries(shards-module-gfx gfx-core gfx-gltf gfx-data-format)
 
 target_precompile_headers(shards-module-gfx PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/pch.cpp>")

@@ -5,6 +5,7 @@
 namespace gfx {
 namespace fs {
 using namespace boost::filesystem;
+using Path = boost::filesystem::path;
 }
 } // namespace gfx
 

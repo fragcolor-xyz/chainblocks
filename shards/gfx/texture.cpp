@@ -7,19 +7,54 @@
 #include <map>
 
 namespace gfx {
-TextureDesc TextureDesc::getDefault() {
-  return TextureDesc{.format = {.pixelFormat = WGPUTextureFormat_RGBA8Unorm}, .resolution = int2(512, 512)};
+TextureDescGPUOnly TextureDescGPUOnly::getDefault() {
+  return TextureDescGPUOnly{.format = {.resolution = int2(512, 512), .pixelFormat = WGPUTextureFormat_RGBA8Unorm}};
 }
 
-std::vector<uint8_t> convertToRGBA(const TextureDesc &desc) {
-  shassert(desc.source.numChannels == 3);
-  auto width = desc.resolution.x;
-  auto height = desc.resolution.y;
+TextureFormat TextureFormat::deriveFrom(size_t numComponents, StorageType storageType, bool preferSrgb) {
+  TextureFormat result{
+      .dimension = TextureDimension::D2,
+  };
+
+  auto throwUnsupportedPixelFormat = [&]() {
+    throw formatException("Unsupported pixel format for {} components: {} ", numComponents, magic_enum::enum_name(storageType));
+  };
+  if (numComponents == 4) {
+    if (storageType == StorageType::UNorm8)
+      result.pixelFormat = preferSrgb ? WGPUTextureFormat_RGBA8UnormSrgb : WGPUTextureFormat_RGBA8Unorm;
+    else if (storageType == StorageType::Float32)
+      result.pixelFormat = WGPUTextureFormat_RGBA32Float;
+    else
+      throwUnsupportedPixelFormat();
+  } else if (numComponents == 2) {
+    if (storageType == StorageType::UNorm8)
+      result.pixelFormat = WGPUTextureFormat_RG8Unorm;
+    else if (storageType == StorageType::Float32)
+      result.pixelFormat = WGPUTextureFormat_RG32Float;
+    else
+      throwUnsupportedPixelFormat();
+  } else if (numComponents == 1) {
+    if (storageType == StorageType::UNorm8)
+      result.pixelFormat = WGPUTextureFormat_R8Unorm;
+    else if (storageType == StorageType::Float32)
+      result.pixelFormat = WGPUTextureFormat_R32Float;
+    else
+      throwUnsupportedPixelFormat();
+  } else {
+    throw formatException("{} component textures not supported", numComponents);
+  }
+  return result;
+}
+
+std::vector<uint8_t> convertToRGBA(const TextureDescCPUCopy &desc) {
+  shassert(desc.sourceChannels == 3);
+  auto width = desc.format.resolution.x;
+  auto height = desc.format.resolution.y;
   std::vector<uint8_t> rgbaData(width * height * 4);
 
-  shassert(desc.source.data);
-  auto srcData = desc.source.data.getData();
-  size_t rowStride = desc.source.rowStride != 0 ? desc.source.rowStride : width * 3;
+  shassert(desc.sourceData);
+  auto srcData = desc.sourceData.getData();
+  size_t rowStride = desc.sourceRowStride != 0 ? desc.sourceRowStride : width * 3;
   for (size_t y = 0; y < height; ++y) {
     for (size_t x = 0; x < width; ++x) {
       size_t srcIndex = y * rowStride + x * 3;
@@ -36,7 +71,7 @@ std::vector<uint8_t> convertToRGBA(const TextureDesc &desc) {
 }
 
 std::shared_ptr<Texture> Texture::makeRenderAttachment(WGPUTextureFormat format, std::string &&label) {
-  TextureDesc desc{
+  TextureDescCPUCopy desc{
       .format =
           {
               .flags = TextureFormatFlags::RenderAttachment,
@@ -49,7 +84,7 @@ std::shared_ptr<Texture> Texture::makeRenderAttachment(WGPUTextureFormat format,
 }
 
 Texture &Texture::init(const TextureDesc &desc) {
-  if (this->desc != desc || desc.externalTexture) {
+  if (this->desc != desc || desc.isExternal()) {
     // NOTE: Always update when external texture is present
     update();
     this->desc = desc;
@@ -61,30 +96,6 @@ Texture &Texture::initWithSamplerState(const SamplerState &samplerState) {
   if (this->samplerState != samplerState) {
     this->samplerState = samplerState;
     ++version;
-  }
-  return *this;
-}
-
-Texture &Texture::initWithResolution(int2 resolution) {
-  if (desc.resolution != resolution) {
-    desc.resolution = resolution;
-    update();
-  }
-  return *this;
-}
-
-Texture &Texture::initWithFlags(TextureFormatFlags flags) {
-  if (desc.format.flags != flags) {
-    desc.format.flags = flags;
-    update();
-  }
-  return *this;
-}
-
-Texture &Texture::initWithPixelFormat(WGPUTextureFormat format) {
-  if (desc.format.pixelFormat != format) {
-    desc.format.pixelFormat = format;
-    update();
   }
   return *this;
 }
@@ -135,70 +146,70 @@ void Texture::initContextData(Context &context, TextureContextData &contextData)
 void Texture::updateContextData(Context &context, TextureContextData &contextData) {
   ZoneScoped;
 
-  WGPUDevice device = context.wgpuDevice;
-  shassert(device);
+  // WGPUDevice device = context.wgpuDevice;
+  // shassert(device);
 
-  contextData.id = id;
-  contextData.size.width = desc.resolution.x;
-  contextData.size.height = desc.resolution.y;
-  contextData.size.depthOrArrayLayers = 1;
-  contextData.format = desc.format;
+  // contextData.id = id;
+  // contextData.size.width = desc.resolution.x;
+  // contextData.size.height = desc.resolution.y;
+  // contextData.size.depthOrArrayLayers = 1;
+  // contextData.format = desc.format;
 
-  if (contextData.size.width == 0 || contextData.size.height == 0)
-    return;
+  // if (contextData.size.width == 0 || contextData.size.height == 0)
+  //   return;
 
-  if (desc.externalTexture) {
-    contextData.externalTexture = desc.externalTexture.value();
-  } else {
-    WGPUTextureDescriptor wgpuDesc = {};
-    wgpuDesc.usage = WGPUTextureUsage_TextureBinding;
-    if (desc.source.data) {
-      wgpuDesc.usage |= WGPUTextureUsage_CopyDst;
-    }
+  // if (desc.externalTexture) {
+  //   contextData.externalTexture = desc.externalTexture.value();
+  // } else {
+  //   WGPUTextureDescriptor wgpuDesc = {};
+  //   wgpuDesc.usage = WGPUTextureUsage_TextureBinding;
+  //   if (desc.source.data) {
+  //     wgpuDesc.usage |= WGPUTextureUsage_CopyDst;
+  //   }
 
-    if (textureFormatFlagsContains(desc.format.flags, TextureFormatFlags::RenderAttachment)) {
-      wgpuDesc.usage |= WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
-    }
+  //   if (textureFormatFlagsContains(desc.format.flags, TextureFormatFlags::RenderAttachment)) {
+  //     wgpuDesc.usage |= WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
+  //   }
 
-    if (!textureFormatFlagsContains(desc.format.flags, TextureFormatFlags::NoTextureBinding)) {
-      wgpuDesc.usage |= WGPUTextureUsage_TextureBinding;
-    }
+  //   if (!textureFormatFlagsContains(desc.format.flags, TextureFormatFlags::NoTextureBinding)) {
+  //     wgpuDesc.usage |= WGPUTextureUsage_TextureBinding;
+  //   }
 
-    switch (desc.format.dimension) {
-    case TextureDimension::D1:
-      wgpuDesc.dimension = WGPUTextureDimension_1D;
-      contextData.size.height = 1;
-      break;
-    case TextureDimension::D2:
-      wgpuDesc.dimension = WGPUTextureDimension_2D;
-      break;
-    case TextureDimension::Cube:
-      wgpuDesc.dimension = WGPUTextureDimension_2D;
-      contextData.size.depthOrArrayLayers = 6;
-      break;
-    default:
-      shassert(false);
-    }
+  //   switch (desc.format.dimension) {
+  //   case TextureDimension::D1:
+  //     wgpuDesc.dimension = WGPUTextureDimension_1D;
+  //     contextData.size.height = 1;
+  //     break;
+  //   case TextureDimension::D2:
+  //     wgpuDesc.dimension = WGPUTextureDimension_2D;
+  //     break;
+  //   case TextureDimension::Cube:
+  //     wgpuDesc.dimension = WGPUTextureDimension_2D;
+  //     contextData.size.depthOrArrayLayers = 6;
+  //     break;
+  //   default:
+  //     shassert(false);
+  //   }
 
-    wgpuDesc.size = contextData.size;
-    wgpuDesc.format = desc.format.pixelFormat;
-    wgpuDesc.sampleCount = 1;
-    wgpuDesc.mipLevelCount = desc.format.mipLevels;
-    wgpuDesc.label = label.empty() ? "unknown" : label.c_str();
+  //   wgpuDesc.size = contextData.size;
+  //   wgpuDesc.format = desc.format.pixelFormat;
+  //   wgpuDesc.sampleCount = 1;
+  //   wgpuDesc.mipLevelCount = desc.format.mipLevels;
+  //   wgpuDesc.label = label.empty() ? "unknown" : label.c_str();
 
-    contextData.texture.reset(wgpuDeviceCreateTexture(context.wgpuDevice, &wgpuDesc));
-    shassert(contextData.texture);
+  //   contextData.texture.reset(wgpuDeviceCreateTexture(context.wgpuDevice, &wgpuDesc));
+  //   shassert(contextData.texture);
 
-    if (desc.source.data)
-      if (desc.source.numChannels == 3) {
-        auto rgbaData = convertToRGBA(desc);
-        writeTextureData(context, desc.format, desc.resolution, contextData.size.depthOrArrayLayers, contextData.texture,
-                         rgbaData.data(), rgbaData.size(), 0);
-      } else {
-        writeTextureData(context, desc.format, desc.resolution, contextData.size.depthOrArrayLayers, contextData.texture,
-                         desc.source.data, desc.source.rowStride);
-      }
-  }
+  //   if (desc.source.data)
+  //     if (desc.source.numChannels == 3) {
+  //       auto rgbaData = convertToRGBA(desc);
+  //       writeTextureData(context, desc.format, desc.resolution, contextData.size.depthOrArrayLayers, contextData.texture,
+  //                        rgbaData.data(), rgbaData.size(), 0);
+  //     } else {
+  //       writeTextureData(context, desc.format, desc.resolution, contextData.size.depthOrArrayLayers, contextData.texture,
+  //                        desc.source.data, desc.source.rowStride);
+  //     }
+  // }
 }
 
 UniqueId Texture::getNextId() {

@@ -2,13 +2,13 @@
 #define C8C54D29_755D_4D95_87CC_9D6F10462CFA
 
 #include <boost/uuid/uuid.hpp>
+#include <string>
 
 namespace gfx {
 
 struct BTextureMetadata {
   boost::uuids::uuid uuid;
   std::string path;
-
 };
 
 struct BTextureRef {

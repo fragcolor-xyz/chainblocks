@@ -16,21 +16,21 @@
 #include "shards_utils.hpp"
 #include "drawable_utils.hpp"
 #include <shards/modules/inputs/inputs.hpp>
-#include <shards/core/serialization.hpp>
+#include <shards/core/serialization/linalg.hpp>
 #include "window.hpp"
 
 using namespace shards;
 
 namespace shards {
-template <typename T> void serde(T &stream, gfx::FovDirection &v) { serdeAs<T, uint8_t>(stream, v); }
-template <typename T> void serde(T &stream, gfx::OrthographicSizeType &v) { serdeAs<T, uint8_t>(stream, v); }
-template <typename T> void serde(T &stream, gfx::ViewPerspectiveProjection &v) {
+template <SerializerStream T> void serde(T &stream, gfx::FovDirection &v) { serdeAs<int8_t>(stream, v); }
+template <SerializerStream T> void serde(T &stream, gfx::OrthographicSizeType &v) { serdeAs<int8_t>(stream, v); }
+template <SerializerStream T> void serde(T &stream, gfx::ViewPerspectiveProjection &v) {
   serde(stream, v.far);
   serde(stream, v.near);
   serde(stream, v.fov);
   serde(stream, v.fovType);
 }
-template <typename T> void serde(T &stream, gfx::ViewOrthographicProjection &v) {
+template <SerializerStream T> void serde(T &stream, gfx::ViewOrthographicProjection &v) {
   serde(stream, v.far);
   serde(stream, v.near);
   serde(stream, v.size);

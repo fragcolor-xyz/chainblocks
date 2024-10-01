@@ -1,0 +1,8 @@
+#ifndef BB429670_CA27_42DE_9E12_938A912FA8B9
+#define BB429670_CA27_42DE_9E12_938A912FA8B9
+
+struct MeshTreeBuilder {
+  void append();
+};
+
+#endif /* BB429670_CA27_42DE_9E12_938A912FA8B9 */

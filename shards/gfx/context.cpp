@@ -169,7 +169,7 @@ struct ContextMainOutput {
     wgpuCurrentTexture = wgpuSwapChainGetCurrentTexture(wgpuSwapChain);
 #endif
 
-    auto desc = texture->getDesc();
+    auto desc = std::get<TextureDescExternal>(texture->getDesc());
     desc.externalTexture = wgpuCurrentTexture;
     desc.format.flags = desc.format.flags | TextureFormatFlags::DontCache;
     texture->init(desc);
@@ -310,10 +310,12 @@ struct ContextMainOutput {
 #endif
 
     texture
-        ->initWithPixelFormat(swapchainFormat) //
-        .initWithLabel("<main output>")
-        .initWithResolution(currentSize)
-        .initWithFlags(textureFormatFlags);
+        ->init(TextureDescExternal{.format{
+            .resolution = currentSize,
+            .flags = textureFormatFlags,
+            .pixelFormat = swapchainFormat,
+        }})
+        .initWithLabel("<main output>");
   }
 
   void releaseSurface() {

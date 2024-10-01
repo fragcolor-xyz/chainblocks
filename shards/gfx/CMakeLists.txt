@@ -42,6 +42,7 @@ set(GFX_SOURCES
   pipeline_step.cpp
   pipeline_hashes.cpp
   unique_id.cpp
+  data_cache/data_cache.cpp
 )
 
 if(EMSCRIPTEN)
@@ -62,8 +63,7 @@ target_bundle_files(gfx-core-obj
 
 # Always optimize files with hot-paths
 set_source_files_properties(
-  drawables/mesh_tree_drawable.cpp
-  gltf/gltf.cpp
+  # drawables/mesh_tree_drawable.cpp
   texture_file/texture_file.cpp
   pipeline_hashes.cpp
   PROPERTIES
@@ -86,7 +86,7 @@ target_include_directories(gfx-core-obj
 target_link_libraries(gfx-core-obj
   tinygltf draco-wrapper
   magic_enum nameof linalg
-  spdlog stb xxHash Boost::algorithm Boost::filesystem Boost::container Boost::tti
+  spdlog stb xxHash Boost::algorithm Boost::filesystem Boost::container Boost::uuid Boost::tti tbb
   brotlidec-static brotlicommon-static
   shards-logging
   shards-fast-string
@@ -106,27 +106,9 @@ endif()
 
 target_link_libraries(gfx-core-obj Taskflow)
 
-add_library(gfx-texture-file-obj OBJECT texture_file/texture_file.cpp)
-target_link_libraries(gfx-texture-file-obj gfx-core-obj)
-
-add_library(gfx-texture-file INTERFACE)
-target_sources(gfx-texture-file PUBLIC $<TARGET_OBJECTS:gfx-texture-file-obj>)
-target_link_libraries(gfx-texture-file INTERFACE gfx-texture-file-obj)
-
-add_library(gfx-gltf-obj OBJECT gltf/gltf.cpp)
-target_link_libraries(gfx-gltf-obj gfx-core-obj tinygltf)
-target_link_libraries(gfx-gltf-obj Tracy::TracyClient)
-
-add_library(gfx-gltf INTERFACE)
-target_sources(gfx-gltf PUBLIC $<TARGET_OBJECTS:gfx-gltf-obj>)
-target_link_libraries(gfx-gltf INTERFACE gfx-gltf-obj)
-
-add_library(gfx-data-format-obj OBJECT formats/bfmt.cpp)
-target_link_libraries(gfx-data-format-obj Boost::uuid gfx-core-obj tinygltf Tracy::Client)
-
-add_library(gfx-data-format INTERFACE)
-target_sources(gfx-data-format PUBLIC $<TARGET_OBJECTS:gfx-data-format-obj>)
-target_link_libraries(gfx-data-format INTERFACE gfx-data-format-obj)
+add_subdirectory(gltf)
+add_subdirectory(data_format)
+add_subdirectory(texture_file)
 
 option(GFX_USE_DATA_PATH "Uses build tree paths to find data (dev only)" ON)
 
