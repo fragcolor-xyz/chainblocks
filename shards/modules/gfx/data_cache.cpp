@@ -1,4 +1,5 @@
 #include "data_cache.hpp"
+#include <gfx/data_cache/fmt.hpp>
 #include <shards/core/serialization.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -102,12 +103,12 @@ struct ShardsDataCacheIO : public data::IDataCacheIO {
 
   virtual void fetchImmediate(data::AssetInfo key, shards::pmr::vector<uint8_t> &data) { retrieveInternal(key, data); }
 
-  void store(const data::AssetInfo &key, boost::span<uint8_t> data) {
+  void store(const data::AssetInfo &key, gfx::ImmutableSharedBuffer data) {
     auto &inner = getSubTypeIO(key.category, key.categoryFlags);
     auto path = inner.getPath(key.key);
 
     try {
-      if (fs::file_size(path) == data.size()) {
+      if (fs::file_size(path) == data.getLength()) {
         return;
       }
     } catch (fs::filesystem_error &e) {
@@ -115,7 +116,7 @@ struct ShardsDataCacheIO : public data::IDataCacheIO {
     }
 
     std::ofstream outFile(path.string(), std::ios::out | std::ios::binary);
-    outFile.write(reinterpret_cast<const char *>(data.data()), data.size());
+    outFile.write(reinterpret_cast<const char *>(data.getData()), data.getLength());
     outFile.close();
   }
 

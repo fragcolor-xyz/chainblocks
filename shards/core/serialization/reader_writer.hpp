@@ -10,11 +10,11 @@ namespace shards {
 
 enum class IOMode { Read, Write };
 
-struct BufferRefWriter {
+template <typename TAlloc = std::allocator<uint8_t>> struct BufferRefWriter {
   static constexpr IOMode Mode = IOMode::Write;
 
-  std::vector<uint8_t> &_buffer;
-  BufferRefWriter(std::vector<uint8_t> &stream, bool clear = true) : _buffer(stream) {
+  std::vector<uint8_t, TAlloc> &_buffer;
+  BufferRefWriter(std::vector<uint8_t, TAlloc> &stream, bool clear = true) : _buffer(stream) {
     if (clear) {
       _buffer.clear();
     }
@@ -22,13 +22,15 @@ struct BufferRefWriter {
   void operator()(const uint8_t *buf, size_t size) { _buffer.insert(_buffer.end(), buf, buf + size); }
 };
 
-struct BufferWriter {
+template <typename TAlloc = std::allocator<uint8_t>> struct BufferWriter {
   static constexpr IOMode Mode = IOMode::Write;
 
-  std::vector<uint8_t> _buffer;
-  BufferRefWriter _inner;
-  BufferWriter() : _inner(_buffer) {}
+  std::vector<uint8_t, TAlloc> _buffer;
+  BufferRefWriter<TAlloc> _inner;
+  
+  BufferWriter(TAlloc allocator = TAlloc()) : _buffer(allocator), _inner(_buffer) {}
   void operator()(const uint8_t *buf, size_t size) { _inner(buf, size); }
+  std::vector<uint8_t, TAlloc> takeBuffer() { return std::move(_buffer); }
 };
 
 struct BytesReader {
@@ -40,6 +42,7 @@ struct BytesReader {
 
   BytesReader(std::string_view sv) : buffer((uint8_t *)sv.data()), offset(0), max(sv.size()) {}
   BytesReader(const uint8_t *buf, size_t size) : buffer(buf), offset(0), max(size) {}
+  BytesReader(boost::span<uint8_t> buf) : buffer(buf.data()), offset(0), max(buf.size()) {}
   void operator()(uint8_t *buf, size_t size) {
     auto newOffset = offset + size;
     if (newOffset > max) {

@@ -4,8 +4,8 @@
 #include <shards/core/params.hpp>
 #include <shards/core/object_type.hpp>
 #include <shards/common_types.hpp>
+#include <gfx/gltf/impl.hpp>
 #include <shards/gfx/gltf/gltf2.hpp>
-#include <shards/gfx/gltf/gltf2.inl>
 #include <gfx/filesystem.hpp>
 
 using shards::CoreInfo;

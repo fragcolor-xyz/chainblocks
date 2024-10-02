@@ -1,4 +1,5 @@
 #include "data_cache.hpp"
+#include "../hasherxxh3.hpp"
 #include <tbb/concurrent_map.h>
 #include <boost/filesystem.hpp>
 #include <fstream>
@@ -78,11 +79,23 @@ AssetInfo DataCache::generateSourceKey(boost::span<uint8_t> data, AssetCategory 
 
 bool DataCache::hasAsset(const AssetInfo &info) { return io->hasAsset(info); }
 
-void DataCache::store(const AssetInfo &info, boost::span<uint8_t> data) { io->store(info, data); }
+void DataCache::store(const AssetInfo &info, ImmutableSharedBuffer data) { io->store(info, data); }
+
+std::shared_ptr<AssetRequest> DataCache::fetch(AssetInfo key) {
+  auto req = std::make_shared<AssetRequest>();
+  req->key = key;
+  io->enqueueRequest(req);
+  return req;
+}
+void DataCache::fetchImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data) {
+  io->fetchImmediate(key, data);
+}
 
 // TODO: Mayhaps replace this with a per-context cache, athough fully shared might be better
 static std::shared_ptr<DataCache> instance;
-std::shared_ptr<DataCache> getInstance() { return instance; }
-void setInstance(std::shared_ptr<DataCache> cache) { instance = cache; }
+std::shared_ptr<DataCache> getInstance() {
+  return instance; }
+void setInstance(std::shared_ptr<DataCache> cache) {
+  instance = cache; }
 
 } // namespace gfx::data

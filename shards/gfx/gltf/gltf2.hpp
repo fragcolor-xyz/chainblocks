@@ -5,6 +5,8 @@
 
 #include "../linalg.hpp"
 #include "../drawables/mesh_tree_drawable.hpp"
+#include "../filesystem.hpp"
+#include "impl.hpp"
 #include "animation.hpp"
 #include <functional>
 #include <optional>
@@ -25,8 +27,10 @@ struct glTF2 {
   glTF2 &operator=(const glTF2 &) = delete;
 };
 
-// glTF2 loadGltfFromFile2(std::string_view file);
-// glTF2 loadGltfFromMemory2(const uint8_t *data, size_t dataLength);
+tinygltf::Model loadGltfModelFromFile2(std::string_view inFilepath);
+tinygltf::Model loadGltfModelFromMemory2(boost::span<uint8_t> data, const fs::Path &rootPath);
+glTF2 processGltfModel2(tinygltf::Model &model, const fs::Path &rootPath);
+
 // bool isBinary2(uint8_t (&peekBuffer)[4]);
 // std::vector<uint8_t> convertToGlb2(const std::string &inputPath);
 } // namespace gfx

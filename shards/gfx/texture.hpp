@@ -1,5 +1,5 @@
-#ifndef GFX_TEXTURE
-#define GFX_TEXTURE
+#ifndef EBC1B4F9_8C5A_4721_8F9B_B9072C5BC5DD
+#define EBC1B4F9_8C5A_4721_8F9B_B9072C5BC5DD
 
 #include "context_data.hpp"
 #include "wgpu_handle.hpp"
@@ -10,14 +10,13 @@
 #include "fwd.hpp"
 #include "enums.hpp"
 #include "log.hpp"
-#include "data_cache/data_cache.hpp"
+#include "data_cache/types.hpp"
 #include <compare>
 #include <variant>
 #include <optional>
 #include <string>
 #include <boost/container_hash/hash_fwd.hpp>
 #include <boost/tti/has_member_data.hpp>
-#include <shards/core/serialization/generic.hpp>
 
 namespace gfx {
 struct SamplerState {
@@ -210,14 +209,4 @@ static_assert(TWithContextDataKeepAlive<Texture>, "");
 
 } // namespace gfx
 
-namespace shards {
-template <SerializerStream T, typename V> void serde(T &stream, gfx::TextureFormat &v) {
-  serde(stream, v.resolution);
-  serdeAs<uint8_t>(stream, v.dimension);
-  serdeAs<uint8_t>(stream, v.flags);
-  serdeAs<uint32_t>(stream, v.pixelFormat);
-  serdeAs<uint8_t>(stream, v.mipLevels);
-}
-} // namespace shards
-
-#endif // GFX_TEXTURE
+#endif /* EBC1B4F9_8C5A_4721_8F9B_B9072C5BC5DD */

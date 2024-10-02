@@ -67,6 +67,20 @@ template <typename SizeType, SerializerStream T, typename V> void serdeWithSize(
   }
 }
 
+template <typename T, typename Allocator = std::pmr::polymorphic_allocator<uint8_t>>
+inline std::vector<uint8_t, Allocator> toByteArray(T &v, Allocator alloc = Allocator()) {
+  BufferWriter<Allocator> writer(Allocator);
+  ::shards::template serde<>(writer, v);
+  return writer.takeBuffer();
+}
+
+template <typename T> inline T fromByteArray(boost::span<uint8_t> bytes) {
+  T v{};
+  BytesReader reader(bytes);
+  ::shards::serde(reader, (T&)v);
+  return v;
+}
+
 } // namespace shards
 
 #endif /* EB7C6582_4FDE_4A76_A10F_E7AAF9D2B894 */

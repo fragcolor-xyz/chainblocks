@@ -3,21 +3,27 @@
 #include "gfx/linalg.hpp"
 #include "linalg.h"
 #include "spdlog/spdlog.h"
+#include "impl.hpp"
 #include "../filesystem.hpp"
-#include <algorithm>
-#include <cmath>
+
+#include <gfx/isb.hpp>
 #include <gfx/data_cache/data_cache.hpp>
 #include <gfx/error_utils.hpp>
 #include <gfx/filesystem.hpp>
 #include <gfx/material.hpp>
 #include <gfx/mesh.hpp>
 #include <gfx/texture.hpp>
+#include <gfx/texture_serde.hpp>
 #include <gfx/texture_file/texture_file.hpp>
 #include <gfx/drawables/mesh_drawable.hpp>
 #include <gfx/features/alpha_cutoff.hpp>
 #include <shards/defer.hpp>
 #include <shards/core/serialization/generic.hpp>
 #include <boost/container/flat_map.hpp>
+#include <stb_image.h>
+#include <stb_image_write.h>
+#include <algorithm>
+#include <cmath>
 #include <iterator>
 #include <memory>
 #include <stdexcept>
@@ -30,9 +36,6 @@
 #include <regex>
 #include <fstream>
 #include <iostream>
-#include "impl.hpp"
-
-#include <stb_image.h>
 
 namespace gfx {
 
@@ -126,6 +129,14 @@ struct Loader2 {
   std::unordered_map<std::string, gfx::Animation> animations;
   std::unordered_map<std::string, MaterialPtr> materials;
   std::vector<std::shared_ptr<gfx::Skin>> skins;
+
+  struct ImageUsage {
+    // Tagged if a texture is used by a material as
+    //  base color or lighting (emissive) map
+    // All other usages are assumed to be linear space
+    bool asSrgb{};
+  };
+  std::vector<ImageUsage> imageUsages;
 
   Loader2(tinygltf::Model &model, fs::Path rootPath) : rootPath(rootPath), model(model) {}
 
@@ -379,8 +390,8 @@ struct Loader2 {
     }
   }
 
-  void insertImageIntoCache(data::AssetKey assetKey, const fs::Path &filePath) {
-    auto metaAssetKey = assetKey;
+  void insertImageIntoCache(data::AssetKey assetKey, const fs::Path &filePath, const ImageUsage &usage) {
+    data::AssetKey metaAssetKey = assetKey;
     metaAssetKey.categoryFlags = data::AssetCategoryFlags::MetaData;
 
     std::string filePathStr = filePath.string();
@@ -393,29 +404,47 @@ struct Loader2 {
     int2 imageSize;
     int numChannels{};
     StorageType storageType;
-    size_t desired{};
     stbi_info_from_file(file, &imageSize.x, &imageSize.y, &numChannels);
     if (stbi_is_16_bit_from_file(file)) {
       storageType = StorageType::UInt16;
     } else {
-      storageType = StorageType::UInt8;
+      storageType = StorageType::UNorm8;
     }
 
-    if (numChannels == 3) {
-      // Convert image to RGBA
-    }
+    // std::vector<uint8_t> pngData;
+    // if (numChannels == 3) {
+    //   // Convert to RGBA to be GPU ready
+    //   stbi_uc *imageData = stbi_load_from_file(file, &imageSize.x, &imageSize.y, &numChannels, 4);
 
-    TextureFormat format;
-    // format.pixelFormat = TextureFormat::deriveFrom(numChannels, StorageType storageType, bool preferSrgb)
+    //   pngData.reserve(1024 * 1024 * 16);
+    //   auto writePng = [](void *context, void *data, int size) {
+    //     auto &pngData = reinterpret_cast<std::vector<uint8_t> &>(context);
+    //     size_t ofs = pngData.size();
+    //     pngData.resize(pngData.size() + size);
+    //     memcpy(pngData.data() + ofs, data, size);
+    //   };
+    //   stbi_write_png_to_func(writePng, &pngData, imageSize.x, imageSize.y, 4, imageData, imageSize.x * 4);
+    //   // Convert image to RGBA
+    //   numChannels = 4;
+    // }
 
-        // dataCache->store(metaAssetKey);
+    int numChannelsForDerivedFormat = numChannels;
+    if (numChannelsForDerivedFormat == 3)
+      numChannelsForDerivedFormat = 4;
+    TextureFormat format = TextureFormat::deriveFrom(numChannelsForDerivedFormat, storageType, true);
 
-    if (storageType == StorageType::UInt16) {
-      stbi_load_from_file_16(file, &imageSize.x, &imageSize.y, &numChannels, 0);
-    } else {
-    else {
-      // stbi_load_from_file(file, &imageSize.x, &imageSize.y, &numChannels, 0);
-    }
+    // auto metaBytes = shards::toByteArray(format);
+    // dataCache->store(metaAssetKey, metaBytes);
+    shards::BufferWriter<> writer;
+    shards::serde(writer, format);
+    dataCache->store(metaAssetKey, gfx::ImmutableSharedBuffer(writer.takeBuffer()));
+
+    fseek(file, 0, SEEK_END);
+    size_t fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    std::vector<uint8_t> imageData(fileSize);
+    fread(imageData.data(), 1, fileSize, file);
+    dataCache->store(assetKey, gfx::ImmutableSharedBuffer(imageData.data(), imageData.size()));
   }
 
   void loadTextures() {
@@ -431,44 +460,68 @@ struct Loader2 {
         textureMap[i] = itCached->second;
         continue;
       } else {
+        std::optional<data::AssetKey> assetKey;
         if (!gltfImage.uri.empty()) {
           // gltfImage.
           fs::Path relativePath = (rootPath / gltfImage.uri).lexically_normal();
-          auto assetKey = dataCache->generateSourceKey(relativePath.string(), data::AssetCategory::Image);
+          assetKey = dataCache->generateSourceKey(relativePath.string(), data::AssetCategory::Image);
 
-          if (!dataCache->hasAsset(assetKey)) {
-            insertImageIntoCache(assetKey, relativePath);
+          if (!dataCache->hasAsset(*assetKey)) {
+            ImageUsage usage = gltfTexture.source < imageUsages.size() ? imageUsages[gltfTexture.source] : ImageUsage{};
+            insertImageIntoCache(*assetKey, relativePath, usage);
           }
         } else {
           throw std::runtime_error("Embedded texture not supported");
         }
 
+        shards::pmr::vector<uint8_t> metaBuffer;
+        // std::vector<uint8_t> metaBuffer;
+        dataCache->fetchImmediate(assetKey->metaKey(), metaBuffer);
+
+        // shards::BytesReader reader(metaBuffer);
+        // TextureFormat format;
+        // ::shards::template serde<>(reader, format);
+        // TextureFormat format = shards::fromByteArray<gfx::TextureFormat>(metaBuffer);
+
         TexturePtr &texture = textureMap[i];
-        texture = std::make_shared<Texture>();
 
         SamplerState samplerState{};
         if (gltfTexture.sampler >= 0) {
           samplerState = convertSampler(model.samplers[gltfTexture.sampler]);
         }
 
-        int2 resolution(gltfImage.width, gltfImage.height);
-        // texture
-        //     ->init(TextureDesc{
-        //         .format = convertTextureFormat(gltfImage, false),
-        //         .resolution = resolution,
-        //         .source =
-        //             TextureSource{
-        //                 .data = ImmutableSharedBuffer(gltfImage.image.data(), gltfImage.image.size()),
-        //             },
-        //     })
-        //     .initWithSamplerState(samplerState);
+        texture->init(TextureDescAsset{
+            // .format = format,
+            .key = *assetKey,
+        });
+      }
+    }
+  }
 
-        textureLookup[cacheKey] = texture;
+  void prePopulateTextureMap() {
+    // Pre-populate texture map with empty textures
+    this->textureMap.resize(model.textures.size());
+    for (size_t i = 0; i < this->textureMap.size(); ++i) {
+      auto &texture = this->textureMap[i];
+
+      if (!texture) {
+        const tinygltf::Texture &gltfTexture = model.textures[i];
+
+        TextureKey cacheKey{.imageIndex = gltfTexture.source, .samplerIndex = gltfTexture.sampler};
+        auto itCached = textureLookup.find(cacheKey);
+        if (itCached != textureLookup.end()) {
+          texture = itCached->second;
+        } else {
+          texture = std::make_shared<Texture>();
+          textureLookup[cacheKey] = texture;
+        }
       }
     }
   }
 
   void loadMaterials() {
+    prePopulateTextureMap();
+
     size_t numMaterials = model.materials.size();
     materialMap.resize(numMaterials);
     for (size_t i = 0; i < model.materials.size(); i++) {
@@ -481,13 +534,15 @@ struct Loader2 {
       auto convertTextureParam = [&](const char *name, const auto &textureInfo, bool asSrgb) {
         if (textureInfo.index >= 0) {
           const tinygltf::Texture &gltfTexture = model.textures[textureInfo.index];
-          const tinygltf::Image &gltfImage = model.images[gltfTexture.source];
+          // const tinygltf::Image &gltfImage = model.images[gltfTexture.source];
           TexturePtr texture = textureMap[textureInfo.index];
           material->parameters.set(name, TextureParameter(texture, textureInfo.texCoord));
 
-          // Update texture format to apply srgb/gamma hint from usage
-          // WGPUTextureFormat targetFormat = convertTextureFormat(gltfImage, asSrgb).pixelFormat;
-          // texture->initWithPixelFormat(targetFormat);
+          if (gltfTexture.source >= imageUsages.size()) {
+            imageUsages.resize(gltfTexture.source + 1);
+          }
+          auto &imageUsage = imageUsages[gltfTexture.source];
+          imageUsage.asSrgb = asSrgb;
         }
       };
 
@@ -671,8 +726,9 @@ struct Loader2 {
 
   void load() {
     allocateNodes();
+    // Load materials first to annotate how textures are used (srgb or not)
+    loadMaterials();
     loadTextures();
-    // loadMaterials();
     loadMeshes();
     loadNodes();
 
@@ -736,8 +792,6 @@ static inline bool isBinaryFormat(boost::span<uint8_t> data) {
   return false;
 }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-function"
 struct GLTFIO {
   std::shared_ptr<data::DataCache> dataCache;
   std::unordered_map<int, data::AssetInfo> imageAssetMap;
@@ -748,16 +802,16 @@ struct GLTFIO {
     tinygltf::FsCallbacks ret;
     ret.user_data = this;
     ret.FileExists = [](const std::string &abs_filename, void *user_data) -> bool {
-      GLTFIO &self = *static_cast<GLTFIO *>(user_data);
+      // GLTFIO &self = *static_cast<GLTFIO *>(user_data);
       return true;
     };
     ret.ExpandFilePath = [](const std::string &abs_filename, void *user_data) -> std::string {
-      GLTFIO &self = *static_cast<GLTFIO *>(user_data);
+      // GLTFIO &self = *static_cast<GLTFIO *>(user_data);
       return abs_filename;
     };
     ret.ReadWholeFile = [](std::vector<unsigned char> *out, std::string *err, const std::string &abs_filename,
                            void *user_data) -> bool {
-      GLTFIO &self = *static_cast<GLTFIO *>(user_data);
+      // GLTFIO &self = *static_cast<GLTFIO *>(user_data);
       std::fstream file(abs_filename, std::ios::in | std::ios::binary);
       if (!file.is_open()) {
         return false;
@@ -772,7 +826,7 @@ struct GLTFIO {
     };
     ret.WriteWholeFile = [](std::string *out, const std::string &abs_filename, const std::vector<unsigned char> &data,
                             void *user_data) -> bool {
-      GLTFIO &self = *static_cast<GLTFIO *>(user_data);
+      // GLTFIO &self = *static_cast<GLTFIO *>(user_data);
       return false;
     };
     return ret;
@@ -781,18 +835,18 @@ struct GLTFIO {
     tinygltf::URICallbacks ret;
     ret.user_data = this;
     ret.encode = [](const std::string &in_uri, const std::string &object_type, std::string *out_uri, void *user_data) -> bool {
-      GLTFIO &self = *static_cast<GLTFIO *>(user_data);
+      // GLTFIO &self = *static_cast<GLTFIO *>(user_data);
       return false;
     };
     ret.decode = [](const std::string &in_uri, std::string *out_uri, void *user_data) -> bool {
-      GLTFIO &self = *static_cast<GLTFIO *>(user_data);
+      // GLTFIO &self = *static_cast<GLTFIO *>(user_data);
       return false;
     };
     return ret;
   }
 
   tinygltf::LoadImageDataFunction getLoadImageDataFunction() {
-    return false;
+    return nullptr;
     // return [](tinygltf::Image *image, int image_idx, std::string *err, std::string *warn, int req_width, int req_height,
     //           const unsigned char *bytes, int size, void *user_data) -> bool {
     //   GLTFIO &self = *static_cast<GLTFIO *>(user_data);
@@ -811,7 +865,6 @@ struct GLTFIO {
     // };
   }
 };
-#pragma clang diagnostic pop
 
 tinygltf::Model loadGltfModelFromFile2(std::string_view inFilepath) {
   tinygltf::TinyGLTF context;
