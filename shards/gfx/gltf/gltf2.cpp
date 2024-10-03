@@ -13,7 +13,7 @@
 #include <gfx/material.hpp>
 #include <gfx/mesh.hpp>
 #include <gfx/texture.hpp>
-#include <gfx/texture_serde.hpp>
+// #include <gfx/texture_serde.hpp>
 #include <gfx/texture_file/texture_file.hpp>
 #include <gfx/drawables/mesh_drawable.hpp>
 #include <gfx/features/alpha_cutoff.hpp>
@@ -436,7 +436,7 @@ struct Loader2 {
     // auto metaBytes = shards::toByteArray(format);
     // dataCache->store(metaAssetKey, metaBytes);
     shards::BufferWriter<> writer;
-    shards::serde(writer, format);
+    // shards::serde(writer, format);
     dataCache->store(metaAssetKey, gfx::ImmutableSharedBuffer(writer.takeBuffer()));
 
     fseek(file, 0, SEEK_END);

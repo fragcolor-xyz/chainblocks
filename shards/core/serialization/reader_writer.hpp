@@ -5,6 +5,7 @@
 #include <cassert>
 #include <string_view>
 #include <vector>
+#include <boost/core/span.hpp>
 
 namespace shards {
 

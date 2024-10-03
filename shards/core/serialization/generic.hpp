@@ -15,27 +15,21 @@
 
 namespace shards {
 template <typename T>
-concept SerializerStream = requires(T &stream, uint8_t *buf, size_t size) {
-  { stream(buf, size) };
+concept SerializerStream = requires(T &stream__, uint8_t *buf, size_t size) {
+  { stream__(buf, size) };
   { T::Mode } -> std::convertible_to<IOMode>;
 };
 
-struct Serializer {
-  enum Mode { Mode_Read, Mode_Write };
-  Mode mode = Mode_Read;
-
-  Serializer(Mode mode) : mode(mode) {}
+// Generic template, specialize this for custom types
+template <typename V> struct Serialize {
+  template <SerializerStream S> void operator()(S &stream, V &v) { static_assert(false, "Type is not serializable"); }
 };
 
-template <SerializerStream T, typename V>
-std::enable_if_t<std::is_integral_v<V> || std::is_floating_point_v<V> || std::is_same_v<V, bool>, void> //
-serde(T &stream, V &v) {
-  stream((uint8_t *)&v, sizeof(V));
-}
-template <SerializerStream T> void serde(T &stream, std::monostate &v) {}
-template <SerializerStream T, typename V> void serdeConst(T &stream, const V &v) { serde(stream, const_cast<V &>(v)); }
-template <typename As, SerializerStream T, typename V> void serdeAs(T &stream, V &v) {
-  if constexpr (T::Mode == IOMode::Read) {
+// Helper serialization functions
+template <SerializerStream S, typename V> void serde(S &stream, V &v) { Serialize<V>{}(stream, v); }
+template <SerializerStream S, typename V> void serdeConst(S &stream, const V &v) { serde(stream, const_cast<V &>(v)); }
+template <typename As, SerializerStream S, typename V> void serdeAs(S &stream, V &v) {
+  if constexpr (S::Mode == IOMode::Read) {
     As a{};
     serde(stream, a);
     v = V(a);
@@ -45,11 +39,23 @@ template <typename As, SerializerStream T, typename V> void serdeAs(T &stream, V
   }
 }
 
-template <SerializerStream T, typename V> void serde(T &stream, boost::span<V> &v) {
-  for (size_t i = 0; i < v.size(); i++) {
-    serde(stream, v[i]);
+template <typename V>
+concept TriviallySerializable = std::is_integral_v<V> || std::is_floating_point_v<V> || std::is_same_v<V, bool>;
+template <TriviallySerializable V> struct Serialize<V> {
+  template <SerializerStream S> void operator()(S &stream, V &v) { stream((uint8_t *)&v, sizeof(V)); }
+};
+
+template <> struct Serialize<std::monostate> {
+  template <SerializerStream S> void operator()(S &stream, std::monostate &v) {}
+};
+
+template <typename V> struct Serialize<boost::span<V>> {
+  template <SerializerStream S> void operator()(S &stream, boost::span<V> &v) {
+    for (size_t i = 0; i < v.size(); i++) {
+      Serialize<V>{}(stream, v[i]);
+    }
   }
-}
+};
 
 template <typename SizeType, SerializerStream T, typename V> void serdeWithSize(T &stream, std::vector<V> &v) {
   if constexpr (T::Mode == IOMode::Read) {
@@ -67,17 +73,17 @@ template <typename SizeType, SerializerStream T, typename V> void serdeWithSize(
   }
 }
 
-template <typename T, typename Allocator = std::pmr::polymorphic_allocator<uint8_t>>
-inline std::vector<uint8_t, Allocator> toByteArray(T &v, Allocator alloc = Allocator()) {
-  BufferWriter<Allocator> writer(Allocator);
-  ::shards::template serde<>(writer, v);
+template <typename V, typename Allocator = std::pmr::polymorphic_allocator<uint8_t>>
+inline std::vector<uint8_t, Allocator> toByteArray(V &v, Allocator alloc = Allocator()) {
+  BufferWriter<Allocator> writer(alloc);
+  ::shards::template serde<>((BufferWriter<Allocator> &)writer, v);
   return writer.takeBuffer();
 }
 
-template <typename T> inline T fromByteArray(boost::span<uint8_t> bytes) {
-  T v{};
+template <typename V> inline V fromByteArray(boost::span<uint8_t> bytes) {
+  V v{};
   BytesReader reader(bytes);
-  ::shards::serde(reader, (T&)v);
+  ::shards::serde(reader, (V &)v);
   return v;
 }
 
