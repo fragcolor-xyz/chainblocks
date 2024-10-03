@@ -13,7 +13,7 @@
 #include <gfx/material.hpp>
 #include <gfx/mesh.hpp>
 #include <gfx/texture.hpp>
-// #include <gfx/texture_serde.hpp>
+#include <gfx/texture_serde.hpp>
 #include <gfx/texture_file/texture_file.hpp>
 #include <gfx/drawables/mesh_drawable.hpp>
 #include <gfx/features/alpha_cutoff.hpp>
@@ -433,11 +433,11 @@ struct Loader2 {
       numChannelsForDerivedFormat = 4;
     TextureFormat format = TextureFormat::deriveFrom(numChannelsForDerivedFormat, storageType, true);
 
-    // auto metaBytes = shards::toByteArray(format);
-    // dataCache->store(metaAssetKey, metaBytes);
-    shards::BufferWriter<> writer;
+    // shards::BufferWriter<> writer;
     // shards::serde(writer, format);
-    dataCache->store(metaAssetKey, gfx::ImmutableSharedBuffer(writer.takeBuffer()));
+    auto metaBytes = shards::toByteArray(format);
+    // dataCache->store(metaAssetKey, gfx::ImmutableSharedBuffer(writer.takeBuffer()));
+    dataCache->store(metaAssetKey, std::move(metaBytes));
 
     fseek(file, 0, SEEK_END);
     size_t fileSize = ftell(file);
@@ -448,53 +448,51 @@ struct Loader2 {
   }
 
   void loadTextures() {
+    std::set<Texture *> initializedTextures;
     size_t numTextures = model.textures.size();
     textureMap.resize(numTextures);
     for (size_t i = 0; i < numTextures; i++) {
       const tinygltf::Texture &gltfTexture = model.textures[i];
       const tinygltf::Image &gltfImage = model.images[gltfTexture.source];
 
-      TextureKey cacheKey{.imageIndex = gltfTexture.source, .samplerIndex = gltfTexture.sampler};
-      auto itCached = textureLookup.find(cacheKey);
-      if (itCached != textureLookup.end()) {
-        textureMap[i] = itCached->second;
+      auto &texture = textureMap[i];
+      if (initializedTextures.contains(texture.get())) {
         continue;
-      } else {
-        std::optional<data::AssetKey> assetKey;
-        if (!gltfImage.uri.empty()) {
-          // gltfImage.
-          fs::Path relativePath = (rootPath / gltfImage.uri).lexically_normal();
-          assetKey = dataCache->generateSourceKey(relativePath.string(), data::AssetCategory::Image);
-
-          if (!dataCache->hasAsset(*assetKey)) {
-            ImageUsage usage = gltfTexture.source < imageUsages.size() ? imageUsages[gltfTexture.source] : ImageUsage{};
-            insertImageIntoCache(*assetKey, relativePath, usage);
-          }
-        } else {
-          throw std::runtime_error("Embedded texture not supported");
-        }
-
-        shards::pmr::vector<uint8_t> metaBuffer;
-        // std::vector<uint8_t> metaBuffer;
-        dataCache->fetchImmediate(assetKey->metaKey(), metaBuffer);
-
-        // shards::BytesReader reader(metaBuffer);
-        // TextureFormat format;
-        // ::shards::template serde<>(reader, format);
-        // TextureFormat format = shards::fromByteArray<gfx::TextureFormat>(metaBuffer);
-
-        TexturePtr &texture = textureMap[i];
-
-        SamplerState samplerState{};
-        if (gltfTexture.sampler >= 0) {
-          samplerState = convertSampler(model.samplers[gltfTexture.sampler]);
-        }
-
-        texture->init(TextureDescAsset{
-            // .format = format,
-            .key = *assetKey,
-        });
       }
+      initializedTextures.insert(texture.get());
+
+      std::optional<data::AssetKey> assetKey;
+      if (!gltfImage.uri.empty()) {
+        // gltfImage.
+        fs::Path relativePath = (rootPath / gltfImage.uri).lexically_normal();
+        assetKey = dataCache->generateSourceKey(relativePath.string(), data::AssetCategory::Image);
+
+        if (!dataCache->hasAsset(*assetKey)) {
+          ImageUsage usage = gltfTexture.source < imageUsages.size() ? imageUsages[gltfTexture.source] : ImageUsage{};
+          insertImageIntoCache(*assetKey, relativePath, usage);
+        }
+      } else {
+        throw std::runtime_error("Embedded texture not supported");
+      }
+
+      shards::pmr::vector<uint8_t> metaBuffer;
+      // std::vector<uint8_t> metaBuffer;
+      dataCache->fetchImmediate(assetKey->metaKey(), metaBuffer);
+
+      // shards::BytesReader reader(metaBuffer);
+      // TextureFormat format;
+      // ::shards::template serde<>(reader, format);
+      TextureFormat format = shards::fromByteArray<gfx::TextureFormat>(metaBuffer);
+
+      SamplerState samplerState{};
+      if (gltfTexture.sampler >= 0) {
+        samplerState = convertSampler(model.samplers[gltfTexture.sampler]);
+      }
+
+      texture->init(TextureDescAsset{
+          .format = format,
+          .key = *assetKey,
+      });
     }
   }
 

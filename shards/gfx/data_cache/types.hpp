@@ -9,12 +9,13 @@ namespace gfx::data {
 
 enum class AssetCategory : uint8_t {
   // Source types
-  GLTF,
+  Drawable,
+  Mesh,
   Image,
   // Derived types
-  TextureLod,
-  MeshLod,
-  Pipeline,
+  // TextureLod,
+  // MeshLod,
+  // Pipeline,
 };
 
 enum class AssetCategoryFlags : uint8_t {
