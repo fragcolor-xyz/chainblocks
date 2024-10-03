@@ -334,9 +334,14 @@ TEST_CASE("Write to texture auto-size", "[RenderGraph]") {
   PipelineSteps steps;
 
   TexturePtr outputTexture = std::make_shared<Texture>("outputText");
-  outputTexture->initWithPixelFormat(WGPUTextureFormat::WGPUTextureFormat_RGBA32Float)
-      .initWithFlags(TextureFormatFlags::RenderAttachment)
-      .initWithResolution(int2(100, 100));
+  outputTexture->init(TextureDescGPUOnly{
+      .format =
+          TextureFormat{
+              .resolution = int2(100),
+              .flags = TextureFormatFlags::RenderAttachment,
+              .pixelFormat = WGPUTextureFormat::WGPUTextureFormat_RGBA32Float,
+          },
+  });
 
   // write "color" & "test" target with mismatching sizes
   {
@@ -367,9 +372,14 @@ TEST_CASE("Graph evaluate output size mismatch", "[RenderGraph]") {
   PipelineSteps steps;
 
   TexturePtr outputTexture = std::make_shared<Texture>("outputText");
-  outputTexture->initWithPixelFormat(WGPUTextureFormat::WGPUTextureFormat_RGBA32Float)
-      .initWithFlags(TextureFormatFlags::RenderAttachment)
-      .initWithResolution(int2(100, 100));
+  outputTexture->init(TextureDescGPUOnly{
+      .format =
+          TextureFormat{
+              .resolution = int2(100),
+              .flags = TextureFormatFlags::RenderAttachment,
+              .pixelFormat = WGPUTextureFormat::WGPUTextureFormat_RGBA32Float,
+          },
+  });
 
   // write "color" & "test" target with mismatching sizes
   {
@@ -401,9 +411,14 @@ TEST_CASE("Read and write same texture", "[RenderGraph]") {
   PipelineSteps steps;
 
   TexturePtr outputTexture = std::make_shared<Texture>("outputText");
-  outputTexture->initWithPixelFormat(WGPUTextureFormat::WGPUTextureFormat_RGBA32Float)
-      .initWithFlags(TextureFormatFlags::RenderAttachment)
-      .initWithResolution(int2(100, 100));
+  outputTexture->init(TextureDescGPUOnly{
+      .format =
+          TextureFormat{
+              .resolution = int2(100),
+              .flags = TextureFormatFlags::RenderAttachment,
+              .pixelFormat = WGPUTextureFormat::WGPUTextureFormat_RGBA32Float,
+          },
+  });
 
   // write "color" & "test" target with mismatching sizes
   {

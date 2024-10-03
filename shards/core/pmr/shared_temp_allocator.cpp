@@ -1,6 +1,8 @@
 #include "shared_temp_allocator.hpp"
 #include <shards/log/log.hpp>
 #include <tracy/Wrapper.hpp>
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
 
 static shards::logging::Logger getLogger() {
   static auto logger = shards::logging::getOrCreate("SharedTempAllocator");

@@ -1,5 +1,6 @@
 #include "data_cache.hpp"
 #include "../hasherxxh3.hpp"
+#include "loaded_asset_tracker.hpp"
 #include <tbb/concurrent_map.h>
 #include <boost/filesystem.hpp>
 #include <fstream>
@@ -87,15 +88,16 @@ std::shared_ptr<AssetRequest> DataCache::fetch(AssetInfo key) {
   io->enqueueRequest(req);
   return req;
 }
-void DataCache::fetchImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data) {
-  io->fetchImmediate(key, data);
-}
+void DataCache::fetchImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data) { io->fetchImmediate(key, data); }
 
 // TODO: Mayhaps replace this with a per-context cache, athough fully shared might be better
 static std::shared_ptr<DataCache> instance;
-std::shared_ptr<DataCache> getInstance() {
-  return instance; }
-void setInstance(std::shared_ptr<DataCache> cache) {
-  instance = cache; }
+std::shared_ptr<DataCache> getInstance() { return instance; }
+void setInstance(std::shared_ptr<DataCache> cache) { instance = cache; }
+
+const std::shared_ptr<LoadedAssetTracker> &getStaticLoadedAssetTracker() {
+  static std::shared_ptr<LoadedAssetTracker> tracker = std::make_shared<LoadedAssetTracker>();
+  return tracker;
+}
 
 } // namespace gfx::data

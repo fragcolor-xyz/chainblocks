@@ -12,12 +12,15 @@ using shards::CoreInfo;
 using shards::Var;
 namespace gfx {
 
-struct GLTF2Obj {};
+struct GLTF2Obj {
+  glTF2 gltf;
+};
 constexpr char GLTF2_NAME[] = "GFX.glTF2";
 using GLTF2ObjInfo = shards::TObjectTypeInfo<GLTF2Obj, 'glf2', shards::CoreCC, GLTF2_NAME>;
 
 struct GLTF2Shard {
-  PARAM_PARAMVAR(_rootPath, "RootPath", "Root path for relative file paths", {CoreInfo::NoneType, CoreInfo::StringType, CoreInfo::StringVarType})
+  PARAM_PARAMVAR(_rootPath, "RootPath", "Root path for relative file paths",
+                 {CoreInfo::NoneType, CoreInfo::StringType, CoreInfo::StringVarType})
   PARAM_IMPL(PARAM_IMPL_FOR(_rootPath))
 
   static SHTypesInfo inputTypes() {
@@ -26,7 +29,7 @@ struct GLTF2Shard {
   }
   static SHTypesInfo outputTypes() { return GLTF2ObjInfo::Type; }
 
-  shards::OwnedVar _output = GLTF2ObjInfo::newOwnedVar();
+  shards::OwnedVar _outputCache;
 
   GLTF2Shard() { _rootPath = Var::Empty; }
 
@@ -55,9 +58,14 @@ struct GLTF2Shard {
     }
   }
 
-  void cleanup(SHContext *ctx) { PARAM_CLEANUP(ctx); }
+  void cleanup(SHContext *ctx) {
+    PARAM_CLEANUP(ctx);
+    _outputCache.reset();
+  }
 
   SHVar activate(SHContext *ctx, const SHVar &input) {
+    auto [gltfObj, gltfObjVar] = GLTF2ObjInfo::ObjectVar.NewOwnedVar();
+
     std::optional<fs::Path> rootPath;
 
     Var &rootPathVar = (Var &)_rootPath.get();
@@ -81,9 +89,9 @@ struct GLTF2Shard {
       model = loadGltfModelFromMemory2(bytes, *rootPath);
     }
 
-    auto gltf = processGltfModel2(*model, *rootPath);
+    gltfObj.gltf = processGltfModel2(*model, *rootPath);
 
-    return _output;
+    return (_outputCache = gltfObjVar);
   }
 };
 

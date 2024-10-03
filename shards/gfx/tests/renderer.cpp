@@ -38,14 +38,14 @@ void TestRenderer::createRenderTarget(int2 res) {
 
   // Wrap in texture
   TexturePtr rtTexture = std::make_shared<Texture>();
-  rtTexture->init(TextureDesc{
+  rtTexture->init(TextureDescExternal{
       .format =
           TextureFormat{
+              .resolution = rtSize,
               .dimension = TextureDimension::D2,
               .flags = TextureFormatFlags::RenderAttachment,
               .pixelFormat = rtFormat,
           },
-      .resolution = rtSize,
       .externalTexture = this->rtTexture,
   });
 

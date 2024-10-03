@@ -3,6 +3,7 @@
 
 #include <string_view>
 #include <boost/uuid/uuid.hpp>
+#include <boost/uuid/nil_generator.hpp>
 #include <optional>
 
 namespace gfx::data {
@@ -45,7 +46,7 @@ inline bool assetFlagsContains(AssetFlags flags, AssetFlags b) {
 struct AssetKey;
 struct AssetInfo {
   AssetCategory category;
-  AssetCategoryFlags categoryFlags;
+  AssetCategoryFlags categoryFlags{};
   AssetFlags flags : 16 = AssetFlags::None;
   boost::uuids::uuid key;
   // In case this asset is derived from a source asset, this will be the source asset
@@ -60,6 +61,7 @@ struct AssetKey {
   AssetCategoryFlags categoryFlags;
   boost::uuids::uuid key;
 
+  AssetKey() : key(boost::uuids::nil_uuid()) {}
   AssetKey(AssetCategory category, boost::uuids::uuid key, AssetCategoryFlags categoryFlags = AssetCategoryFlags::None)
       : category(category), categoryFlags(categoryFlags), key(key) {}
   AssetKey(const AssetInfo &info) : category(info.category), categoryFlags(info.categoryFlags), key(info.key) {}
@@ -67,10 +69,11 @@ struct AssetKey {
   std::strong_ordering operator<=>(const AssetKey &other) const = default;
 
   AssetKey metaKey() const { return AssetKey(category, key, categoryFlags | AssetCategoryFlags::MetaData); }
+
+  operator bool() const { return key.is_nil(); }
 };
 
 inline AssetInfo::AssetInfo(const AssetKey &key) : category(key.category), categoryFlags(key.categoryFlags), key(key.key) {}
 } // namespace gfx::data
-
 
 #endif /* E52D1428_FF30_41BD_BF58_74530373D525 */

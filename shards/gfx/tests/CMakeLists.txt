@@ -18,6 +18,7 @@ add_executable(test-gfx
   test_naga.cpp
   test_fast_string.cpp
   test_leaks.cpp
+  test_serialization.cpp
 )
 
 if(EMSCRIPTEN)

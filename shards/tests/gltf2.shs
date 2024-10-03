@@ -7,3 +7,5 @@ ForEach({
     GLTF.Read >> models
   })
 })
+
+models | Log("Models")

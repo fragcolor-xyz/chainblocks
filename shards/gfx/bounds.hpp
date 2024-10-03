@@ -117,6 +117,13 @@ inline AABounds getMeshBounds(MeshPtr mesh) {
 
   return bounds;
 }
+
+// Represents both a sphere and box around a mesh
+struct CompleteBounds {
+  float3 center;
+  float sphereRadius;
+  float3 boxHalfExtent;
+};
 } // namespace gfx
 
 #endif /* A1665234_253E_49DD_B428_FA0D8802DD91 */

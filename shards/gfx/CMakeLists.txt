@@ -89,6 +89,7 @@ target_link_libraries(gfx-core-obj
   spdlog stb xxHash Boost::algorithm Boost::filesystem Boost::container Boost::uuid Boost::tti tbb
   brotlidec-static brotlicommon-static
   shards-logging
+  shards-shared-temp-allocator
   shards-fast-string
 )
 target_precompile_headers(gfx-core-obj PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/pch.cpp>")

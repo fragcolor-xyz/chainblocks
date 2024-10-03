@@ -8,6 +8,7 @@
 
 #include <gfx/isb.hpp>
 #include <gfx/data_cache/data_cache.hpp>
+#include <gfx/data_cache/loaded_asset_tracker.hpp>
 #include <gfx/error_utils.hpp>
 #include <gfx/filesystem.hpp>
 #include <gfx/material.hpp>
@@ -113,9 +114,10 @@ struct Loader2 {
     int samplerIndex;
     std::strong_ordering operator<=>(const TextureKey &rhs) const = default;
   };
-  boost::container::flat_map<TextureKey, TexturePtr> textureLookup;
+  // boost::container::flat_map<TextureKey, TexturePtr> textureLookup;
 
   std::shared_ptr<data::DataCache> dataCache = data::getInstance();
+  std::shared_ptr<data::LoadedAssetTracker> loadedAssetTracker = data::getStaticLoadedAssetTracker();
 
   fs::Path rootPath;
 
@@ -390,9 +392,9 @@ struct Loader2 {
     }
   }
 
-  void insertImageIntoCache(data::AssetKey assetKey, const fs::Path &filePath, const ImageUsage &usage) {
-    data::AssetKey metaAssetKey = assetKey;
-    metaAssetKey.categoryFlags = data::AssetCategoryFlags::MetaData;
+  void insertImageIntoCache(data::AssetKey assetKey, const tinygltf::Image &image, const fs::Path &filePath,
+                            const ImageUsage &usage) {
+    data::AssetKey metaAssetKey = assetKey.metaKey();
 
     std::string filePathStr = filePath.string();
     FILE *file = fopen(filePathStr.c_str(), "rb");
@@ -432,10 +434,12 @@ struct Loader2 {
     if (numChannelsForDerivedFormat == 3)
       numChannelsForDerivedFormat = 4;
     TextureFormat format = TextureFormat::deriveFrom(numChannelsForDerivedFormat, storageType, true);
+    format.resolution = int2(imageSize);
 
     // shards::BufferWriter<> writer;
     // shards::serde(writer, format);
-    auto metaBytes = shards::toByteArray(format);
+    TextureAssetHeader hdr{.name = image.name, .format = format};
+    auto metaBytes = shards::toByteArray(hdr);
     // dataCache->store(metaAssetKey, gfx::ImmutableSharedBuffer(writer.takeBuffer()));
     dataCache->store(metaAssetKey, std::move(metaBytes));
 
@@ -469,52 +473,73 @@ struct Loader2 {
 
         if (!dataCache->hasAsset(*assetKey)) {
           ImageUsage usage = gltfTexture.source < imageUsages.size() ? imageUsages[gltfTexture.source] : ImageUsage{};
-          insertImageIntoCache(*assetKey, relativePath, usage);
+          insertImageIntoCache(*assetKey, gltfImage, relativePath, usage);
         }
       } else {
         throw std::runtime_error("Embedded texture not supported");
       }
 
-      shards::pmr::vector<uint8_t> metaBuffer;
-      // std::vector<uint8_t> metaBuffer;
-      dataCache->fetchImmediate(assetKey->metaKey(), metaBuffer);
+      auto loadedAssetTracker = data::getStaticLoadedAssetTracker();
+      auto loadedTexture = loadedAssetTracker->find<Texture>(*assetKey);
+      if (loadedTexture) {
+        texture = loadedTexture;
+        continue;
+      }
 
-      // shards::BytesReader reader(metaBuffer);
-      // TextureFormat format;
-      // ::shards::template serde<>(reader, format);
-      TextureFormat format = shards::fromByteArray<gfx::TextureFormat>(metaBuffer);
+      shards::pmr::vector<uint8_t> metaBuffer;
+      dataCache->fetchImmediate(assetKey->metaKey(), metaBuffer);
+      TextureAssetHeader hdr = shards::fromByteArray<TextureAssetHeader>(metaBuffer);
 
       SamplerState samplerState{};
       if (gltfTexture.sampler >= 0) {
         samplerState = convertSampler(model.samplers[gltfTexture.sampler]);
       }
 
-      texture->init(TextureDescAsset{
-          .format = format,
-          .key = *assetKey,
-      });
+      texture = std::make_shared<Texture>();
+      texture
+          ->init(TextureDescAsset{
+              .format = hdr.format,
+              .key = *assetKey,
+          })
+          .initWithLabel(std::move(hdr.name))
+          .initWithSamplerState(samplerState); // TODO: Move sampler state to usage
+
+      loadedAssetTracker->insert(*assetKey, texture);
     }
   }
 
   void prePopulateTextureMap() {
     // Pre-populate texture map with empty textures
     this->textureMap.resize(model.textures.size());
-    for (size_t i = 0; i < this->textureMap.size(); ++i) {
-      auto &texture = this->textureMap[i];
+    // for (size_t i = 0; i < this->textureMap.size(); ++i) {
+    //   auto &texture = this->textureMap[i];
 
-      if (!texture) {
-        const tinygltf::Texture &gltfTexture = model.textures[i];
+    //   if (!texture) {
+    //     const tinygltf::Texture &gltfTexture = model.textures[i];
 
-        TextureKey cacheKey{.imageIndex = gltfTexture.source, .samplerIndex = gltfTexture.sampler};
-        auto itCached = textureLookup.find(cacheKey);
-        if (itCached != textureLookup.end()) {
-          texture = itCached->second;
-        } else {
-          texture = std::make_shared<Texture>();
-          textureLookup[cacheKey] = texture;
-        }
-      }
-    }
+    //     TextureKey cacheKey{.imageIndex = gltfTexture.source, .samplerIndex = gltfTexture.sampler};
+    //     auto itCached = textureLookup.find(cacheKey);
+    //     if (itCached != textureLookup.end()) {
+    //       texture = itCached->second;
+    //     } else {
+    //       texture = std::make_shared<Texture>();
+    //       textureLookup[cacheKey] = texture;
+    //     }
+    //   }
+    // }
+  }
+
+  // Calls fn for each texture in the material
+  // args: (name, textureInfo, isSRGB)
+  template <typename T> void materialTextureForEach(const tinygltf::Material &gltfMaterial, T &&fn) {
+    static FastString fs_baseColor("baseColor");
+    static FastString fs_emissive("emissive");
+    static FastString fs_metallicRoughness("metallicRoughness");
+    static FastString fs_normal("normal");
+    fn(fs_baseColor, gltfMaterial.pbrMetallicRoughness.baseColorTexture, true);
+    fn(fs_emissive, gltfMaterial.emissiveTexture, true);
+    fn(fs_metallicRoughness, gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture, false);
+    fn(fs_normal, gltfMaterial.normalTexture, false);
   }
 
   void loadMaterials() {
@@ -529,13 +554,9 @@ struct Loader2 {
       const tinygltf::Material &gltfMaterial = model.materials[i];
       materials[gltfMaterial.name] = material;
 
-      auto convertTextureParam = [&](const char *name, const auto &textureInfo, bool asSrgb) {
+      auto annotateTextureUsage = [&](FastString name, const auto &textureInfo, bool asSrgb) {
         if (textureInfo.index >= 0) {
           const tinygltf::Texture &gltfTexture = model.textures[textureInfo.index];
-          // const tinygltf::Image &gltfImage = model.images[gltfTexture.source];
-          TexturePtr texture = textureMap[textureInfo.index];
-          material->parameters.set(name, TextureParameter(texture, textureInfo.texCoord));
-
           if (gltfTexture.source >= imageUsages.size()) {
             imageUsages.resize(gltfTexture.source + 1);
           }
@@ -544,13 +565,13 @@ struct Loader2 {
         }
       };
 
-      auto convertOptionalFloat4Param = [&](const char *name, const std::vector<double> &param, const float4 &defaultValue) {
+      auto convertOptionalFloat4Param = [&](FastString name, const std::vector<double> &param, const float4 &defaultValue) {
         float4 f4val = convertFloat4Vec(param);
         if (f4val != defaultValue) {
           material->parameters.set(name, f4val);
         }
       };
-      auto convertOptionalFloatParam = [&](const char *name, const float &param, const float &defaultValue) {
+      auto convertOptionalFloatParam = [&](FastString name, const float &param, const float &defaultValue) {
         if (param != defaultValue) {
           material->parameters.set(name, param);
         }
@@ -567,14 +588,32 @@ struct Loader2 {
         });
       }
 
-      convertOptionalFloat4Param("baseColor", gltfMaterial.pbrMetallicRoughness.baseColorFactor, float4(1, 1, 1, 1));
-      convertOptionalFloatParam("roughness", gltfMaterial.pbrMetallicRoughness.roughnessFactor, 1.0f);
-      convertOptionalFloatParam("metallic", gltfMaterial.pbrMetallicRoughness.metallicFactor, 0.0f);
-      convertOptionalFloatParam("normalScale", gltfMaterial.normalTexture.scale, 1.0f);
-      convertTextureParam("baseColorTexture", gltfMaterial.pbrMetallicRoughness.baseColorTexture, true);
-      convertTextureParam("emissiveTexture", gltfMaterial.emissiveTexture, true);
-      convertTextureParam("metallicRoughnessTexture", gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture, false);
-      convertTextureParam("normalTexture", gltfMaterial.normalTexture, false);
+      static FastString fs_baseColor("baseColor");
+      static FastString fs_roughness("roughness");
+      static FastString fs_metallic("metallic");
+      static FastString fs_normalScale("normalScale");
+
+      convertOptionalFloat4Param(fs_baseColor, gltfMaterial.pbrMetallicRoughness.baseColorFactor, float4(1, 1, 1, 1));
+      convertOptionalFloatParam(fs_roughness, gltfMaterial.pbrMetallicRoughness.roughnessFactor, 1.0f);
+      convertOptionalFloatParam(fs_metallic, gltfMaterial.pbrMetallicRoughness.metallicFactor, 0.0f);
+      convertOptionalFloatParam(fs_normalScale, gltfMaterial.normalTexture.scale, 1.0f);
+      materialTextureForEach(gltfMaterial, annotateTextureUsage);
+    }
+  }
+
+  void fixupMaterialTextures() {
+    for (size_t i = 0; i < model.materials.size(); i++) {
+      auto &gltfMaterial = model.materials[i];
+      MaterialPtr &material = materialMap[i];
+      auto visitTexture = [&](FastString name, const auto &textureInfo, bool asSrgb) {
+        if (textureInfo.index >= 0) {
+          const tinygltf::Texture &gltfTexture = model.textures[textureInfo.index];
+          // const tinygltf::Image &gltfImage = model.images[gltfTexture.source];
+          TexturePtr texture = textureMap[textureInfo.index];
+          material->parameters.set(name, TextureParameter(texture, textureInfo.texCoord));
+        }
+      };
+      materialTextureForEach(gltfMaterial, visitTexture);
     }
   }
 
@@ -727,6 +766,7 @@ struct Loader2 {
     // Load materials first to annotate how textures are used (srgb or not)
     loadMaterials();
     loadTextures();
+    fixupMaterialTextures();
     loadMeshes();
     loadNodes();
 

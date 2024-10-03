@@ -16,7 +16,15 @@ if(EMSCRIPTEN)
   list(APPEND core_SOURCES em_proxy.cpp)
 endif()
 
+add_library(shards-shared-temp-allocator STATIC pmr/shared_temp_allocator.cpp)
+target_include_directories(shards-shared-temp-allocator PUBLIC
+  ${SHARDS_DIR}/include
+  ${SHARDS_DIR})
+target_link_libraries(shards-shared-temp-allocator Tracy::TracyClient spdlog shards-logging Boost::container)
+
 add_library(shards-core STATIC ${core_SOURCES})
+
+target_link_libraries(shards-core shards-shared-temp-allocator)
 
 target_include_directories(shards-core PUBLIC ${SHARDS_DIR}/include)
 target_include_directories(shards-core PUBLIC ${SHARDS_DIR})
@@ -43,6 +51,7 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
 else()
   set(SHARDS_DEBUG_THREAD_NAMES_DEFAULT OFF)
 endif()
+
 set(SHARDS_DEBUG_THREAD_NAMES ${SHARDS_DEBUG_THREAD_NAMES_DEFAULT} CACHE BOOL "When enabled, threads are given names based on running wires")
 
 if(SHARDS_DEBUG_THREAD_NAMES)
@@ -55,7 +64,7 @@ if(SHARDS_THREAD_FIBER)
   target_compile_definitions(shards-core PUBLIC SH_USE_THREAD_FIBER=1)
 endif()
 
-## Uncomment to enable consistent resumer debugging, this might be useful to debug some specific issues when coroutines cannot be resumed on different threads
+# # Uncomment to enable consistent resumer debugging, this might be useful to debug some specific issues when coroutines cannot be resumed on different threads
 if(CMAKE_BUILD_TYPE MATCHES Debug AND NOT SHARDS_THREAD_FIBER AND NOT EMSCRIPTEN)
   # Set to non-zero to enable, Set to 2 to enable more detailed logging
   target_compile_definitions(shards-core PUBLIC SH_DEBUG_CONSISTENT_RESUMER=1)

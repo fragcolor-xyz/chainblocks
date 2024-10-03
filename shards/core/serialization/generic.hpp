@@ -57,23 +57,60 @@ template <typename V> struct Serialize<boost::span<V>> {
   }
 };
 
-template <typename SizeType, SerializerStream T, typename V> void serdeWithSize(T &stream, std::vector<V> &v) {
+template <typename V>
+concept Container = requires(V &v) {
+  typename V::value_type;
+  { v.size() } -> std::convertible_to<size_t>;
+  { v.resize(0) } -> std::same_as<void>;
+  { boost::span(v.data(), v.size()) };
+};
+
+template <typename SizeType, SerializerStream T, Container V> void serdeWithSize(T &stream, V &v) {
   if constexpr (T::Mode == IOMode::Read) {
     SizeType size{};
     serde(stream, size);
     v.resize(size);
-    serde(stream, boost::span<V>(v));
+    boost::span<typename V::value_type> span(v.data(), v.size());
+    serde(stream, span);
   } else {
     if (v.size() > std::numeric_limits<SizeType>::max()) {
       throw std::runtime_error("Vector too large to serialize");
     }
     SizeType size = v.size();
     serde(stream, size);
-    serde(stream, boost::span<V>(v));
+    boost::span<typename V::value_type> span(v.data(), v.size());
+    serde(stream, span);
   }
 }
 
-template <typename V, typename Allocator = std::pmr::polymorphic_allocator<uint8_t>>
+template <Container C> struct Serialize<C> {
+  template <SerializerStream S> void operator()(S &stream, C &v) { serdeWithSize<uint32_t>(stream, v); }
+};
+
+template <typename... TArgs> struct Serialize<std::variant<TArgs...>> {
+  template <SerializerStream S> void operator()(S &stream, std::variant<TArgs...> &v) {
+    uint32_t index = v.index();
+    serde(stream, index);
+    if constexpr (S::Mode == IOMode::Read) {
+      // Emplace by index
+      size_t counter = 0;
+      ((
+          [&]<typename T>(T *) {
+            if (counter == index) {
+              T value;
+              Serialize<T>{}(stream, value);
+              v = std::move(value);
+            }
+            counter++;
+          }(static_cast<TArgs *>(nullptr)),
+          ...));
+    } else {
+      std::visit([&](auto &arg) { Serialize<std::decay_t<decltype(arg)>>{}(stream, arg); }, v);
+    }
+  }
+};
+
+template <typename V, typename Allocator = std::allocator<uint8_t>>
 inline std::vector<uint8_t, Allocator> toByteArray(V &v, Allocator alloc = Allocator()) {
   BufferWriter<Allocator> writer(alloc);
   ::shards::template serde<>((BufferWriter<Allocator> &)writer, v);

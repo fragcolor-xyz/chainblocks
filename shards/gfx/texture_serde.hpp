@@ -5,10 +5,24 @@
 #include <shards/core/serialization/generic.hpp>
 #include <shards/core/serialization/linalg.hpp>
 
+namespace gfx {
+struct TextureAssetHeader {
+  std::string name;
+  ::gfx::TextureFormat format;
+};
+} // namespace gfx
+
 namespace shards {
+
+template <> struct Serialize<gfx::TextureAssetHeader> {
+  template <SerializerStream S> void operator()(S &stream, gfx::TextureAssetHeader &v) {
+    serde(stream, v.name);
+    serde(stream, v.format);
+  }
+};
+
 template <> struct Serialize<::gfx::TextureFormat> {
-  template <SerializerStream S>
-  void operator()(S &stream, ::gfx::TextureFormat &v) {
+  template <SerializerStream S> void operator()(S &stream, ::gfx::TextureFormat &v) {
     serde(stream, v.resolution);
     serdeAs<uint8_t>(stream, v.dimension);
     serdeAs<uint8_t>(stream, v.flags);

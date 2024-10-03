@@ -53,7 +53,13 @@ TEST_CASE("RenderGraph with texture bindings", "[RenderGraphHeadless]") {
   RenderStepOutput output = RenderStepOutput::make(colorOutput, depthOutput);
 
   TexturePtr texture = std::make_shared<Texture>("testTexture");
-  texture->initWithPixelFormat(WGPUTextureFormat::WGPUTextureFormat_RGBA8Unorm);
+  texture->init(TextureDescGPUOnly{
+      .format =
+          TextureFormat{
+              .resolution = int2(1024),
+              .pixelFormat = WGPUTextureFormat::WGPUTextureFormat_RGBA8Unorm,
+          },
+  });
 
   PipelineSteps steps;
   steps.emplace_back(makePipelineStep(RenderFullscreenStep{
@@ -83,7 +89,13 @@ TEST_CASE("RenderGraph read/write chain", "[RenderGraphHeadless]") {
   RenderStepInput input = RenderStepInput::make("color");
 
   TexturePtr texture = std::make_shared<Texture>("testTexture");
-  texture->initWithPixelFormat(WGPUTextureFormat::WGPUTextureFormat_RGBA8Unorm);
+  texture->init(TextureDescGPUOnly{
+      .format =
+          TextureFormat{
+              .resolution = int2(1024),
+              .pixelFormat = WGPUTextureFormat::WGPUTextureFormat_RGBA8Unorm,
+          },
+  });
 
   PipelineSteps steps;
   steps.emplace_back(makePipelineStep(RenderFullscreenStep{
@@ -124,7 +136,13 @@ TEST_CASE("RenderGraph different formats", "[RenderGraphHeadless]") {
   RenderStepInput input = RenderStepInput::make("color");
 
   TexturePtr texture = std::make_shared<Texture>("testTexture");
-  texture->initWithPixelFormat(WGPUTextureFormat::WGPUTextureFormat_RGBA8Unorm);
+  texture->init(TextureDescGPUOnly{
+      .format =
+          TextureFormat{
+              .resolution = int2(1024),
+              .pixelFormat = WGPUTextureFormat::WGPUTextureFormat_RGBA8Unorm,
+          },
+  });
 
   PipelineSteps steps;
 
@@ -177,7 +195,13 @@ TEST_CASE("RenderGraph relative sizes", "[RenderGraphHeadless]") {
   RenderStepInput input = RenderStepInput::make("color");
 
   TexturePtr texture = std::make_shared<Texture>("testTexture");
-  texture->initWithPixelFormat(WGPUTextureFormat::WGPUTextureFormat_RGBA8Unorm);
+  texture->init(TextureDescGPUOnly{
+      .format =
+          TextureFormat{
+              .resolution = int2(1024),
+              .pixelFormat = WGPUTextureFormat::WGPUTextureFormat_RGBA8Unorm,
+          },
+  });
 
   PipelineSteps steps;
 

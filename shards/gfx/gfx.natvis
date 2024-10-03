@@ -25,4 +25,18 @@
             <Item Name="[LastTouched]">lastTouched</Item>
         </Expand>
     </Type>
+
+    <Type Name="boost::uuids::uuid">
+        <DisplayString>{data[0],nvoxb}{data[1],nvoxb}{data[2],nvoxb}{data[3],nvoxb}-{data[4],nvoxb}{data[5],nvoxb}-{data[6],nvoxb}{data[7],nvoxb}-{data[8],nvoxb}{data[9],nvoxb}-{data[10],nvoxb}{data[11],nvoxb}{data[12],nvoxb}{data[13],nvoxb}{data[14],nvoxb}{data[15],nvoxb}</DisplayString>
+    </Type>
+
+    <Type Name="gfx::data::AssetKey">
+        <DisplayString Condition="((unsigned char)categoryFlags &amp; 1) != 0">{key} ({category,en}, Metadata)</DisplayString>
+        <DisplayString>{key} ({category,en})</DisplayString>
+        <Expand>
+            <Item Name="[Category]">category</Item>
+            <Item Name="[CategoryFlags]">categoryFlags</Item>
+            <Item Name="[Key]">key</Item>
+        </Expand>
+    </Type>
 </AutoVisualizer>
