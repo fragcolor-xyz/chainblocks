@@ -845,7 +845,12 @@ struct MeshDrawableProcessor final : public IDrawableProcessor {
         if (requiredAttributes.requirePerVertexLocalBasis) {
           // Optionally generate tangent mesh
           try {
-            meshCacheEntry.mesh = generateLocalBasisAttribute(meshCacheEntry.mesh);
+            const MeshDescCPUCopy *meshDescPtr = std::get_if<MeshDescCPUCopy>(&meshCacheEntry.mesh->getDesc());
+            if(!meshDescPtr)
+              throw std::runtime_error("MeshDesc is not a MeshDescCPUCopy");
+            // TODO
+            const MeshDescCPUCopy &meshDesc = *meshDescPtr;
+            meshCacheEntry.mesh = generateLocalBasisAttribute(meshDesc);
             meshCacheEntry.hasLocalBasisVector = true;
           } catch (...) {
             SPDLOG_LOGGER_WARN(getLogger(), "Failed to generate tangents for mesh {}", mesh->getId().value);

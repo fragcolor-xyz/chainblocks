@@ -28,6 +28,6 @@ void Material::pipelineHashCollect(PipelineHashCollector &pipelineHashCollector)
 
 void Feature::pipelineHashCollect(PipelineHashCollector &pipelineHashCollector) const { pipelineHashCollector(id); }
 
-void Mesh::pipelineHashCollect(PipelineHashCollector &pipelineHashCollector) const { pipelineHashCollector(format); }
+void Mesh::pipelineHashCollect(PipelineHashCollector &pipelineHashCollector) const { pipelineHashCollector(getFormat()); }
 
 } // namespace gfx

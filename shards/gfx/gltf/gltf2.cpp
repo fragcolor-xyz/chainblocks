@@ -9,12 +9,12 @@
 #include <gfx/isb.hpp>
 #include <gfx/data_cache/data_cache.hpp>
 #include <gfx/data_cache/loaded_asset_tracker.hpp>
+#include <gfx/data_format/texture.hpp>
 #include <gfx/error_utils.hpp>
 #include <gfx/filesystem.hpp>
 #include <gfx/material.hpp>
 #include <gfx/mesh.hpp>
 #include <gfx/texture.hpp>
-#include <gfx/texture_serde.hpp>
 #include <gfx/texture_file/texture_file.hpp>
 #include <gfx/drawables/mesh_drawable.hpp>
 #include <gfx/features/alpha_cutoff.hpp>
@@ -436,19 +436,21 @@ struct Loader2 {
     TextureFormat format = TextureFormat::deriveFrom(numChannelsForDerivedFormat, storageType, true);
     format.resolution = int2(imageSize);
 
-    // shards::BufferWriter<> writer;
-    // shards::serde(writer, format);
-    TextureAssetHeader hdr{.name = image.name, .format = format};
-    auto metaBytes = shards::toByteArray(hdr);
-    // dataCache->store(metaAssetKey, gfx::ImmutableSharedBuffer(writer.takeBuffer()));
-    dataCache->store(metaAssetKey, std::move(metaBytes));
+    SerializedTextureHeader hdr{.name = image.name, .format = format};
+    hdr.serializedFormat = SerializedTextureDataFormat::STBImageCompatible;
 
+    SerializedTexture serializedTexture;
+    serializedTexture.header = hdr;
     fseek(file, 0, SEEK_END);
     size_t fileSize = ftell(file);
     fseek(file, 0, SEEK_SET);
     std::vector<uint8_t> imageData(fileSize);
     fread(imageData.data(), 1, fileSize, file);
-    dataCache->store(assetKey, gfx::ImmutableSharedBuffer(imageData.data(), imageData.size()));
+    serializedTexture.diskImageData = gfx::ImmutableSharedBuffer(std::move(imageData));
+
+    auto metaBytes = shards::toByteArray(hdr);
+    dataCache->store(metaAssetKey, data::LoadedAssetData::makePtr(metaBytes));
+    dataCache->store(assetKey, data::LoadedAssetData::makePtr(std::move(serializedTexture)));
   }
 
   void loadTextures() {
@@ -487,8 +489,8 @@ struct Loader2 {
       }
 
       shards::pmr::vector<uint8_t> metaBuffer;
-      dataCache->fetchImmediate(assetKey->metaKey(), metaBuffer);
-      TextureAssetHeader hdr = shards::fromByteArray<TextureAssetHeader>(metaBuffer);
+      dataCache->loadImmediate(assetKey->metaKey(), metaBuffer);
+      SerializedTextureHeader hdr = shards::fromByteArray<SerializedTextureHeader>(metaBuffer);
 
       SamplerState samplerState{};
       if (gltfTexture.sampler >= 0) {

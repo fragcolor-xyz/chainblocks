@@ -43,6 +43,8 @@ set(GFX_SOURCES
   pipeline_hashes.cpp
   unique_id.cpp
   data_cache/data_cache.cpp
+  data_cache/data_cache_impl.cpp
+  data_cache/asset_loader.cpp
 )
 
 if(EMSCRIPTEN)
@@ -91,6 +93,7 @@ target_link_libraries(gfx-core-obj
   shards-logging
   shards-shared-temp-allocator
   shards-fast-string
+  shards-threading
 )
 target_precompile_headers(gfx-core-obj PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/pch.cpp>")
 target_link_libraries(gfx-core-obj Tracy::TracyClient)

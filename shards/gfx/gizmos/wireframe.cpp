@@ -14,10 +14,14 @@ MeshPtr WireframeMeshGenerator::generate() {
   if (!mesh)
     throw std::logic_error("Input mesh required");
 
-  auto &srcFormat = mesh->getFormat();
-  auto indicesPtr = mesh->getIndexData().data();
-  auto verticesPtr = mesh->getVertexData().data();
-  if (mesh->getNumIndices() == 0)
+  auto meshDescPtr = std::get_if<MeshDescCPUCopy>(&mesh->getDesc());
+  if (!meshDescPtr)
+    throw std::runtime_error("MeshDesc is not a MeshDescCPUCopy");
+  const MeshDescCPUCopy &meshDesc = *meshDescPtr;
+  auto &srcFormat = meshDesc.format;
+  auto indicesPtr = meshDesc.indexData.data();
+  auto verticesPtr = meshDesc.vertexData.data();
+  if (meshDesc.getNumIndices() == 0)
     return mesh;
 
   boost::container::small_vector<size_t, 16> attributesToCopy;
@@ -40,7 +44,7 @@ MeshPtr WireframeMeshGenerator::generate() {
       attributesToCopy.push_back(i);
       auto &buffer = attributes.emplace_back();
       buffer.initFromIndexedTriangleList(attrib.type, attrib.numComponents, srcFormat.indexFormat, indicesPtr,
-                                         mesh->getNumIndices(), srcStride, verticesPtr + offset);
+                                         meshDesc.getNumIndices(), srcStride, verticesPtr + offset);
     }
     offset += attrib.numComponents * getStorageTypeSize(attrib.type);
   }

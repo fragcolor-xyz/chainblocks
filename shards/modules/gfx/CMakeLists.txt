@@ -25,7 +25,6 @@ set(SOURCES
   gizmos/gizmos.cpp
   gizmos/highlight.cpp
   gizmos/shapes.cpp
-  data_cache.cpp
 )
 
 if(HAS_WGPU_NATIVE)

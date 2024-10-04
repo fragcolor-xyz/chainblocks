@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <vector>
+#include <boost/core/span.hpp>
 
 namespace gfx {
 
@@ -70,10 +71,14 @@ public:
 
   ImmutableSharedBuffer(std::vector<uint8_t> &&data) { container = std::make_shared<OwnedContainer>(std::move(data)); }
 
+  boost::span<const uint8_t> asSpan() const { return boost::span<const uint8_t>(getData(), getLength()); }
+
   std::strong_ordering operator<=>(const ImmutableSharedBuffer &other) const = default;
 
   size_t getLength() const { return container ? container->getLength() : 0; }
   const uint8_t *getData() const { return container ? container->getData() : nullptr; }
+  size_t size() const { return getLength(); }
+  const uint8_t *data() const { return getData(); }
   operator bool() const { return (bool)container; }
 };
 

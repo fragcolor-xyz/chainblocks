@@ -3,7 +3,7 @@
 
 #include <gfx/data_cache/data_cache.hpp>
 
-namespace gfx {
+namespace gfx::data {
 std::shared_ptr<data::IDataCacheIO> createShardsDataCacheIO(std::string_view rootPath);
 std::shared_ptr<data::IDataCacheIO> getDefaultDataCacheIO();
 } // namespace gfx

@@ -54,12 +54,33 @@ public:
     if (!handle) {
       return nullptr;
     }
-    if (auto ptr = std::get_if<std::weak_ptr<T>>(&*handle)) {
+    return getFromHandle<T>(*handle);
+  }
+
+  template <typename T> std::shared_ptr<T> getFromHandle(LoadedAssetHandle h) {
+    if (auto ptr = std::get_if<std::weak_ptr<T>>(&h)) {
       if (auto locked = ptr->lock()) {
         return locked;
       }
     }
     return nullptr;
+  }
+
+  template <typename T, typename F> std::shared_ptr<T> getOrInsert(const AssetKey &key, F &&factory) {
+    auto handle = find(key);
+    if (handle) {
+      return getFromHandle<T>(*handle);
+    }
+
+    std::unique_lock lock2(mutex);
+    auto it = map.find(key);
+    if (it != map.end()) {
+      return getFromHandle<T>(it->second);
+    }
+    auto ptr = factory();
+    map.insert(std::make_pair(key, ptr));
+    iterator.reset();
+    return ptr;
   }
 
 private:

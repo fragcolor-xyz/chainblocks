@@ -2,14 +2,11 @@ set(core_SOURCES
   async.cpp
   ops_internal.cpp
   number_types.cpp
-  utils.cpp
   coro.cpp
   wire_dsl.cpp
   trait.cpp
   type_info.cpp
   hash.cpp
-  taskflow.cpp
-  pmr/shared_temp_allocator.cpp
 )
 
 if(EMSCRIPTEN)
@@ -22,9 +19,13 @@ target_include_directories(shards-shared-temp-allocator PUBLIC
   ${SHARDS_DIR})
 target_link_libraries(shards-shared-temp-allocator Tracy::TracyClient spdlog shards-logging Boost::container)
 
+add_library(shards-threading STATIC taskflow.cpp threading.cpp)
+target_include_directories(shards-threading PUBLIC ${SHARDS_DIR}/include ${SHARDS_DIR})
+target_link_libraries(shards-threading Taskflow spdlog)
+
 add_library(shards-core STATIC ${core_SOURCES})
 
-target_link_libraries(shards-core shards-shared-temp-allocator)
+target_link_libraries(shards-core shards-shared-temp-allocator shards-threading)
 
 target_include_directories(shards-core PUBLIC ${SHARDS_DIR}/include)
 target_include_directories(shards-core PUBLIC ${SHARDS_DIR})
@@ -56,6 +57,7 @@ set(SHARDS_DEBUG_THREAD_NAMES ${SHARDS_DEBUG_THREAD_NAMES_DEFAULT} CACHE BOOL "W
 
 if(SHARDS_DEBUG_THREAD_NAMES)
   target_compile_definitions(shards-core PUBLIC SH_DEBUG_THREAD_NAMES=1)
+  target_compile_definitions(shards-threading PUBLIC SH_DEBUG_THREAD_NAMES=1)
 endif()
 
 set(SHARDS_THREAD_FIBER OFF CACHE BOOL "When enabled, coroutines are evaluated using a single thread (for debugging purposes)")
@@ -134,7 +136,7 @@ endif()
 
 target_link_libraries(shards-core
   spdlog magic_enum nameof linalg xxHash
-  pdqsort entt utf8.h Taskflow stb nlohmann_json
+  pdqsort entt utf8.h stb nlohmann_json
   shards-logging tbb
 )
 

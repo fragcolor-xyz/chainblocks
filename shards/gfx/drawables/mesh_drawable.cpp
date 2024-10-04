@@ -21,17 +21,22 @@ OrientedBounds MeshDrawable::getBounds() const {
   if (!mesh)
     return OrientedBounds::empty();
 
+  const MeshDescCPUCopy *descPtr = std::get_if<MeshDescCPUCopy>(&mesh->getDesc());
+  if (!descPtr)
+    throw std::runtime_error("MeshDesc is not a MeshDescCPUCopy");
+  const MeshDescCPUCopy &meshDesc = *descPtr;
+
   if (skin) {
     // AABounds bounds = AABounds::empty();
     // for (auto &joint : skin->jointMatrices) {
     //   bounds.expand(extractTranslation(joint));
     // }
-    AABounds meshBounds = OrientedBounds(getMeshBounds(mesh), transform).toAligned();
-    AABounds bounds = AABounds::both(meshBounds,  skin->bounds);
+    AABounds meshBounds = OrientedBounds(getMeshBounds(meshDesc), transform).toAligned();
+    AABounds bounds = AABounds::both(meshBounds, skin->bounds);
     return OrientedBounds(bounds, linalg::identity).expand(float3(0.5f));
   }
 
-  return OrientedBounds(getMeshBounds(mesh), transform);
+  return OrientedBounds(getMeshBounds(meshDesc), transform);
 }
 
 } // namespace gfx

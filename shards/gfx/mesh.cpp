@@ -22,55 +22,58 @@ size_t MeshFormat::getVertexSize() const {
   return vertexSize;
 }
 
+size_t MeshDescCPUCopy::getNumIndices() const {
+  return indexData.getLength() / getIndexFormatSize(format.indexFormat);
+}
+
+size_t MeshDescCPUCopy::getNumVertices() const {
+  size_t vertexSize = format.getVertexSize();
+  shassert(vertexSize > 0 && "vertexSize was 0");
+  return vertexData.getLength() / vertexSize;
+}
+
 void Mesh::update(const MeshFormat &format, const void *inVertexData, size_t vertexDataLength, const void *inIndexData,
                   size_t indexDataLength) {
-  this->format = format;
-
-  size_t vertexSize = format.getVertexSize();
-  size_t indexSize = getIndexFormatSize(format.indexFormat);
-
-  calculateElementCounts(vertexDataLength, indexDataLength, vertexSize, indexSize);
+  MeshDescCPUCopy desc;
+  desc.format = format;
 
   // FIXME: wgpu-rs requires buffer writes to be aligned to 4 currently
+  std::vector<uint8_t> vertexData;
   vertexData.resize(alignTo<4>(vertexDataLength));
+  std::vector<uint8_t> indexData;
   indexData.resize(alignTo<4>(indexDataLength));
 
-  if (vertexDataLength > 0)
+  if (vertexDataLength > 0) {
     memcpy(vertexData.data(), inVertexData, vertexDataLength);
+    desc.vertexData = std::move(vertexData);
+  }
 
-  if (indexDataLength > 0)
+  if (indexDataLength > 0) {
     memcpy(indexData.data(), inIndexData, indexDataLength);
+    desc.indexData = std::move(indexData);
+  }
 
-  update();
+  update(desc);
 }
 
 void Mesh::update(const MeshFormat &format, std::vector<uint8_t> &&vertexData, std::vector<uint8_t> &&indexData) {
-  this->format = format;
-
-  size_t vertexSize = format.getVertexSize();
-  size_t indexSize = getIndexFormatSize(format.indexFormat);
-
-  this->vertexData = std::move(vertexData);
-  this->indexData = std::move(indexData);
-  calculateElementCounts(this->vertexData.size(), this->indexData.size(), vertexSize, indexSize);
+  MeshDescCPUCopy desc;
+  desc.format = format;
 
   // FIXME: wgpu-rs requires buffer writes to be aligned to 4 currently
-  this->vertexData.resize(alignTo<4>(this->vertexData.size()));
-  this->indexData.resize(alignTo<4>(this->indexData.size()));
+  vertexData.resize(alignTo<4>(vertexData.size()));
+  indexData.resize(alignTo<4>(indexData.size()));
+
+  desc.vertexData = std::move(vertexData);
+  desc.indexData = std::move(indexData);
 
   update();
 }
 
-void Mesh::calculateElementCounts(size_t vertexDataLength, size_t indexDataLength, size_t vertexSize, size_t indexSize) {
-  shassert(vertexSize > 0 && "vertexSize was 0");
-
-  numVertices = vertexDataLength / vertexSize;
-  shassert(numVertices * vertexSize == vertexDataLength);
-
-  numIndices = indexDataLength / indexSize;
-  shassert(numIndices * indexSize == indexDataLength);
+void Mesh::update(MeshDesc desc) {
+  this->desc = desc;
+  update();
 }
-
 void Mesh::update() { version++; }
 
 MeshPtr Mesh::clone() const {
@@ -86,44 +89,45 @@ void Mesh::initContextData(Context &context, MeshContextData &contextData) {
 }
 
 void Mesh::updateContextData(Context &context, MeshContextData &contextData) {
-  WGPUDevice device = context.wgpuDevice;
-  shassert(device);
+  // TODO
+  // WGPUDevice device = context.wgpuDevice;
+  // shassert(device);
 
 #if SH_GFX_CONTEXT_DATA_LABELS
   contextData.label = getLabel();
 #endif
 
-  contextData.format = format;
-  contextData.numIndices = numIndices;
-  contextData.numVertices = numVertices;
+  // contextData.format = format;
+  // contextData.numIndices = numIndices;
+  // contextData.numVertices = numVertices;
 
-  if (vertexData.size() > 0) {
-    // Grow/create vertex buffer
-    if (contextData.vertexBufferLength < vertexData.size()) {
-      WGPUBufferDescriptor desc = {};
-      desc.size = vertexData.size();
-      desc.usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst;
-      contextData.vertexBuffer.reset(wgpuDeviceCreateBuffer(device, &desc));
-      contextData.vertexBufferLength = desc.size;
-    }
+  // if (vertexData.size() > 0) {
+  //   // Grow/create vertex buffer
+  //   if (contextData.vertexBufferLength < vertexData.size()) {
+  //     WGPUBufferDescriptor desc = {};
+  //     desc.size = vertexData.size();
+  //     desc.usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst;
+  //     contextData.vertexBuffer.reset(wgpuDeviceCreateBuffer(device, &desc));
+  //     contextData.vertexBufferLength = desc.size;
+  //   }
 
-    shassert(contextData.vertexBuffer);
-    wgpuQueueWriteBuffer(context.wgpuQueue, contextData.vertexBuffer, 0, vertexData.data(), vertexData.size());
-  }
+  //   shassert(contextData.vertexBuffer);
+  //   wgpuQueueWriteBuffer(context.wgpuQueue, contextData.vertexBuffer, 0, vertexData.data(), vertexData.size());
+  // }
 
-  if (indexData.size() > 0) {
-    // Grow/create index buffer
-    if (indexData.size() > contextData.indexBufferLength) {
-      WGPUBufferDescriptor desc = {};
-      desc.size = indexData.size();
-      desc.usage = WGPUBufferUsage_Index | WGPUBufferUsage_CopyDst;
-      contextData.indexBuffer.reset(wgpuDeviceCreateBuffer(device, &desc));
-      contextData.indexBufferLength = desc.size;
-    }
+  // if (indexData.size() > 0) {
+  //   // Grow/create index buffer
+  //   if (indexData.size() > contextData.indexBufferLength) {
+  //     WGPUBufferDescriptor desc = {};
+  //     desc.size = indexData.size();
+  //     desc.usage = WGPUBufferUsage_Index | WGPUBufferUsage_CopyDst;
+  //     contextData.indexBuffer.reset(wgpuDeviceCreateBuffer(device, &desc));
+  //     contextData.indexBufferLength = desc.size;
+  //   }
 
-    shassert(contextData.indexBuffer);
-    wgpuQueueWriteBuffer(context.wgpuQueue, contextData.indexBuffer, 0, indexData.data(), indexData.size());
-  }
+  //   shassert(contextData.indexBuffer);
+  //   wgpuQueueWriteBuffer(context.wgpuQueue, contextData.indexBuffer, 0, indexData.data(), indexData.size());
+  // }
 }
 
 } // namespace gfx

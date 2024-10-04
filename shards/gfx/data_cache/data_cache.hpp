@@ -3,6 +3,9 @@
 
 #include "types.hpp"
 #include "../isb.hpp"
+#include "../texture.hpp"
+#include "../mesh.hpp"
+#include "../data_format/texture.hpp"
 #include <string_view>
 #include <shards/core/pmr/vector.hpp>
 #include <boost/core/span.hpp>
@@ -13,25 +16,58 @@
 #include <spdlog/fmt/fmt.h>
 
 namespace gfx::data {
-enum class AssetRequestState : uint32_t {
+enum class AssetLoadRequestState : uint32_t {
   Pending = 0,
   Loaded = 1,
   Failure = 2,
 };
 
-struct AssetRequest {
-  AssetInfo key;
-  std::atomic_uint32_t state;
-  shards::pmr::vector<uint8_t> data;
+using LoadedAssetDataVariant = std::variant<std::monostate, std::vector<uint8_t>, SerializedTexture, gfx::TextureDescCPUCopy,
+                                            gfx::MeshDescCPUCopy, gfx::DrawablePtr>;
+struct LoadedAssetData : public LoadedAssetDataVariant {
+  using variant::variant;
+
+  LoadedAssetData() = default;
+  LoadedAssetData(LoadedAssetDataVariant variant) : LoadedAssetDataVariant(variant) {}
+  operator bool() const { return !std::holds_alternative<std::monostate>(*this); }
+
+  template <typename T> static std::shared_ptr<LoadedAssetData> makePtr(T &&data) {
+    return std::make_shared<LoadedAssetData>(std::forward<T>(data));
+  }
 };
+
+using LoadedAssetDataPtr = std::shared_ptr<LoadedAssetData>;
+
+struct AssetLoadRequest {
+  AssetInfo key;
+  std::atomic_uint32_t state = 0;
+  LoadedAssetDataPtr data;
+
+  bool isFinished() const { return state.load() != (uint32_t)AssetLoadRequestState::Pending; }
+  bool isSuccess() const { return state.load() == (uint32_t)AssetLoadRequestState::Loaded; }
+};
+
+struct AssetStoreRequest {
+  AssetInfo key;
+  std::atomic_uint32_t state = 0;
+  LoadedAssetDataPtr data;
+
+  bool isFinished() const { return state.load() != (uint32_t)AssetLoadRequestState::Pending; }
+  bool isSuccess() const { return state.load() == (uint32_t)AssetLoadRequestState::Loaded; }
+};
+
+// After binary data is loaded, constructs the typed LoadedAssetData for the asset being loaded
+void finializeAssetLoadRequest(AssetLoadRequest &request, boost::span<uint8_t> sourceData);
+void processAssetStoreRequest(AssetStoreRequest &request, shards::pmr::vector<uint8_t> &outData);
+void processAssetLoadFromStoreRequest(AssetLoadRequest &request, const AssetStoreRequest &inRequest);
 
 struct IDataCacheIO {
   virtual ~IDataCacheIO() = default;
-  // Enqueue an asset fetch request to be processed in the background
-  virtual void enqueueRequest(std::shared_ptr<AssetRequest> request) = 0;
-  // Fetch an asset immediately, this should only be used for small metadata
-  virtual void fetchImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data) = 0;
-  virtual void store(const AssetInfo &key, ImmutableSharedBuffer data) = 0;
+  // Enqueue an asset load request to be processed in the background
+  virtual void enqueueLoadRequest(std::shared_ptr<AssetLoadRequest> request) = 0;
+  // Load an asset immediately, this should only be used for small metadata
+  virtual void loadImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data) = 0;
+  virtual void enqueueStoreRequest(std::shared_ptr<AssetStoreRequest> request) = 0;
   virtual bool hasAsset(const AssetInfo &key) = 0;
 };
 
@@ -52,13 +88,15 @@ public:
   AssetInfo generateSourceKey(boost::span<uint8_t> data, AssetCategory category);
 
   bool hasAsset(const AssetInfo &info);
-  void store(const AssetInfo &info, ImmutableSharedBuffer data);
+
+  // Store an asset, returns a request object that can be used to check the status
+  std::shared_ptr<AssetStoreRequest> store(const AssetInfo &info, const LoadedAssetDataPtr &data);
 
   // Asynchronously fetch an asset, returns a request object that can be used to check the status
-  std::shared_ptr<AssetRequest> fetch(AssetInfo key);
+  std::shared_ptr<AssetLoadRequest> load(AssetInfo key);
 
   // Fetch an asset immediately, this should only be used for small metadata
-  void fetchImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data);
+  void loadImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data);
 };
 
 std::shared_ptr<DataCache> getInstance();

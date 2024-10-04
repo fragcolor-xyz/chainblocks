@@ -9,9 +9,12 @@
 #include "fwd.hpp"
 #include "unique_id.hpp"
 #include "log.hpp"
+#include "data_cache/types.hpp"
+#include "isb.hpp"
 #include <string>
 #include <vector>
 #include <optional>
+#include <variant>
 
 namespace gfx {
 
@@ -33,6 +36,8 @@ struct MeshVertexAttribute {
   bool isSameDataFormat(const MeshVertexAttribute &other) const {
     return numComponents == other.numComponents && type == other.type;
   }
+
+  std::strong_ordering operator<=>(const MeshVertexAttribute &other) const = default;
 
   template <typename T> void getPipelineHash(T &hasher) const {
     hasher(name);
@@ -56,6 +61,8 @@ struct MeshFormat {
     hasher(indexFormat);
     hasher(vertexAttributes);
   }
+
+  std::strong_ordering operator<=>(const MeshFormat &other) const = default;
 };
 
 /// <div rustbindgen opaque></div>
@@ -93,17 +100,35 @@ struct MeshContextData : public ContextData {
 #endif
 };
 
-/// <div rustbindgen opaque></div>
+// Add these new structures
+struct MeshDescCPUCopy {
+  MeshFormat format;
+  ImmutableSharedBuffer vertexData;
+  ImmutableSharedBuffer indexData;
+
+  size_t getNumIndices() const;
+  size_t getNumVertices() const;
+
+  std::strong_ordering operator<=>(const MeshDescCPUCopy &other) const = default;
+};
+
+struct MeshDescAsset {
+  MeshFormat format;
+  data::AssetKey key;
+  std::strong_ordering operator<=>(const MeshDescAsset &other) const = default;
+};
+
+struct MeshDesc : public std::variant<MeshDescCPUCopy, MeshDescAsset> {
+  using variant::variant;
+};
+
+// Modify the Mesh struct
 struct Mesh final {
   using ContextDataType = MeshContextData;
 
 private:
   UniqueId id = getNextId();
-  MeshFormat format;
-  size_t numVertices = 0;
-  size_t numIndices = 0;
-  std::vector<uint8_t> vertexData;
-  std::vector<uint8_t> indexData;
+  MeshDesc desc;
   size_t version{};
 #if SH_GFX_CONTEXT_DATA_LABELS
   std::string label;
@@ -112,8 +137,6 @@ private:
   friend struct gfx::UpdateUniqueId<Mesh>;
 
 public:
-  const MeshFormat &getFormat() const { return format; }
-
 #if SH_GFX_CONTEXT_DATA_LABELS
   void setLabel(std::string_view label) {
     this->label = label;
@@ -129,20 +152,19 @@ public:
     return "<unknown>";
   }
 #endif
-
-  size_t getNumVertices() const { return numVertices; }
-  size_t getNumIndices() const { return numIndices; }
-  const std::vector<uint8_t> &getVertexData() const { return vertexData; }
-  const std::vector<uint8_t> &getIndexData() const { return indexData; }
+  const MeshDesc &getDesc() const { return desc; }
+  const MeshFormat &getFormat() const {
+    return std::visit([](const auto &d) -> const MeshFormat & { return d.format; }, desc);
+  }
 
   // This increments every time the mesh is updated
   size_t getVersion() const { return version; }
-
   // Updates mesh data with length in bytes
   void update(const MeshFormat &format, const void *inVertexData, size_t vertexDataLength, const void *inIndexData,
               size_t indexDataLength);
   void update(const MeshFormat &format, std::vector<uint8_t> &&vertexData,
               std::vector<uint8_t> &&indexData = std::vector<uint8_t>());
+  void update(MeshDesc desc);
 
   UniqueId getId() const { return id; }
   MeshPtr clone() const;
@@ -158,6 +180,7 @@ protected:
 
   static UniqueId getNextId();
 };
+
 } // namespace gfx
 
 #endif /* A9FF2947_97BD_4662_A743_E2DB36A32FA2 */

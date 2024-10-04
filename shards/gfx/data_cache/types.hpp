@@ -4,7 +4,9 @@
 #include <string_view>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/nil_generator.hpp>
+#include <shards/core/serialization/generic.hpp>
 #include <optional>
+#include <magic_enum.hpp>
 
 namespace gfx::data {
 
@@ -48,7 +50,7 @@ struct AssetInfo {
   AssetCategory category;
   AssetCategoryFlags categoryFlags{};
   AssetFlags flags : 16 = AssetFlags::None;
-  boost::uuids::uuid key;
+  boost::uuids::uuid key{};
   // In case this asset is derived from a source asset, this will be the source asset
   std::optional<boost::uuids::uuid> rootAsset;
 
@@ -75,5 +77,42 @@ struct AssetKey {
 
 inline AssetInfo::AssetInfo(const AssetKey &key) : category(key.category), categoryFlags(key.categoryFlags), key(key.key) {}
 } // namespace gfx::data
+
+namespace std {
+template <> struct hash<gfx::data::AssetKey> {
+  size_t operator()(const gfx::data::AssetKey &key) const {
+    size_t base = boost::uuids::hash_value(key.key);
+    base = base * 3 + std::hash<gfx::data::AssetCategoryFlags>()(key.categoryFlags);
+    base = base * 3 + std::hash<gfx::data::AssetCategory>()(key.category);
+    return base;
+  }
+};
+} // namespace std
+
+namespace shards {
+template <> struct Serialize<boost::uuids::uuid> {
+  template <SerializerStream S> void operator()(S &stream, boost::uuids::uuid &uuid) {
+    stream((uint8_t *)uuid.data, sizeof(uuid.data));
+  }
+};
+
+template <> struct Serialize<gfx::data::AssetKey> {
+  template <SerializerStream S> void operator()(S &stream, gfx::data::AssetKey &key) {
+    serde(stream, key.key);
+    serdeAs<uint8_t>(stream, key.categoryFlags);
+    serdeAs<uint8_t>(stream, key.category);
+  }
+};
+} // namespace shards
+
+namespace magic_enum::customize {
+template <> struct enum_range<gfx::data::AssetFlags> {
+  static constexpr bool is_flags = true;
+};
+template <> struct enum_range<gfx::data::AssetCategoryFlags> {
+  static constexpr bool is_flags = true;
+};
+} // namespace magic_enum::customize
+
 
 #endif /* E52D1428_FF30_41BD_BF58_74530373D525 */

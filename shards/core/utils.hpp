@@ -2,6 +2,7 @@
 #define F676CA55_B5BE_4F37_8AF8_84A2AD0989F5
 
 #include "platform.hpp"
+#include "assert.hpp"
 
 #if SH_WINDOWS
 #include <windows.h>

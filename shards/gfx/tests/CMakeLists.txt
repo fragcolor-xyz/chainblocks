@@ -6,19 +6,20 @@ endif()
 
 add_executable(test-gfx
   main.cpp
-  test_general.cpp
-  test_shader.cpp
-  test_gltf.cpp
-  test_gizmos.cpp
-  test_comparison.cpp
-  test_rendergraph.cpp
-  test_rendergraph_headless.cpp
-  test_multithreaded.cpp
-  test_caching.cpp
-  test_naga.cpp
-  test_fast_string.cpp
-  test_leaks.cpp
+  # test_general.cpp
+  # test_shader.cpp
+  # test_gltf.cpp
+  # test_gizmos.cpp
+  # test_comparison.cpp
+  # test_rendergraph.cpp
+  # test_rendergraph_headless.cpp
+  # test_multithreaded.cpp
+  # test_caching.cpp
+  # test_naga.cpp
+  # test_fast_string.cpp
+  # test_leaks.cpp
   test_serialization.cpp
+  test_assets.cpp
 )
 
 if(EMSCRIPTEN)

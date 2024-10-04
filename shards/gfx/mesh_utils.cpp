@@ -15,8 +15,8 @@ namespace gfx {
 // Generate surface orientation information in the form of a quaternion
 // in case the mesh already contains at least a normal & tangent, these will be converted into quaternion form
 // otherwise, the surface orientation quaternion will be generated from the normal and the texture coordinates (if available)
-MeshPtr generateLocalBasisAttribute(MeshPtr mesh) {
-  auto &srcFormat = mesh->getFormat();
+MeshPtr generateLocalBasisAttribute(const MeshDescCPUCopy& mesh) {
+  auto &srcFormat = mesh.format;
 
   small_vector<size_t, 16> attributesToCopy;
 
@@ -27,9 +27,9 @@ MeshPtr generateLocalBasisAttribute(MeshPtr mesh) {
   small_vector<AttribBuffer, 16> srcAttributes;
   AttribBuffer indexBuffer;
 
-  auto &indexData = mesh->getIndexData();
-  auto &vertexData = mesh->getVertexData();
-  size_t numIndices = mesh->getNumIndices();
+  auto &indexData = mesh.indexData;
+  auto &vertexData = mesh.vertexData;
+  size_t numIndices = mesh.getNumIndices();
 
   if (srcFormat.primitiveType != PrimitiveType::TriangleList) {
     throw std::runtime_error("Only triangle lists are supported");

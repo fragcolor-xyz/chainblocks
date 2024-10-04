@@ -11,11 +11,11 @@ namespace shards {
 
 enum class IOMode { Read, Write };
 
-template <typename TAlloc = std::allocator<uint8_t>> struct BufferRefWriter {
+template <typename TAlloc = std::allocator<uint8_t>> struct BufferRefWriterA {
   static constexpr IOMode Mode = IOMode::Write;
 
   std::vector<uint8_t, TAlloc> &_buffer;
-  BufferRefWriter(std::vector<uint8_t, TAlloc> &stream, bool clear = true) : _buffer(stream) {
+  BufferRefWriterA(std::vector<uint8_t, TAlloc> &stream, bool clear = true) : _buffer(stream) {
     if (clear) {
       _buffer.clear();
     }
@@ -23,16 +23,19 @@ template <typename TAlloc = std::allocator<uint8_t>> struct BufferRefWriter {
   void operator()(const uint8_t *buf, size_t size) { _buffer.insert(_buffer.end(), buf, buf + size); }
 };
 
-template <typename TAlloc = std::allocator<uint8_t>> struct BufferWriter {
+template <typename TAlloc = std::allocator<uint8_t>> struct BufferWriterA {
   static constexpr IOMode Mode = IOMode::Write;
 
   std::vector<uint8_t, TAlloc> _buffer;
-  BufferRefWriter<TAlloc> _inner;
+  BufferRefWriterA<TAlloc> _inner;
   
-  BufferWriter(TAlloc allocator = TAlloc()) : _buffer(allocator), _inner(_buffer) {}
+  BufferWriterA(TAlloc allocator = TAlloc()) : _buffer(allocator), _inner(_buffer) {}
   void operator()(const uint8_t *buf, size_t size) { _inner(buf, size); }
   std::vector<uint8_t, TAlloc> takeBuffer() { return std::move(_buffer); }
 };
+
+using BufferRefWriter = BufferRefWriterA<>;
+using BufferWriter = BufferWriterA<>;
 
 struct BytesReader {
   static constexpr IOMode Mode = IOMode::Read;

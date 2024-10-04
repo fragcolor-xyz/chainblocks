@@ -80,15 +80,30 @@ AssetInfo DataCache::generateSourceKey(boost::span<uint8_t> data, AssetCategory 
 
 bool DataCache::hasAsset(const AssetInfo &info) { return io->hasAsset(info); }
 
-void DataCache::store(const AssetInfo &info, ImmutableSharedBuffer data) { io->store(info, data); }
-
-std::shared_ptr<AssetRequest> DataCache::fetch(AssetInfo key) {
-  auto req = std::make_shared<AssetRequest>();
-  req->key = key;
-  io->enqueueRequest(req);
+std::shared_ptr<AssetStoreRequest> DataCache::store(const AssetInfo &info, const LoadedAssetDataPtr &data) {
+  if (!data)
+    throw std::logic_error("Data must not be null");
+  auto req = std::make_shared<AssetStoreRequest>();
+  req->key = info;
+  req->data = data;
+  if (info.key.is_nil()) {
+    if (auto dataPtr = std::get_if<std::vector<uint8_t>>(data.get())) {
+      req->key.key = generateSourceKey(boost::span(*dataPtr), info.category).key;
+    } else {
+      throw std::logic_error("Asset key is nil and not derivable from data");
+    }
+  }
+  io->enqueueStoreRequest(req);
   return req;
 }
-void DataCache::fetchImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data) { io->fetchImmediate(key, data); }
+
+std::shared_ptr<AssetLoadRequest> DataCache::load(AssetInfo key) {
+  auto req = std::make_shared<AssetLoadRequest>();
+  req->key = key;
+  io->enqueueLoadRequest(req);
+  return req;
+}
+void DataCache::loadImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data) { io->loadImmediate(key, data); }
 
 // TODO: Mayhaps replace this with a per-context cache, athough fully shared might be better
 static std::shared_ptr<DataCache> instance;

@@ -84,8 +84,8 @@ public:
   }
 };
 
-inline AABounds getMeshBounds(MeshPtr mesh) {
-  auto &fmt = mesh->getFormat();
+inline AABounds getMeshBounds(const MeshDescCPUCopy &meshDesc) {
+  auto &fmt = meshDesc.format;
   size_t offset{};
   AABounds bounds = AABounds::empty();
 
@@ -105,12 +105,13 @@ inline AABounds getMeshBounds(MeshPtr mesh) {
     throw std::runtime_error("Mesh has no position attribute");
   }
 
-  if (mesh->getNumVertices() == 0) {
+  size_t numVertices = meshDesc.getNumVertices();
+  if (numVertices == 0) {
     return bounds;
   }
 
-  const uint8_t *basePtr = mesh->getVertexData().data() + *positionOffset;
-  for (size_t i = 0; i < mesh->getNumVertices(); i++) {
+  const uint8_t *basePtr = meshDesc.vertexData.data() + *positionOffset;
+  for (size_t i = 0; i < numVertices; i++) {
     auto &pt = *(float3 *)(basePtr + stride * i);
     bounds.expand(pt);
   }

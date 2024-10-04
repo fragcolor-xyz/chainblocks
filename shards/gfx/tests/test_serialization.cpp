@@ -1,5 +1,7 @@
+#include "gfx/params.hpp"
 #include <catch2/catch_all.hpp>
-#include <gfx/texture_serde.hpp>
+#include <shards/core/serialization/linalg.hpp>
+#include <gfx/data_format/texture.hpp>
 #include <boost/container/pmr/polymorphic_allocator.hpp>
 
 TEST_CASE("Serialization", "[Serializer]") {
@@ -48,4 +50,36 @@ TEST_CASE("Variant", "[Serializer]") {
     auto q1 = shards::fromByteArray<decltype(q)>(bytes);
     CHECK(q1 == q);
   }
+  {
+    gfx::NumParameter p0 = linalg::mat<float, 4, 4>(linalg::identity);
+    auto bytes = shards::toByteArray(p0);
+    auto p1 = shards::fromByteArray<decltype(p0)>(bytes);
+    CHECK(p1 == p0);
+  }
+}
+
+TEST_CASE("Pair", "[Serializer]") {
+  std::pair<int, std::string> pair = {1, "Hello"};
+  auto bytes = shards::toByteArray(pair);
+  auto pair2 = shards::fromByteArray<decltype(pair)>(bytes);
+  CHECK(pair2 == pair);
+}
+
+TEST_CASE("Table", "[Serializer]") {
+  std::unordered_map<std::string, int> table = {{"Hello", 1}, {"world", 2}, {"this", 3}, {"is", 4}, {"a", 5}, {"test", 6}};
+  auto bytes = shards::toByteArray(table);
+  // for (auto &pair : table) {
+  // shards::BufferWriter writer;
+  // serdeWithSize<size_t>(writer, table);
+  // std::pair<std::string, int> pair = {"Hello", 1};
+  // serde(writer, pair);
+  // }
+  auto table2 = shards::fromByteArray<decltype(table)>(bytes);
+  CHECK(table2.size() == table.size());
+  CHECK(table2["Hello"] == 1);
+  CHECK(table2["world"] == 2);
+  CHECK(table2["this"] == 3);
+  CHECK(table2["is"] == 4);
+  CHECK(table2["a"] == 5);
+  CHECK(table2["test"] == 6);
 }
