@@ -3,6 +3,7 @@
 #include "./renderer.hpp"
 #include "renderer_utils.hpp"
 #include <catch2/catch_all.hpp>
+#include <thread>
 
 #include <gfx/filesystem.hpp>
 #include <gfx/drawables/mesh_drawable.hpp>
@@ -81,6 +82,7 @@ TEST_CASE("Texture Format", "[DataFormats]") {
   auto logoTexture = gfx::textureFromFile(logoPath.c_str());
 
   gfx::SerializedTexture stex(logoTexture);
+  stex.header.name = "logo";
   std::vector<uint8_t> data = shards::toByteArray(stex);
   auto op = cache->store(blankAssetKey(gfx::data::AssetCategory::Image), gfx::data::LoadedAssetData::makePtr(std::move(data)));
   auto key = op->key;

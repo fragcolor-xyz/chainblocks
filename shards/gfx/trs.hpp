@@ -40,6 +40,7 @@ struct TRS {
   TRS(const float3 &translation, const float4 &rotation, const float3 &scale = float3(1.0f))
       : translation(translation), scale(scale), rotation(rotation) {}
   TRS(const float4x4 &other) { *this = other; }
+  TRS(const TRS& other) = default;
   TRS &operator=(const TRS &other) = default;
   TRS &operator=(const float4x4 &other) {
     TRSRef(*this) = other;

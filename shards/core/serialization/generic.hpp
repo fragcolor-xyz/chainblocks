@@ -6,6 +6,7 @@
 #include <cassert>
 #include <string_view>
 #include <concepts>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <tracy/Wrapper.hpp>
@@ -17,20 +18,22 @@
 namespace shards {
 template <typename T>
 concept SerializerStream = requires(T &stream__, uint8_t *buf, size_t size) {
-  { stream__(buf, size) };
+  {stream__(buf, size)};
   { T::Mode } -> std::convertible_to<IOMode>;
 };
 
+template <typename T> struct ErrorHelper { static_assert(std::is_same<T, void>::value, "Type is not serializable"); };
+
 // Generic template, specialize this for custom types
 template <typename V> struct Serialize {
-  template <SerializerStream S> void operator()(S &stream, V &v) { static_assert(false, "Type is not serializable"); }
+  template <SerializerStream S> void operator()(S &stream, V &v) { ErrorHelper<V> e{}; }
 };
 
 // Helper serialization functions
 template <SerializerStream S, typename V> void serde(S &stream, V &v) { Serialize<V>{}(stream, v); }
-template <SerializerStream S, typename V> void serdeConst(S &stream, const V &v) { 
+template <SerializerStream S, typename V> void serdeConst(S &stream, const V &v) {
   static_assert(S::Mode == IOMode::Write, "Cannot deserialize const value");
-  serde(stream, const_cast<V &>(v)); 
+  serde(stream, const_cast<V &>(v));
 }
 template <typename As, SerializerStream S, typename V> void serdeAs(S &stream, V &v) {
   if constexpr (S::Mode == IOMode::Read) {
@@ -66,7 +69,7 @@ concept Container = requires(V &v) {
   typename V::value_type;
   { v.size() } -> std::convertible_to<size_t>;
   { v.resize(0) } -> std::same_as<void>;
-  { boost::span(v.data(), v.size()) };
+  {boost::span(v.data(), v.size())};
 };
 
 template <typename SizeType, SerializerStream T, Container V> void serdeWithSize(T &stream, V &v) {
@@ -87,14 +90,14 @@ template <typename SizeType, SerializerStream T, Container V> void serdeWithSize
   }
 }
 
-template<typename K, typename V> struct Serialize<std::pair<K, V>> {
+template <typename K, typename V> struct Serialize<std::pair<K, V>> {
   template <SerializerStream S> void operator()(S &stream, std::pair<K, V> &v) {
     serde(stream, v.first);
     serde(stream, v.second);
   }
 };
 
-template<typename K, typename V> struct Serialize<std::pair<const K, V>> {
+template <typename K, typename V> struct Serialize<std::pair<const K, V>> {
   template <SerializerStream S> void operator()(S &stream, std::pair<const K, V> &v) {
     static_assert(S::Mode == IOMode::Write, "Cannot deserialize const key-value pair");
     serde(stream, const_cast<K &>(v.first));
@@ -116,15 +119,15 @@ concept KeyValueContainer = requires(V &v, typename V::value_type pair) {
   typename V::mapped_type;
   typename V::value_type;
   { v.size() } -> std::convertible_to<size_t>;
-  { v.emplace(pair) };
-  { v.insert(pair) };
+  {v.emplace(pair)};
+  {v.insert(pair)};
 };
 
 template <typename SizeType, SerializerStream T, KeyValueContainer V> void serdeWithSize(T &stream, V &v) {
   if constexpr (T::Mode == IOMode::Read) {
     SizeType size{};
     serde(stream, size);
-    for(size_t i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
       std::pair<typename V::key_type, typename V::mapped_type> pair;
       serde(stream, pair);
       v.insert(pair);
@@ -135,12 +138,11 @@ template <typename SizeType, SerializerStream T, KeyValueContainer V> void serde
     }
     SizeType size = v.size();
     serde(stream, size);
-    for(auto& pair : v) {
+    for (auto &pair : v) {
       serde(stream, pair);
     }
   }
 }
-
 
 template <KeyValueContainer C> struct Serialize<C> {
   template <SerializerStream S> void operator()(S &stream, C &v) { serdeWithSize<SerializeSizeType>(stream, v); }
@@ -157,17 +159,19 @@ template <typename... TArgs> struct Serialize<std::variant<TArgs...>> {
           [&]<typename T>(T *) {
             if (counter == index) {
               T value;
-              ::shards::serde((S&)stream, (decltype(value)&)value);
+              ::shards::serde((S &)stream, (decltype(value) &)value);
               v = std::move(value);
             }
             counter++;
           }(static_cast<TArgs *>(nullptr)),
           ...));
     } else {
-      std::visit([&](auto &arg) { 
-        using T = std::decay_t<decltype(arg)>;
-        ::shards::serde((S&)stream, (T&)arg);
-       }, v);
+      std::visit(
+          [&](auto &arg) {
+            using T = std::decay_t<decltype(arg)>;
+            ::shards::serde((S &)stream, (T &)arg);
+          },
+          v);
     }
   }
 };
