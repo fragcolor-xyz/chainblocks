@@ -203,7 +203,7 @@ struct Cond {
           auto newlen = validation.exposedInfo.len;
           if (curlen != newlen) {
             SHLOG_DEBUG("Cond: number of exposed variables between actions mismatch, "
-                       "variables won't be exposed, flow is unpredictable!");
+                        "variables won't be exposed, flow is unpredictable!");
             exposing = false;
           }
 
@@ -211,8 +211,8 @@ struct Cond {
             for (uint32_t i = 0; i < curlen; i++) {
               if (_wireValidation.exposedInfo.elements[i] != validation.exposedInfo.elements[i]) {
                 SHLOG_DEBUG("Cond: types of exposed variables between actions "
-                           "mismatch, variables won't be exposed, flow is "
-                           "unpredictable!");
+                            "mismatch, variables won't be exposed, flow is "
+                            "unpredictable!");
                 exposing = false;
                 break;
               }
@@ -424,8 +424,9 @@ struct Maybe : public BaseSubFlow {
       if (state == SHWireState::Error) {
         if (!_silent) {
           shassert(_self);
-          SHLOG_WARNING("Maybe shard Ignored an error: {}, line: {}, column: {}", context->getErrorMessage(), _self->line,
-                        _self->column);
+          auto currentWire = context->currentWire();
+          SHLOG_WARNING("Maybe shard Ignored an error: {}, line: {}, column: {}, wire: {}", context->getErrorMessage(),
+                        _self->line, _self->column, currentWire ? currentWire->name : "unknown");
         }
         if (likely(!context->onLastResume)) {
           context->resetErrorStack();
@@ -437,8 +438,9 @@ struct Maybe : public BaseSubFlow {
             return input;
           }
         } else {
-          SHLOG_DEBUG("Maybe shard Ignored an error: {}, when on last resume, line: {}, column: {}", context->getErrorMessage(),
-                      _self->line, _self->column);
+          auto currentWire = context->currentWire();
+          SHLOG_DEBUG("Maybe shard Ignored an error: {}, when on last resume, line: {}, column: {}, wire: {}",
+                      context->getErrorMessage(), _self->line, _self->column, currentWire ? currentWire->name : "unknown");
           // Just continue as the wire is done
           return _output;
         }

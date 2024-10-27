@@ -702,6 +702,15 @@ struct SuspendWire : public WireBase {
     }
   }
 
+  SHTypeInfo compose(const SHInstanceData &data) {
+    resolveWire();
+    if (wire) {
+      auto currentMesh = wire->mesh.lock();
+      checkWireMesh(data.wire->name, currentMesh.get());
+    }
+    return data.inputType;
+  }
+
   SHVar activate(SHContext *context, const SHVar &input) {
     ensureWire();
 
@@ -767,6 +776,15 @@ struct ResumeWire : public WireBase {
     } else {
       return {};
     }
+  }
+
+  SHTypeInfo compose(const SHInstanceData &data) {
+    resolveWire();
+    if (wire) {
+      auto currentMesh = wire->mesh.lock();
+      checkWireMesh(data.wire->name, currentMesh.get());
+    }
+    return data.inputType;
   }
 
   SHVar activate(SHContext *context, const SHVar &input) {
