@@ -439,6 +439,8 @@ impl Shard for NotifyShard {
                   let p = Var::ephemeral_string(path);
                   let t = self.output.0.next_mut();
                   let t = t.as_mut_table_creating().unwrap();
+                  // TODO, this originally used path as the key to deduplicate.
+                  // We "fixed" it after, but now we got dupes :)
                   t.insert_fast_static("path", &p);
                   t.insert_fast_static("type", &k);
                 }
