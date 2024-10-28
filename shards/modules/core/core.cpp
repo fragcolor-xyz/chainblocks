@@ -10,6 +10,7 @@
 #include "pdqsort.h"
 #include <boost/algorithm/string.hpp>
 #include <chrono>
+#include <shards/core/params.hpp>
 
 #if SH_ANDROID
 extern "C" {
@@ -1220,7 +1221,7 @@ private:
   ShardsVar _shards{};
   SHTypeInfo _outputSingleType{};
   SHExposedTypeInfo _tmpInfo{"$0"};
-  SHVar *_tmpIndex = nullptr; // New member for index reference
+  SHVar *_tmpIndex = nullptr;            // New member for index reference
   SHExposedTypeInfo _tmpInfoIndex{"$i"}; // New exposed info for index
 };
 
@@ -1984,6 +1985,129 @@ struct GetObjectTypeHelp {
 
     return _output;
   }
+};
+
+struct Iterate {
+  PARAM_PARAMVAR(_from, "From", "The starting key to begin searching from (including this key).", {CoreInfo::AnyType});
+  PARAM_PARAMVAR(_to, "To",
+                 "The ending key to stop searching at (not including this key). If not provided or same as From, "
+                 "will keep searching until From no longer matches.",
+                 {CoreInfo::AnyType, CoreInfo::NoneType});
+  PARAM(ShardsVar, _action, "Action", "The shards to run on each matching element that is found.",
+        {CoreInfo::Shards, {CoreInfo::NoneType}});
+  PARAM_IMPL(PARAM_IMPL_FOR(_from), PARAM_IMPL_FOR(_to), PARAM_IMPL_FOR(_action));
+
+  static SHOptionalString help() {
+    return SHCCSTR("Searches through a sorted table input for a range of matching elements. Returns all values from the table that have keys "
+                   "between the From and To keys. If Focused is true, will stop searching once From no longer matches.");
+  }
+
+  static SHTypesInfo inputTypes() { return CoreInfo::AnyTableType; }
+  static SHOptionalString inputHelp() { return SHCCSTR("The input table to perform the range query on."); }
+
+  static SHTypesInfo outputTypes() { return CoreInfo::AnyTableType; }
+  static SHOptionalString outputHelp() { return SHCCSTR("Passes through the input table unchanged."); }
+
+  void cleanup(SHContext *context) { 
+    PARAM_CLEANUP(context);
+    if (_tmp0) {
+      const auto rc = _tmp0->refcount;
+      const auto flags = _tmp0->flags;
+      memset(_tmp0, 0x0, sizeof(SHVar));
+      _tmp0->refcount = rc;
+      _tmp0->flags = flags;
+      releaseVariable(_tmp0);
+      _tmp0 = nullptr;
+    }
+    if (_tmp1) {
+      const auto rc = _tmp1->refcount;
+      const auto flags = _tmp1->flags;
+      memset(_tmp1, 0x0, sizeof(SHVar));
+      _tmp1->refcount = rc;
+      _tmp1->flags = flags;
+      releaseVariable(_tmp1);
+      _tmp1 = nullptr;
+    }
+  }
+
+  void warmup(SHContext *context) { 
+    PARAM_WARMUP(context);
+    _tmp0 = referenceVariable(context, "$0");
+    _tmp1 = referenceVariable(context, "$1");
+  }
+
+  PARAM_REQUIRED_VARIABLES()
+  SHTypeInfo compose(SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+
+    // Add special variables $0 and $1 for key and value
+    auto dataCopy = data;
+    dataCopy.shared = {};
+    DEFER({ arrayFree(dataCopy.shared); });
+    
+    // Copy shared vars except $0/$1
+    for (uint32_t i = data.shared.len; i > 0; i--) {
+      auto idx = i - 1;
+      auto &item = data.shared.elements[idx];
+      if (strcmp(item.name, "$0") != 0 && strcmp(item.name, "$1") != 0) {
+        arrayPush(dataCopy.shared, item);
+      }
+    }
+
+    // Add $0 for key and $1 for value
+    _tmpInfo0.exposedType = CoreInfo::AnyType;
+    _tmpInfo1.exposedType = CoreInfo::AnyType;
+    arrayPush(dataCopy.shared, _tmpInfo0);
+    arrayPush(dataCopy.shared, _tmpInfo1);
+
+    _action.compose(dataCopy);
+
+    return data.inputType;
+  }
+
+  void activate(SHContext *context, const SHVar &input) {
+    if (input.valueType != SHType::Table) {
+      throw ActivationError("Iterate: Expected table input.");
+    }
+
+    SHMap *table = static_cast<SHMap *>(input.payload.tableValue.opaque);
+    const auto &fromKey = _from.get();
+    const auto &toKey = _to.get();
+
+    auto begin = table->begin();
+    auto end = table->end();
+
+    // Find range start
+    begin = std::lower_bound(table->begin(), table->end(), fromKey, [](const auto &a, const auto &b) { return *a.first < b; });
+
+    if (toKey.valueType != SHType::None) {
+      // Find range end inclusively using lower_bound
+      end = std::lower_bound(begin, table->end(), toKey, [](const auto &a, const auto &b) { return *a.first < b; });
+    }
+
+    for (auto it = begin; it != end; ++it) {
+      // Set $0 to key and $1 to value
+      assignVariableValue(*_tmp0, *it->first);
+      assignVariableValue(*_tmp1, *it->second);
+
+      // Create key-value pair for action input
+      _tableItem[0] = *it->first;
+      _tableItem[1] = *it->second;
+      const auto item = Var(_tableItem);
+
+      SHVar output{};
+      auto state = _action.activate<true>(context, item, output);
+      if (state != SHWireState::Continue)
+        break;
+    }
+  }
+
+private:
+  SHVar *_tmp0 = nullptr;
+  SHVar *_tmp1 = nullptr;
+  SHExposedTypeInfo _tmpInfo0{"$0"};
+  SHExposedTypeInfo _tmpInfo1{"$1"};
+  std::array<SHVar, 2> _tableItem;
 };
 
 // Register And
@@ -2946,5 +3070,7 @@ SHARDS_REGISTER_FN(core) {
 
   using ExportStringsShard = LambdaShard<export_strings, CoreInfo::NoneType, CoreInfo::AnySeqType>;
   REGISTER_SHARD("_ExportStrings", ExportStringsShard);
+
+  REGISTER_SHARD("Iterate", Iterate);
 }
 }; // namespace shards
