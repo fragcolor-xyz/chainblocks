@@ -235,3 +235,12 @@ none
 
 "../../.github/workflows/main.yml" | FS.Read | Yaml.ToJson | FromJson | Log
 ToJson | Yaml.FromJson | Log
+
+{["A" 1]: 1 ["A" 2]: 2 ["C"]: 3 ["D" 1]: 4 ["D" 2]: 5 ["E"]: 6}
+{Iterate(From: ["B" 1] To: ["D" 1] Action: {Log | $1 | Assert.Is(3)})}
+
+{
+  Sequence(iter-verify)
+  Iterate(From: ["C"] Action: {$1 | Push(iter-verify)})
+  iter-verify | Log | Assert.Is([3 4 5 6])
+}

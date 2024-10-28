@@ -1134,6 +1134,7 @@ struct SetUpdateBase : public SetBase {
       return *_cell;
     }
 
+    SHMap *table = nullptr;
     if (_target->valueType != SHType::Table) {
       if (_target->valueType != SHType::None)
         destroyVar(*_target);
@@ -1141,26 +1142,27 @@ struct SetUpdateBase : public SetBase {
       // Not initialized yet
       _target->valueType = SHType::Table;
       _target->payload.tableValue.api = &GetGlobals().TableInterface;
-      _target->payload.tableValue.opaque = new SHMap();
+      table = _target->payload.tableValue.opaque = new SHMap();
+    } else {
+      table = static_cast<SHMap *>(_target->payload.tableValue.opaque);
     }
-
-    auto &kv = _key.get();
-    SHVar *vptr = _target->payload.tableValue.api->tableAt(_target->payload.tableValue, kv);
 
     if (input.valueType == SHType::Table && input.payload.tableValue.opaque == _target->payload.tableValue.opaque) {
       context->cancelFlow("Set/Update, attempted to set a variable to itself");
       return input;
     }
 
-    // Clone will try to recycle memory and such
-    cloneVar(*vptr, input);
+    auto &kv = _key.get();
+    auto fk = shards::OwnedVar::Foreign(kv); // pass key copy on write
+    // will use cloneVar and recycle memory under the hood
+    auto &vRef = table->insert_or_assign(fk, input).first->second;
 
     // use fast cell from now
     // if variable we cannot do this tho!
     if (!_key.isVariable())
-      _cell = vptr;
+      _cell = &vRef;
 
-    return *vptr;
+    return vRef;
   }
 
   ALWAYS_INLINE const SHVar &activateRegular(SHContext *context, const SHVar &input) noexcept {
@@ -1830,18 +1832,20 @@ struct Get : public VariableBase {
       if (_isTable) {
         if (_target->valueType == SHType::Table) {
           auto &kv = _key.get();
-          auto maybeValue = _target->payload.tableValue.api->tableGet(_target->payload.tableValue, kv);
-          if (maybeValue) {
+          SHMap *table = static_cast<SHMap *>(_target->payload.tableValue.opaque);
+          auto maybeValue = table->find(kv);
+          if (maybeValue != table->end()) {
+            auto &vRef = maybeValue->second;
             // Has it
-            if (unlikely(_defaultValue.valueType != SHType::None && !defaultTypeCheck(*maybeValue))) {
+            if (unlikely(_defaultValue.valueType != SHType::None && !defaultTypeCheck(vRef))) {
               return _defaultValue;
             } else {
               // Pin fast cell
               // skip if variable
               if (!_key.isVariable()) {
-                _cell = maybeValue;
+                _cell = &vRef;
               }
-              return *maybeValue;
+              return vRef;
             }
           } else {
             // No record
@@ -1946,16 +1950,20 @@ struct SeqBase : public VariableBase {
 
   void initSeq() {
     if (_isTable) {
+      SHMap *table = nullptr;
       if (_target->valueType != SHType::Table) {
         // Not initialized yet
         _target->valueType = SHType::Table;
         _target->payload.tableValue.api = &GetGlobals().TableInterface;
-        _target->payload.tableValue.opaque = new SHMap();
+        table = _target->payload.tableValue.opaque = new SHMap();
+      } else {
+        table = static_cast<SHMap *>(_target->payload.tableValue.opaque);
       }
 
       if (!_key.isVariable()) {
         auto &kv = _key.get();
-        _cell = _target->payload.tableValue.api->tableAt(_target->payload.tableValue, kv);
+        auto fk = shards::OwnedVar::Foreign(kv);
+        _cell = &(*table)[fk];
 
         auto &seq = *_cell;
         if (seq.valueType != SHType::Seq) {
@@ -1977,8 +1985,11 @@ struct SeqBase : public VariableBase {
   }
 
   void fillVariableCell() {
+    assert(_target->valueType == SHType::Table && "Expected a table");
+    SHMap *table = static_cast<SHMap *>(_target->payload.tableValue.opaque);
     auto &kv = _key.get();
-    _cell = _target->payload.tableValue.api->tableAt(_target->payload.tableValue, kv);
+    auto fk = shards::OwnedVar::Foreign(kv);
+    _cell = &(*table)[fk];
 
     auto &seq = *_cell;
     if (seq.valueType != SHType::Seq) {
@@ -3234,12 +3245,14 @@ struct Take {
 
     const auto &indices = _indicesVar ? *_indicesVar : _indices;
     if (!_seqOutput) {
+      SHMap *table = static_cast<SHMap *>(input.payload.tableValue.opaque);
       const auto key = indices;
-      const auto val = input.payload.tableValue.api->tableGet(input.payload.tableValue, key);
-      if (!val) {
+      auto fk = shards::OwnedVar::Foreign(key);
+      const auto val = table->find(fk);
+      if (val == table->end()) {
         return Var::Empty;
       } else {
-        return *val;
+        return val->second;
       }
     } else {
       const uint32_t nkeys = indices.payload.seqValue.len;
