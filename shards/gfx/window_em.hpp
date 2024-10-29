@@ -41,6 +41,8 @@ struct Window {
   // Returns true when the window sizes are specified in pixels (on windows for example)
   static bool isWindowSizeInPixels();
 
+  bool isFocused() const { return true; }
+
   ~Window();
 };
 } // namespace gfx
