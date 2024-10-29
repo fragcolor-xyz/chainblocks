@@ -36,7 +36,7 @@ void NativeEventDecoder::apply(const NativeEventType &event) {
     virtualInputEvents.push_back(RequestCloseEvent{});
   } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
   } else if (event.type == SDL_EVENT_DID_ENTER_BACKGROUND) {
-    virtualInputEvents.push_back(SupendEvent{});
+    virtualInputEvents.push_back(SuspendEvent{});
   } else if (event.type == SDL_EVENT_DID_ENTER_FOREGROUND) {
     virtualInputEvents.push_back(ResumeEvent{});
   } else if (event.type == SDL_EVENT_FINGER_MOTION) {

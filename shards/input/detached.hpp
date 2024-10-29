@@ -205,12 +205,10 @@ private:
           } else if constexpr (std::is_same_v<T, ScrollEvent>) {
             if (!consumed && hasFocus)
               buffer.scrollDelta += arg.delta;
-          } else if constexpr (std::is_same_v<T, SupendEvent>) {
-            newState.suspended = true;
-            // TODO
+          } else if constexpr (std::is_same_v<T, SuspendEvent>) {
+            virtualInputEvents.push_back(SuspendEvent{});
           } else if constexpr (std::is_same_v<T, ResumeEvent>) {
-            newState.suspended = false;
-            // TODO
+            virtualInputEvents.push_back(ResumeEvent{});
           } else if constexpr (std::is_same_v<T, InputRegionEvent>) {
             newState.region = arg.region;
           } else if constexpr (std::is_same_v<T, TextEvent>) {

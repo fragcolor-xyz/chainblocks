@@ -92,7 +92,6 @@ struct InputState {
   uint32_t mouseButtonState{};
   float2 cursorPosition;
   InputRegion region;
-  bool suspended{};
 
   Pointers pointers;
 

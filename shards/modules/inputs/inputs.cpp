@@ -333,108 +333,6 @@ struct InputRegionPixelSize : public Base {
   }
 };
 
-struct Mouse : public Base {
-  ParamVar _hidden{Var(false)};
-  bool _isHidden{false};
-  ParamVar _captured{Var(false)};
-  bool _isCaptured{false};
-  ParamVar _relative{Var(false)};
-  bool _isRelative{false};
-  SDL_Window *_capturedWindow{};
-
-  static inline Parameters params{
-      {"Hidden", SHCCSTR("If the cursor should be hidden."), {CoreInfo::BoolType}},
-      {"Capture", SHCCSTR("If the mouse should be confined to the application window."), {CoreInfo::BoolType}},
-      {"Relative", SHCCSTR("If the mouse should only report relative movements."), {CoreInfo::BoolType}}};
-
-  static SHParametersInfo parameters() { return params; }
-
-  void setParam(int index, const SHVar &value) {
-    switch (index) {
-    case 0:
-      _hidden = value;
-      break;
-    case 1:
-      _captured = value;
-      break;
-    case 2:
-      _relative = value;
-      break;
-    default:
-      break;
-    }
-  }
-
-  SHVar getParam(int index) {
-    switch (index) {
-    case 0:
-      return _hidden;
-    case 1:
-      return _captured;
-    case 2:
-      return _relative;
-    default:
-      throw InvalidParameterIndex();
-    }
-  }
-
-  PARAM_REQUIRED_VARIABLES();
-  SHTypeInfo compose(const SHInstanceData &data) {
-    _requiredVariables.clear();
-    baseCompose(data, _requiredVariables);
-    return data.inputType;
-  }
-
-  void warmup(SHContext *context) {
-    _hidden.warmup(context);
-    _captured.warmup(context);
-    _relative.warmup(context);
-    baseWarmup(context);
-  }
-
-  void cleanup(SHContext *context) {
-    _hidden.cleanup();
-    _captured.cleanup();
-    _relative.cleanup();
-
-    setHidden(false);
-    setCaptured(false);
-    setRelative(false);
-  }
-
-  void setHidden(bool hidden) {
-    if (hidden != _isHidden) {
-      // SDL_ShowCursor(hidden ? SDL_DISABLE : SDL_ENABLE);
-      _isHidden = hidden;
-    }
-  }
-
-  void setRelative(bool relative) {
-    if (relative != _isRelative) {
-      // SDL_SetRelativeMouseMode(relative ? SDL_TRUE : SDL_FALSE);
-      _isRelative = relative;
-    }
-  }
-
-  void setCaptured(bool captured) {
-    if (captured != _isCaptured) {
-      // SDL_Window *windowToCapture = _windowContext->getSdlWindow();
-      // SDL_SetWindowGrab(windowToCapture, captured ? SDL_TRUE : SDL_FALSE);
-      // _capturedWindow = captured ? windowToCapture : nullptr;
-      _isCaptured = captured;
-    }
-  }
-
-  SHVar activate(SHContext *context, const SHVar &input) {
-    // setHidden(_hidden.get().payload.boolValue);
-    // setCaptured(_captured.get().payload.boolValue);
-    // setRelative(_relative.get().payload.boolValue);
-    // TODO
-
-    return input;
-  }
-};
-
 template <bool Pressed> struct MouseUpDown : public Base {
   static SHTypesInfo inputTypes() { return shards::CoreInfo::AnyType; }
   static SHTypesInfo outputTypes() { return shards::CoreInfo::AnyType; }
@@ -900,7 +798,6 @@ SHARDS_REGISTER_FN(inputs) {
   REGISTER_SHARD("Inputs.MousePixelPos", MousePixelPos);
   REGISTER_SHARD("Inputs.MousePos", MousePos);
   REGISTER_SHARD("Inputs.MouseDelta", MouseDelta);
-  REGISTER_SHARD("Inputs.Mouse", Mouse);
   REGISTER_SHARD("Inputs.IsKeyDown", IsKeyDown);
   REGISTER_SHARD("Inputs.HandleURL", HandleURL);
   REGISTER_SHARD("_Inputs.DiscardTempFiles", DiscardTempFiles); // Ignored for docs
