@@ -1998,7 +1998,8 @@ struct Iterate {
   PARAM_IMPL(PARAM_IMPL_FOR(_from), PARAM_IMPL_FOR(_to), PARAM_IMPL_FOR(_action));
 
   static SHOptionalString help() {
-    return SHCCSTR("Searches through a sorted table input for a range of matching elements. Returns all values from the table that have keys "
+    return SHCCSTR("Searches through a sorted table input for a range of matching elements. Returns all values from the table "
+                   "that have keys "
                    "between the From and To keys. If Focused is true, will stop searching once From no longer matches.");
   }
 
@@ -2008,7 +2009,7 @@ struct Iterate {
   static SHTypesInfo outputTypes() { return CoreInfo::AnyTableType; }
   static SHOptionalString outputHelp() { return SHCCSTR("Passes through the input table unchanged."); }
 
-  void cleanup(SHContext *context) { 
+  void cleanup(SHContext *context) {
     PARAM_CLEANUP(context);
     if (_tmp0) {
       const auto rc = _tmp0->refcount;
@@ -2030,7 +2031,7 @@ struct Iterate {
     }
   }
 
-  void warmup(SHContext *context) { 
+  void warmup(SHContext *context) {
     PARAM_WARMUP(context);
     _tmp0 = referenceVariable(context, "$0");
     _tmp1 = referenceVariable(context, "$1");
@@ -2044,7 +2045,7 @@ struct Iterate {
     auto dataCopy = data;
     dataCopy.shared = {};
     DEFER({ arrayFree(dataCopy.shared); });
-    
+
     // Copy shared vars except $0/$1
     for (uint32_t i = data.shared.len; i > 0; i--) {
       auto idx = i - 1;
@@ -2108,6 +2109,88 @@ private:
   SHExposedTypeInfo _tmpInfo0{"$0"};
   SHExposedTypeInfo _tmpInfo1{"$1"};
   std::array<SHVar, 2> _tableItem;
+};
+
+// Add after the Iterate struct
+
+struct First {
+  static SHOptionalString help() {
+    return SHCCSTR("Returns the first element from a sorted table or sequence. For tables, returns a [key, value] pair. Returns "
+                   "None if empty. "
+                   "Note: This operation is fast but unsafe unless the output is cloned (using Set instead of Ref) when combined "
+                   "with await or suspended wire flow.");
+  }
+
+  static SHOptionalString inputHelp() { return SHCCSTR("A table or sequence to get the first element from."); }
+  static SHOptionalString outputHelp() {
+    return SHCCSTR("For sequences: the first value. For tables: a [key, value] pair. Returns None if input is empty.");
+  }
+
+  static SHTypesInfo inputTypes() { return CoreInfo::SeqOrTable; }
+  static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
+
+  std::array<SHVar, 2> _tableItem;
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    if (input.valueType == SHType::Seq) {
+      if (input.payload.seqValue.len == 0) {
+        return Var::Empty;
+      }
+      return input.payload.seqValue.elements[0];
+    } else if (input.valueType == SHType::Table) {
+      SHMap *table = static_cast<SHMap *>(input.payload.tableValue.opaque);
+      if (table->empty()) {
+        return Var::Empty;
+      }
+
+      auto it = table->begin();
+      _tableItem[0] = *it->first;
+      _tableItem[1] = *it->second;
+      return Var(_tableItem);
+    } else {
+      throw ActivationError("First: Expected table or sequence input.");
+    }
+  }
+};
+
+struct Last {
+  static SHOptionalString help() {
+    return SHCCSTR("Returns the last element from a sorted table or sequence. For tables, returns a [key, value] pair. Returns "
+                   "None if empty. "
+                   "Note: This operation is fast but unsafe unless the output is cloned (using Set instead of Ref) when combined "
+                   "with await or suspended wire flow.");
+  }
+
+  static SHOptionalString inputHelp() { return SHCCSTR("A table or sequence to get the last element from."); }
+  static SHOptionalString outputHelp() {
+    return SHCCSTR("For sequences: the last value. For tables: a [key, value] pair. Returns None if input is empty.");
+  }
+
+  static SHTypesInfo inputTypes() { return CoreInfo::SeqOrTable; }
+  static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
+
+  std::array<SHVar, 2> _tableItem;
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    if (input.valueType == SHType::Seq) {
+      if (input.payload.seqValue.len == 0) {
+        return Var::Empty;
+      }
+      return input.payload.seqValue.elements[input.payload.seqValue.len - 1];
+    } else if (input.valueType == SHType::Table) {
+      SHMap *table = static_cast<SHMap *>(input.payload.tableValue.opaque);
+      if (table->empty()) {
+        return Var::Empty;
+      }
+
+      auto it = --table->end();
+      _tableItem[0] = *it->first;
+      _tableItem[1] = *it->second;
+      return Var(_tableItem);
+    } else {
+      throw ActivationError("Last: Expected table or sequence input.");
+    }
+  }
 };
 
 // Register And
@@ -3072,5 +3155,7 @@ SHARDS_REGISTER_FN(core) {
   REGISTER_SHARD("_ExportStrings", ExportStringsShard);
 
   REGISTER_SHARD("Iterate", Iterate);
+  REGISTER_SHARD("First", First);
+  REGISTER_SHARD("Last", Last);
 }
 }; // namespace shards

@@ -165,6 +165,8 @@ struct CoreInfo {
   static inline Types StringStringVarOrNone{{StringType, StringVarType, NoneType}};
 
   static inline Types IntOrIntVar{{IntType, IntVarType}};
+
+  static inline Types SeqOrTable{{AnySeqType, AnyTableType}};
 };
 } // namespace shards
 
