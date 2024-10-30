@@ -3084,6 +3084,17 @@ fn eval_pipeline(
                 })
                 .unwrap_or(false);
 
+              let override_def = param_helper
+                .get_param_by_name_or_index("Override", 3)
+                .map(|v| {
+                  if let Value::Boolean(b) = &v.value {
+                    *b
+                  } else {
+                    false
+                  }
+                })
+                .unwrap_or(false);
+
               match (name, value) {
                 (
                   Param {
@@ -3093,7 +3104,7 @@ fn eval_pipeline(
                   value,
                 ) => {
                   if let Some(_) = find_defined(name, e) {
-                    if !ignore_redefined {
+                    if !ignore_redefined && !override_def {
                       return Err(
                         (
                           format!("{} already defined", name.name),
@@ -3102,8 +3113,10 @@ fn eval_pipeline(
                           .into(),
                       );
                     } else {
-                      // ok we are ignoring redefined, so we just skip
-                      return Ok(());
+                      if !override_def {
+                        // ok we are ignoring redefined, so we just skip
+                        return Ok(());
+                      }
                     }
                   }
 
