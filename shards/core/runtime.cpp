@@ -2999,7 +2999,7 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
     shards::GetGlobals().RootPath = p;
     shards::loadExternalShards(p);
     fs::current_path(p);
-    SHLOG_INFO("Root path set to: {}", p);
+    SHLOG_DEBUG("Root path set to: {}", p);
   };
 
   result->asyncActivate = [](SHContext *context, void *userData, SHAsyncActivateProc call, SHAsyncCancelProc cancel_call) {

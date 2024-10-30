@@ -6,7 +6,7 @@ use clap::{arg, Parser};
 use shards::core::{sleep, Core};
 use shards::types::Mesh;
 use shards::util::from_raw_parts_allow_null;
-use shards::{fourCharacterCode, shlog, shlog_error, SHCore, GIT_VERSION, SHARDS_CURRENT_ABI};
+use shards::{fourCharacterCode, shlog, shlog_debug, shlog_error, SHCore, GIT_VERSION, SHARDS_CURRENT_ABI};
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::fs;
@@ -143,7 +143,7 @@ pub fn process_args(argc: i32, argv: *const *const c_char, no_cancellation: bool
     _ => unsafe {
       shards::core::Core = shardsInterface(SHARDS_CURRENT_ABI as u32);
       shards_install_signal_handlers();
-      shlog!("Shards git version: {}", GIT_VERSION);
+      shlog_debug!("Shards git version: {}", GIT_VERSION);
     },
   };
 
@@ -286,7 +286,7 @@ fn execute_seq(
   let mut defines = HashMap::new();
 
   for arg in args {
-    shlog!("arg: {}", arg);
+    shlog_debug!("arg: {}", arg);
     // find the first column and split it, the rest is the value
     let mut split = arg.split(':');
     let key = split.next().unwrap();
@@ -437,7 +437,7 @@ fn execute(
     }
   }
 
-  shlog!("Evaluating file: {}", file);
+  shlog_debug!("Evaluating file: {}", file);
 
   let ast = {
     let file_path = Path::new(&file);
