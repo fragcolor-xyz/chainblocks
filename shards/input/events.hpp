@@ -74,7 +74,7 @@ struct KeyEvent {
   std::partial_ordering operator<=>(const KeyEvent &other) const = default;
 };
 
-struct SupendEvent {
+struct SuspendEvent {
   std::partial_ordering operator<=>(const KeyEvent &other) const { return std::partial_ordering::equivalent; }
 };
 
@@ -124,7 +124,7 @@ using Event = std::variant<
     // Text events
     KeyEvent, TextEvent, TextCompositionEvent, TextCompositionEndEvent,
     // Other events
-    SupendEvent, ResumeEvent, InputRegionEvent, RequestCloseEvent, DropFileEvent>;
+    SuspendEvent, ResumeEvent, InputRegionEvent, RequestCloseEvent, DropFileEvent>;
 
 inline std::partial_ordering operator<=>(const Event &a, const Event &b) {
   auto ci = a.index() <=> b.index();

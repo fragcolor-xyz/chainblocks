@@ -33,8 +33,8 @@ inline std::string debugFormat(const Event &event) {
           return fmt::format("ScrollEvent {{ delta: {} }}", arg.delta);
         } else if constexpr (std::is_same_v<T, KeyEvent>) {
           return fmt::format("KeyEvent {{ keycode: {}, pressed: {}, modifiers: {}}}", arg.key, arg.pressed, arg.modifiers);
-        } else if constexpr (std::is_same_v<T, SupendEvent>) {
-          return fmt::format("SupendEvent {{}}");
+        } else if constexpr (std::is_same_v<T, SuspendEvent>) {
+          return fmt::format("SuspendEvent {{}}");
         } else if constexpr (std::is_same_v<T, ResumeEvent>) {
           return fmt::format("ResumeEvent {{}}");
         } else if constexpr (std::is_same_v<T, InputRegionEvent>) {

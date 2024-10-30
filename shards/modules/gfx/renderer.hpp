@@ -112,8 +112,8 @@ struct ShardsRenderer {
       return false;
     }
 
-    float deltaTime = 0.0;
-    _loop.beginFrame(0.0f, deltaTime);
+    double deltaTime = 0.0;
+    _loop.beginFrame(0.0, deltaTime);
     if (context->beginFrame()) {
       _graphicsContext.time = _loop.getAbsoluteTime();
       _graphicsContext.deltaTime = deltaTime;

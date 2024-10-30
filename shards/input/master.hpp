@@ -87,6 +87,8 @@ private:
 
   bool terminateRequested{};
 
+  bool foreground{true};
+
 public:
   InputMaster();
   ~InputMaster();

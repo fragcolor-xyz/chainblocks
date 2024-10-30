@@ -193,4 +193,9 @@ bool Window::isWindowSizeInPixels() {
 }
 
 Window::~Window() { cleanup(); }
+
+bool Window::isFocused() const {
+  Uint32 flags = SDL_GetWindowFlags(window);
+  return (flags & SDL_WINDOW_INPUT_FOCUS) || (flags & SDL_WINDOW_MOUSE_FOCUS);
+}
 } // namespace gfx

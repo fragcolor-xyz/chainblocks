@@ -105,6 +105,10 @@ void InputMaster::handleMessage(const Message &message, gfx::Window& window) {
           terminateRequested = true;
         } else if constexpr (std::is_same_v<T, ResizeWindowMessage>) {
           window.resize(arg.newSize);
+        } else if constexpr (std::is_same_v<T, SuspendEvent>) {
+          foreground = false; // TODO, not working for whatever reason
+        } else if constexpr (std::is_same_v<T, ResumeEvent>) {
+          foreground = true; // TODO, not working for whatever reason
         }
       },
       message);

@@ -542,6 +542,42 @@ struct WindowInsets {
   }
 };
 
+struct WindowFocused {
+  static SHTypesInfo inputTypes() { return CoreInfo::NoneType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::BoolType; }
+
+  static SHOptionalString help() {
+    return SHCCSTR("This shard outputs whether the window specified in the Window parameter currently has focus.");
+  }
+  static SHOptionalString inputHelp() { return DefaultHelpText::InputHelpIgnored; }
+  static SHOptionalString outputHelp() { return SHCCSTR("Outputs true if the window currently has focus, false otherwise."); }
+
+  PARAM_PARAMVAR(_window, "Window", "The window to check focus state of.",
+                 {CoreInfo::NoneType, Type::VariableOf(WindowContext::Type)});
+  PARAM_IMPL(PARAM_IMPL_FOR(_window));
+
+  RequiredWindowContext _requiredWindowContext;
+
+  PARAM_REQUIRED_VARIABLES();
+  SHTypeInfo compose(SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    _requiredWindowContext.compose(data, _requiredVariables, &_window);
+    return outputTypes().elements[0];
+  }
+
+  void warmup(SHContext *context) {
+    PARAM_WARMUP(context);
+    _requiredWindowContext.warmup(context, &_window);
+  }
+
+  void cleanup(SHContext *context) {
+    PARAM_CLEANUP(context);
+    _requiredWindowContext.cleanup();
+  }
+
+  SHVar activate(SHContext *shContext, const SHVar &input) { return Var(_requiredWindowContext->window->isFocused()); }
+};
+
 void registerMainWindowShards() {
   REGISTER_SHARD("GFX.MainWindow", MainWindow);
   REGISTER_SHARD("GFX.WindowSize", WindowSize);
@@ -550,6 +586,7 @@ void registerMainWindowShards() {
   REGISTER_SHARD("GFX.UIScaleFactor", OsUiScaleFactor);
   REGISTER_SHARD("GFX.MoveWindow", MoveWindow);
   REGISTER_SHARD("GFX.WindowInsets", WindowInsets);
+  REGISTER_SHARD("GFX.WindowFocused", WindowFocused);
 }
 
 } // namespace gfx

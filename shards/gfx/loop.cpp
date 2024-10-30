@@ -4,9 +4,9 @@
 namespace gfx {
 Loop::Loop() : startTime(Clock::now()) {}
 
-bool Loop::beginFrame(float targetDeltaTime, float &outDeltaTime) {
+bool Loop::beginFrame(double targetDeltaTime, double &outDeltaTime) {
   TimePoint now = Clock::now();
-  outDeltaTime = std::chrono::duration<float>(now - lastFrameTime).count();
+  outDeltaTime = std::chrono::duration<double>(now - lastFrameTime).count();
   if (!haveFirstFrame) {
     outDeltaTime = 0.0f;
     lastFrameTime = now;
