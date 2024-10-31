@@ -7,6 +7,13 @@
 #include <shards/utility.hpp>
 #include <boost/algorithm/string.hpp>
 #include <fstream>
+#include <fcntl.h>
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 #include <boost/filesystem.hpp>
 #include <system_error>
@@ -15,6 +22,35 @@ using ErrorCode = boost::system::error_code;
 
 namespace shards {
 namespace FS {
+
+void portable_fsync(const boost::filesystem::path &filePath) {
+#if defined(_WIN32) || defined(_WIN64)
+  HANDLE hFile = CreateFile(filePath.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (hFile == INVALID_HANDLE_VALUE) {
+    SHLOG_ERROR("Error opening file: {}", GetLastError());
+    return;
+  }
+
+  if (!FlushFileBuffers(hFile)) {
+    SHLOG_ERROR("Error in FlushFileBuffers: {}", GetLastError());
+  }
+
+  CloseHandle(hFile);
+
+#else
+  int fd = ::open(filePath.c_str(), O_RDWR);
+  if (fd == -1) {
+    SHLOG_ERROR("Error opening file: {}", strerror(errno));
+    return;
+  }
+
+  if (::fsync(fd) == -1) {
+    SHLOG_ERROR("Error in fsync: {}", strerror(errno));
+  }
+
+  ::close(fd);
+#endif
+}
 
 struct FileNotFoundException : public std::runtime_error {
   FileNotFoundException(const std::string &err) : std::runtime_error(err) {}
@@ -328,6 +364,7 @@ struct Write {
   SHExposedTypeInfo _requiring;
   bool _overwrite = false;
   bool _append = false;
+  bool _sync = false;
 
   static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
   static SHTypesInfo outputTypes() { return CoreInfo::StringType; }
@@ -337,7 +374,8 @@ struct Write {
        SHCCSTR("The string or bytes to write as the file's contents."),
        {CoreInfo::StringType, CoreInfo::BytesType, CoreInfo::StringVarType, CoreInfo::BytesVarType, CoreInfo::NoneType}},
       {"Overwrite", SHCCSTR("Overwrite the file if it already exists."), {CoreInfo::BoolType}},
-      {"Append", SHCCSTR("If we should append Contents to an existing file."), {CoreInfo::BoolType}}};
+      {"Append", SHCCSTR("If we should append Contents to an existing file."), {CoreInfo::BoolType}},
+      {"Sync", SHCCSTR("If we should sync the file to disk after writing."), {CoreInfo::BoolType}}};
 
   static SHParametersInfo parameters() { return params; }
 
@@ -352,6 +390,9 @@ struct Write {
     case 2:
       _append = value.payload.boolValue;
       break;
+    case 3:
+      _sync = value.payload.boolValue;
+      break;
     }
   }
 
@@ -363,6 +404,8 @@ struct Write {
       return Var(_overwrite);
     case 2:
       return Var(_append);
+    case 3:
+      return Var(_sync);
     default:
       return Var::Empty;
     }
@@ -415,6 +458,10 @@ struct Write {
       } else {
         file.write((const char *)contents.payload.bytesValue, contents.payload.bytesSize);
       }
+
+      if (_sync) {
+        portable_fsync(p);
+      }
     }
     return input;
   }
@@ -422,7 +469,10 @@ struct Write {
 
 struct Copy {
   enum class IfExists { Fail, Skip, Overwrite, Update };
-  DECL_ENUM_INFO(IfExists, IfExists, "Action to take when a destination file already exists during a copy operation. Determines whether to fail, skip, overwrite, or update the file.", 'fsow');
+  DECL_ENUM_INFO(IfExists, IfExists,
+                 "Action to take when a destination file already exists during a copy operation. Determines whether to fail, "
+                 "skip, overwrite, or update the file.",
+                 'fsow');
 
   ParamVar _destination{};
   IfExists _overwrite{IfExists::Fail};
