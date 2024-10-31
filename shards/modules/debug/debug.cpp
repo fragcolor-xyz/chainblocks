@@ -70,6 +70,24 @@ struct DumpEnv {
 
   SHVar activate(SHContext *shContext, const SHVar &input) { return input; }
 };
+
+struct DumpWireStack {
+  static SHTypesInfo inputTypes() { return shards::CoreInfo::AnyType; }
+  static SHTypesInfo outputTypes() { return shards::CoreInfo::AnyType; }
+  static SHOptionalString help() { return SHCCSTR("Dumps the current wire stack during activation"); }
+
+  SHVar activate(SHContext *shContext, const SHVar &input) {
+    std::stringstream ss;
+    ss << "Wire stack:\n";
+    for (size_t i = 0; i < shContext->wireStack.size(); i++) {
+      auto wire = shContext->wireStack[i];
+      ss << fmt::format(" [{:2}] {}\n", i, wire->name);
+    }
+    SHLOG_INFO("{}", ss.str());
+    return input;
+  }
+};
+
 } // namespace shards::Debug
 
 namespace shards {
@@ -77,5 +95,6 @@ SHARDS_REGISTER_FN(debug) {
   using namespace Debug;
   REGISTER_SHARD("Debug.Noop", DebugNoop);
   REGISTER_SHARD("Debug.DumpEnv", DumpEnv);
+  REGISTER_SHARD("Debug.WireStack", DumpWireStack);
 }
 } // namespace shards
