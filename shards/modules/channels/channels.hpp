@@ -98,6 +98,14 @@ protected:
 using Channel = std::variant<DummyChannel, MPMCChannel, BroadcastChannel>;
 std::shared_ptr<Channel> get(const std::string &name);
 
+// Atomic flag wrapper
+struct AtomicFlag {
+  std::atomic_bool value{false};
+};
+
+using FlagPtr = std::shared_ptr<AtomicFlag>;
+FlagPtr getFlag(const std::string &name);
+
 } // namespace channels
 } // namespace shards
 

@@ -511,8 +511,76 @@ struct Flush : public Base {
     return input;
   }
 };
+
+FlagPtr getFlag(const std::string &name) {
+  static std::unordered_map<std::string, std::weak_ptr<AtomicFlag>> flags;
+  static std::shared_mutex mutex;
+
+  std::shared_lock<decltype(mutex)> _l(mutex);
+  auto it = flags.find(name);
+  if (it == flags.end()) {
+    _l.unlock();
+    std::scoped_lock<decltype(mutex)> _l1(mutex);
+    auto sp = std::make_shared<AtomicFlag>();
+    flags[name] = sp;
+    return sp;
+  } else {
+    std::shared_ptr<AtomicFlag> sp = it->second.lock();
+    if (!sp) {
+      _l.unlock();
+      std::scoped_lock<decltype(mutex)> _l1(mutex);
+      sp = std::make_shared<AtomicFlag>();
+      flags[name] = sp;
+    }
+    return sp;
+  }
+}
+
+// Set flag value shard
+struct SetFlag : public Base {
+  FlagPtr _flag;
+
+  static inline Parameters setFlagParams{
+      {"Name", SHCCSTR("The name of the flag."), {CoreInfo::StringType}},
+  };
+
+  static SHTypesInfo inputTypes() { return CoreInfo::BoolType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::BoolType; }
+  static SHParametersInfo parameters() { return setFlagParams; }
+
+  SHTypeInfo compose(const SHInstanceData &data) {
+    _flag = getFlag(_name);
+    return data.inputType;
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    _flag->value.store(input.payload.boolValue);
+    return input;
+  }
+};
+
+// Get flag value shard
+struct GetFlag : public Base {
+  FlagPtr _flag;
+
+  static inline Parameters getFlagParams{
+      {"Name", SHCCSTR("The name of the flag."), {CoreInfo::StringType}},
+  };
+
+  static SHTypesInfo inputTypes() { return CoreInfo::AnyType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::BoolType; }
+  static SHParametersInfo parameters() { return getFlagParams; }
+
+  SHTypeInfo compose(const SHInstanceData &data) {
+    _flag = getFlag(_name);
+    return CoreInfo::BoolType;
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) { return Var(_flag->value.load()); }
+};
 } // namespace channels
 } // namespace shards
+
 SHARDS_REGISTER_FN(channels) {
   using namespace shards::channels;
   REGISTER_SHARD("Produce", Produce);
@@ -521,4 +589,6 @@ SHARDS_REGISTER_FN(channels) {
   REGISTER_SHARD("Listen", Listen);
   REGISTER_SHARD("Complete", Complete);
   REGISTER_SHARD("Flush", Flush);
+  REGISTER_SHARD("SetFlag", SetFlag);
+  REGISTER_SHARD("GetFlag", GetFlag);
 }

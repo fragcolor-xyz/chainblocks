@@ -247,3 +247,6 @@ ToJson | Yaml.FromJson | Log
 
 sorted-table-test | First | ExpectSeq | Assert.Is([["A" 1] 1])
 sorted-table-test | Last | ExpectSeq | Assert.Is([["E"] 6])
+
+true | SetFlag("test-flag")
+GetFlag("test-flag") | Log | Assert.Is(true)
