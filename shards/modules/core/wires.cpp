@@ -790,6 +790,14 @@ struct ResumeWire : public WireBase {
   SHVar activate(SHContext *context, const SHVar &input) {
     ensureWire();
 
+    if (!wire->context) {
+      throw ActivationError("Wire has no context");
+    }
+
+    if (!wire->context->flow) {
+      throw ActivationError("Wire has no flow");
+    }
+
     wire->context->flow->paused = false;
 
     return input;
