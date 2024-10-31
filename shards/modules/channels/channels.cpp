@@ -554,8 +554,8 @@ struct SetFlag : public Base {
   }
 
   SHVar activate(SHContext *context, const SHVar &input) {
-    _flag->value.store(input.payload.boolValue);
-    return input;
+    bool oldValue = _flag->value.exchange(input.payload.boolValue);
+    return Var(oldValue);
   }
 };
 
@@ -578,6 +578,165 @@ struct GetFlag : public Base {
 
   SHVar activate(SHContext *context, const SHVar &input) { return Var(_flag->value.load()); }
 };
+
+CounterPtr getCounter(const std::string &name) {
+  static std::unordered_map<std::string, std::weak_ptr<AtomicCounter>> counters;
+  static std::shared_mutex mutex;
+
+  std::shared_lock<decltype(mutex)> _l(mutex);
+  auto it = counters.find(name);
+  if (it == counters.end()) {
+    _l.unlock();
+    std::scoped_lock<decltype(mutex)> _l1(mutex);
+    auto sp = std::make_shared<AtomicCounter>();
+    counters[name] = sp;
+    return sp;
+  } else {
+    std::shared_ptr<AtomicCounter> sp = it->second.lock();
+    if (!sp) {
+      _l.unlock();
+      std::scoped_lock<decltype(mutex)> _l1(mutex);
+      sp = std::make_shared<AtomicCounter>();
+      counters[name] = sp;
+    }
+    return sp;
+  }
+}
+
+// Increment counter value shard
+struct IncCounter : public Base {
+  CounterPtr _counter;
+  int64_t _amount{1};
+
+  static inline Parameters incCounterParams{
+      {"Name", SHCCSTR("The name of the counter."), {CoreInfo::StringType}},
+      {"Amount", SHCCSTR("The amount to increment by (default: 1)."), {CoreInfo::IntType}},
+  };
+
+  static SHTypesInfo inputTypes() { return CoreInfo::AnyType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::IntType; }
+  static SHParametersInfo parameters() { return incCounterParams; }
+
+  void setParam(int index, const SHVar &value) {
+    switch (index) {
+    case 0:
+      _name = SHSTRVIEW(value);
+      break;
+    case 1:
+      _amount = value.payload.intValue;
+      break;
+    default:
+      throw std::out_of_range("Invalid parameter index.");
+    }
+  }
+
+  SHVar getParam(int index) {
+    switch (index) {
+    case 0:
+      return Var(_name);
+    case 1:
+      return Var(_amount);
+    default:
+      throw std::out_of_range("Invalid parameter index.");
+    }
+  }
+
+  SHTypeInfo compose(const SHInstanceData &data) {
+    _counter = getCounter(_name);
+    return CoreInfo::IntType;
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) { return Var(_counter->value.fetch_add(_amount) + _amount); }
+};
+
+// Decrement counter value shard
+struct DecCounter : public Base {
+  CounterPtr _counter;
+  int64_t _amount{1};
+
+  static inline Parameters decCounterParams{
+      {"Name", SHCCSTR("The name of the counter."), {CoreInfo::StringType}},
+      {"Amount", SHCCSTR("The amount to decrement by (default: 1)."), {CoreInfo::IntType}},
+  };
+
+  static SHTypesInfo inputTypes() { return CoreInfo::AnyType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::IntType; }
+  static SHParametersInfo parameters() { return decCounterParams; }
+
+  void setParam(int index, const SHVar &value) {
+    switch (index) {
+    case 0:
+      _name = SHSTRVIEW(value);
+      break;
+    case 1:
+      _amount = value.payload.intValue;
+      break;
+    default:
+      throw std::out_of_range("Invalid parameter index.");
+    }
+  }
+
+  SHVar getParam(int index) {
+    switch (index) {
+    case 0:
+      return Var(_name);
+    case 1:
+      return Var(_amount);
+    default:
+      throw std::out_of_range("Invalid parameter index.");
+    }
+  }
+
+  SHTypeInfo compose(const SHInstanceData &data) {
+    _counter = getCounter(_name);
+    return CoreInfo::IntType;
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) { return Var(_counter->value.fetch_sub(_amount) - _amount); }
+};
+
+// Get counter value shard
+struct GetCounter : public Base {
+  CounterPtr _counter;
+
+  static inline Parameters getCounterParams{
+      {"Name", SHCCSTR("The name of the counter."), {CoreInfo::StringType}},
+  };
+
+  static SHTypesInfo inputTypes() { return CoreInfo::AnyType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::IntType; }
+  static SHParametersInfo parameters() { return getCounterParams; }
+
+  SHTypeInfo compose(const SHInstanceData &data) {
+    _counter = getCounter(_name);
+    return CoreInfo::IntType;
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) { return Var(_counter->value.load()); }
+};
+
+// Set counter value shard
+struct SetCounter : public Base {
+  CounterPtr _counter;
+
+  static inline Parameters setCounterParams{
+      {"Name", SHCCSTR("The name of the counter."), {CoreInfo::StringType}},
+  };
+
+  static SHTypesInfo inputTypes() { return CoreInfo::IntType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::IntType; }
+  static SHParametersInfo parameters() { return setCounterParams; }
+
+  SHTypeInfo compose(const SHInstanceData &data) {
+    _counter = getCounter(_name);
+    return data.inputType;
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    int64_t oldValue = _counter->value.exchange(input.payload.intValue);
+    return Var(oldValue);
+  }
+};
 } // namespace channels
 } // namespace shards
 
@@ -591,4 +750,8 @@ SHARDS_REGISTER_FN(channels) {
   REGISTER_SHARD("Flush", Flush);
   REGISTER_SHARD("SetFlag", SetFlag);
   REGISTER_SHARD("GetFlag", GetFlag);
+  REGISTER_SHARD("IncCounter", IncCounter);
+  REGISTER_SHARD("DecCounter", DecCounter);
+  REGISTER_SHARD("GetCounter", GetCounter);
+  REGISTER_SHARD("SetCounter", SetCounter);
 }

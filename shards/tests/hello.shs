@@ -248,5 +248,12 @@ ToJson | Yaml.FromJson | Log
 sorted-table-test | First | ExpectSeq | Assert.Is([["A" 1] 1])
 sorted-table-test | Last | ExpectSeq | Assert.Is([["E"] 6])
 
-true | SetFlag("test-flag")
+true | SetFlag("test-flag") | Log("Flag was") | Assert.Is(false)
 GetFlag("test-flag") | Log | Assert.Is(true)
+
+IncCounter("test-counter" 2) | Log | Assert.Is(2)
+GetCounter("test-counter") | Log | Assert.Is(2)
+DecCounter("test-counter" 1) | Log | Assert.Is(1)
+GetCounter("test-counter") | Log | Assert.Is(1)
+10 | SetCounter("test-counter") | Log | Assert.Is(1) ; old value
+GetCounter("test-counter") | Log | Assert.Is(10)

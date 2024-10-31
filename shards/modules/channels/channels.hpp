@@ -106,6 +106,14 @@ struct AtomicFlag {
 using FlagPtr = std::shared_ptr<AtomicFlag>;
 FlagPtr getFlag(const std::string &name);
 
+// After AtomicFlag definition, add:
+struct AtomicCounter {
+  std::atomic<int64_t> value{0};
+};
+
+using CounterPtr = std::shared_ptr<AtomicCounter>;
+CounterPtr getCounter(const std::string &name);
+
 } // namespace channels
 } // namespace shards
 
