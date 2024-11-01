@@ -21,6 +21,7 @@ pub struct AutoGrid {
   pub column_spacing: Option<f32>,
   pub row_spacing: Option<f32>,
   pub center: bool,
+  pub max_tile_height: Option<f32>,
 }
 
 impl Default for AutoGrid {
@@ -31,6 +32,7 @@ impl Default for AutoGrid {
       column_spacing: None,
       row_spacing: None,
       center: true,
+      max_tile_height: None,
     }
   }
 }
@@ -96,53 +98,124 @@ impl AutoGrid {
       initial_cursor_0
     };
 
-    let mut cursor = initial_cursor_1;
-    let mut col_idx: i32 = 0;
-    let mut max_y = initial_cursor_1.y;
-    let mut max_item_height = 0.0;
+    let used_rect = if let Some(tile_height) = self.max_tile_height {
+      let viewport_min_y = ui.clip_rect().min.y;
+      let viewport_max_y = ui.clip_rect().max.y;
 
-    let id_src = Id::new("AutoGrid").with(ui.id());
+      // First pass: calculate total height without rendering
+      let num_rows = (num_children + max_num_cols as usize - 1) / max_num_cols as usize;
 
-    // Pass each element in the given sequence to the shards in the contents and render
-    for i in 0..num_children {
-      // Check if contents will exceed max grid width if added onto current row
-      if col_idx >= max_num_cols {
-        cursor.x = initial_cursor_1.x;
-        cursor.y += max_item_height + row_spacing;
-        max_item_height = 0.0;
-        col_idx = 0;
+      // Calculate total height based on number of rows, ensuring full visibility of last row
+      let total_height = if num_rows > 0 {
+        let row_heights = num_rows as f32 * tile_height;
+        let spacing_heights = (num_rows - 1) as f32 * row_spacing;
+        // Add full tile height as padding to ensure last row is fully visible
+        row_heights + spacing_heights + tile_height
+      } else {
+        0.0
+      } + (initial_cursor_1.y - initial_cursor_0.y);
+
+      // Second pass: actual rendering
+      let mut cursor = initial_cursor_1;
+      let mut col_idx = 0;
+      let mut max_y = initial_cursor_1.y;
+      let mut max_item_height = 0.0;
+
+      let id_src = Id::new("AutoGrid").with(ui.id());
+
+      for i in 0..num_children {
+        if col_idx >= max_num_cols {
+          cursor.x = initial_cursor_1.x;
+          cursor.y += max_item_height + row_spacing;
+          max_item_height = 0.0;
+          col_idx = 0;
+        }
+
+        let is_visible = cursor.y <= viewport_max_y && cursor.y + tile_height >= viewport_min_y;
+
+        if is_visible {
+          let widget_pos = cursor;
+          let item_max_rect = Rect::from_min_max(
+            widget_pos,
+            Pos2::new(widget_pos.x + item_width, ui.max_rect().bottom()),
+          );
+
+          let child_layout = Layout::top_down(egui::Align::Center);
+          let mut child_ui =
+            ui.child_ui_with_id_source(item_max_rect, child_layout, id_src.with(i), None);
+
+          add_child(&mut child_ui, i);
+
+          let child_ui_rect = child_ui.min_rect();
+          let item_size = child_ui_rect.size();
+          max_item_height = f32::max(max_item_height, item_size.y);
+        } else {
+          max_item_height = f32::max(max_item_height, tile_height);
+        }
+
+        max_y = f32::max(max_y, cursor.y + max_item_height);
+        cursor.x += item_width + column_spacing;
+        col_idx += 1;
       }
 
-      let widget_pos = cursor;
-      let item_max_rect = Rect::from_min_max(
-        widget_pos,
-        Pos2::new(widget_pos.x + item_width, ui.max_rect().bottom()),
-      );
+      // Use the calculated total height for the allocation
+      Rect::from_min_max(
+        initial_cursor_0,
+        Pos2 {
+          x: initial_cursor_0.x + avail_x,
+          y: initial_cursor_0.y + total_height,
+        },
+      )
+    } else {
+      let mut cursor = initial_cursor_1;
+      let mut col_idx: i32 = 0;
+      let mut max_y = initial_cursor_1.y;
+      let mut max_item_height = 0.0;
 
-      let child_layout = Layout::top_down(egui::Align::Center);
-      let mut child_ui =
-        ui.child_ui_with_id_source(item_max_rect, child_layout, id_src.with(i), None);
+      let id_src = Id::new("AutoGrid").with(ui.id());
 
-      add_child(&mut child_ui, i);
+      // Pass each element in the given sequence to the shards in the contents and render
+      for i in 0..num_children {
+        // Check if contents will exceed max grid width if added onto current row
+        if col_idx >= max_num_cols {
+          cursor.x = initial_cursor_1.x;
+          cursor.y += max_item_height + row_spacing;
+          max_item_height = 0.0;
+          col_idx = 0;
+        }
 
-      let child_ui_rect = child_ui.min_rect();
-      let item_size = child_ui_rect.size();
+        let widget_pos = cursor;
+        let item_max_rect = Rect::from_min_max(
+          widget_pos,
+          Pos2::new(widget_pos.x + item_width, ui.max_rect().bottom()),
+        );
 
-      max_y = f32::max(max_y, cursor.y + item_size.y);
-      cursor.x += item_width + column_spacing;
-      max_item_height = f32::max(max_item_height, item_size.y);
+        let child_layout = Layout::top_down(egui::Align::Center);
+        let mut child_ui =
+          ui.child_ui_with_id_source(item_max_rect, child_layout, id_src.with(i), None);
 
-      col_idx += 1;
-    }
+        add_child(&mut child_ui, i);
 
-    let used_rect = Rect::from_min_max(
-      initial_cursor_0,
-      Pos2 {
-        x: initial_cursor_0.x + avail_x,
-        y: max_y,
-      },
-    );
-    return ui.allocate_rect(used_rect, egui::Sense::hover());
+        let child_ui_rect = child_ui.min_rect();
+        let item_size = child_ui_rect.size();
+
+        max_y = f32::max(max_y, cursor.y + item_size.y);
+        cursor.x += item_width + column_spacing;
+        max_item_height = f32::max(max_item_height, item_size.y);
+
+        col_idx += 1;
+      }
+
+      Rect::from_min_max(
+        initial_cursor_0,
+        Pos2 {
+          x: initial_cursor_0.x + avail_x,
+          y: max_y,
+        },
+      )
+    };
+
+    ui.allocate_rect(used_rect, egui::Sense::hover())
   }
 }
 
@@ -171,6 +244,12 @@ struct AutoGridShard {
   parents: ParamVar,
   #[shard_required]
   required: ExposedTypes,
+  #[shard_param(
+    "MaxTileHeight",
+    "Maximum height of each tile for viewport culling.",
+    FLOAT_VAR_SLICE
+  )]
+  pub max_tile_height: ParamVar,
 }
 
 impl Default for AutoGridShard {
@@ -186,6 +265,7 @@ impl Default for AutoGridShard {
       row_spacing: ParamVar::default(),
       required: Vec::new(),
       contents: ShardsVar::default(),
+      max_tile_height: ParamVar::default(),
     }
   }
 }
@@ -262,6 +342,10 @@ impl Shard for AutoGridShard {
 
       let item_width_var = self.item_width.get();
       grid.item_width = item_width_var.try_into().unwrap();
+
+      if let Ok(max_tile_height) = TryInto::<f32>::try_into(self.max_tile_height.get()) {
+        grid.max_tile_height = Some(max_tile_height);
+      }
 
       let mut failure: Option<&'static str> = None;
 
