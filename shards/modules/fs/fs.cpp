@@ -625,10 +625,25 @@ struct Absolute {
   static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
   static SHTypesInfo outputTypes() { return CoreInfo::StringType; }
 
+  PARAM_PARAMVAR(_canonical, "Canonical", "Whether to canonicalize the path, the file should exist for this to work", {CoreInfo::BoolType, CoreInfo::BoolVarType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_canonical));
+
+  Absolute() { _canonical = Var(false); }
+
+  PARAM_REQUIRED_VARIABLES()
+  SHTypeInfo compose(const SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return data.inputType;
+  }
+  void warmup(SHContext *context) { PARAM_WARMUP(context); }
+  void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
+
   SHVar activate(SHContext *context, const SHVar &input) {
     _output.clear();
     fs::path p(SHSTRING_PREFER_SHSTRVIEW(input));
-    _output.assign(fs::absolute(p).string());
+    p = fs::absolute(p);
+    p = _canonical.get().payload.boolValue ? fs::canonical(p) : p;
+    _output.assign(p.string());
     return Var(_output);
   }
 };
