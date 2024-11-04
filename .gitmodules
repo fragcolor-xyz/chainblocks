@@ -102,3 +102,6 @@
 [submodule "deps/crdt-lite"]
 	path = deps/crdt-lite
 	url = https://github.com/sinkingsugar/crdt-lite.git
+[submodule "deps/libriscv"]
+	path = deps/libriscv
+	url = https://github.com/shards-lang/libriscv.git

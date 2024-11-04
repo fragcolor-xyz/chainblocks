@@ -1,0 +1,6 @@
+
+"data/hello.riscv"
+FS.Read(Bytes: true)
+RISC-V.Load = machine
+RISC-V.Simulate(machine)
+Msg("Done")
