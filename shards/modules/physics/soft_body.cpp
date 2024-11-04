@@ -324,8 +324,10 @@ struct SoftBodyBuilder {
   void addMesh(const gfx::MeshPtr &mesh, const float4x4 &worldTransform) {
     auto &srcFormat = mesh->getFormat();
 
-    auto &vertexData = mesh->getVertexData();
-    auto &indexData = mesh->getIndexData();
+auto desc = std::get<gfx::MeshDescCPUCopy>(mesh->getDesc());
+
+    auto &vertexData = desc.vertexData;
+    auto &indexData = desc.indexData;
 
     std::optional<size_t> positionIndex;
     std::optional<size_t> positionOffset;
@@ -354,14 +356,14 @@ struct SoftBodyBuilder {
     }
 
     const uint8_t *basePtr = vertexData.data() + *positionOffset;
-    for (size_t i = 0; i < mesh->getNumVertices(); i++) {
+    for (size_t i = 0; i < desc.getNumVertices(); i++) {
       auto &pt = *(float3 *)(basePtr + srcStride * i);
       float3 transformedP = linalg::mul(worldTransform, float4(pt, 1.0)).xyz();
       auto &vertex = settings->mVertices.emplace_back();
       vertex.mPosition = toJPHFloat3(transformedP);
     }
-    if (mesh->getNumIndices() > 0) {
-      size_t numFaces = mesh->getNumIndices() / 3;
+    if (desc.getNumIndices() > 0) {
+      size_t numFaces = desc.getNumIndices() / 3;
       if (srcFormat.indexFormat == gfx::IndexFormat::UInt16) {
         const uint16_t *basePtr = (const uint16_t *)indexData.data();
         for (size_t i = 0; i < numFaces; i++) {
@@ -374,7 +376,7 @@ struct SoftBodyBuilder {
         }
       }
     } else {
-      size_t numFaces = mesh->getNumIndices() / 3;
+      size_t numFaces = desc.getNumIndices() / 3;
       for (size_t i = 0; i < numFaces; i++) {
         settings->AddFace(JPH::SoftBodySharedSettings::Face(i * 3 + 0, i * 3 + 1, i * 3 + 2));
       }

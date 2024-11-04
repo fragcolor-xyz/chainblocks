@@ -6,6 +6,8 @@
 #include "../texture.hpp"
 #include "../mesh.hpp"
 #include "../data_format/texture.hpp"
+#include "../data_format/mesh.hpp"
+#include "../data_format/drawable.hpp"
 #include <string_view>
 #include <shards/core/pmr/vector.hpp>
 #include <boost/core/span.hpp>
@@ -22,8 +24,8 @@ enum class AssetLoadRequestState : uint32_t {
   Failure = 2,
 };
 
-using LoadedAssetDataVariant = std::variant<std::monostate, std::vector<uint8_t>, SerializedTexture, gfx::TextureDescCPUCopy,
-                                            gfx::MeshDescCPUCopy, gfx::DrawablePtr>;
+using LoadedAssetDataVariant =
+    std::variant<std::monostate, std::vector<uint8_t>, SerializedTexture, SerializedMesh, SerializedMeshDrawable>;
 struct LoadedAssetData : public LoadedAssetDataVariant {
   using variant::variant;
 

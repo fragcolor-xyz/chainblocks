@@ -192,9 +192,10 @@ struct PointsBuilder {
   }
 
   void addMesh(const gfx::MeshPtr &mesh, const float4x4 &worldTransform) {
-    auto &srcFormat = mesh->getFormat();
 
-    auto &vertexData = mesh->getVertexData();
+    auto desc = std::get<gfx::MeshDescCPUCopy>(mesh->getDesc());
+    auto &srcFormat = desc.format;
+    auto &vertexData = desc.vertexData;
 
     std::optional<size_t> positionIndex;
     std::optional<size_t> positionOffset;
@@ -207,7 +208,7 @@ struct PointsBuilder {
         positionIndex = i;
         positionOffset = offset;
         break;
-      }
+      }\
       offset += attrib.numComponents * getStorageTypeSize(attrib.type);
     }
 
@@ -224,7 +225,7 @@ struct PointsBuilder {
 
     {
       const uint8_t *basePtr = vertexData.data() + *positionOffset;
-      for (size_t i = 0; i < mesh->getNumVertices(); i++) {
+      for (size_t i = 0; i < desc.getNumVertices(); i++) {
         auto &pt = *(float3 *)(basePtr + srcStride * i);
         float3 transformedP = linalg::mul(worldTransform, float4(pt, 1.0)).xyz();
         points.push_back(toJPHVec3(transformedP));
@@ -241,7 +242,9 @@ struct MeshHullShapeShard {
   static SHOptionalString outputHelp() { return SHCCSTR("Outputs the created physics collisionshape."); }
 
   // See "Convex Radius" in https://jrouwe.github.io/JoltPhysics/index.html
-  PARAM_PARAMVAR(_maxConvexRadius, "MaxConvexRadius", "The convex radius given to the collision shape. A larger convex radius results in better performance but a less accurate simulation. A convex radius of 0 is allowed",
+  PARAM_PARAMVAR(_maxConvexRadius, "MaxConvexRadius",
+                 "The convex radius given to the collision shape. A larger convex radius results in better performance but a "
+                 "less accurate simulation. A convex radius of 0 is allowed",
                  {shards::CoreInfo::FloatType, shards::CoreInfo::FloatVarType});
   PARAM_IMPL(PARAM_IMPL_FOR(_maxConvexRadius));
 

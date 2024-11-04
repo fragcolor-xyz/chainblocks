@@ -1,4 +1,4 @@
-#include "data_cache.hpp"
+#include <gfx/data_cache/data_cache.hpp>
 #include <shards/core/module.hpp>
 #include <shards/core/serialization.hpp>
 #include <shards/core/params.hpp>
@@ -53,9 +53,9 @@ struct GLTF2Shard {
 
   void warmup(SHContext *ctx) {
     PARAM_WARMUP(ctx);
-    if (!gfx::data::getInstance()) {
-      gfx::data::setInstance(std::make_shared<gfx::data::DataCache>(gfx::getDefaultDataCacheIO()));
-    }
+    // if (!gfx::data::getInstance()) {
+    //   gfx::data::setInstance(std::make_shared<gfx::data::DataCache>(gfx::getDefaultDataCacheIO()));
+    // }
   }
 
   void cleanup(SHContext *ctx) {

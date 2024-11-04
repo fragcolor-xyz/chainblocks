@@ -42,6 +42,10 @@ set(GFX_SOURCES
   pipeline_step.cpp
   pipeline_hashes.cpp
   unique_id.cpp
+
+  
+  data_format/base.hpp 
+  data_format/texture.cpp
   data_cache/data_cache.cpp
   data_cache/data_cache_impl.cpp
   data_cache/asset_loader.cpp
@@ -111,7 +115,6 @@ endif()
 target_link_libraries(gfx-core-obj Taskflow)
 
 add_subdirectory(gltf)
-add_subdirectory(data_format)
 add_subdirectory(texture_file)
 
 option(GFX_USE_DATA_PATH "Uses build tree paths to find data (dev only)" ON)

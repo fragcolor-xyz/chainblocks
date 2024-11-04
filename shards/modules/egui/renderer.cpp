@@ -36,7 +36,8 @@ inline constexpr auto findDrawableInPoolByMeshSize(size_t targetSize) {
   }
   return [targetSize](std::shared_ptr<MeshDrawable> &item) -> int64_t {
     auto &mesh = item->mesh;
-    size_t size = mesh->getNumVertices() * mesh->getFormat().getVertexSize();
+    auto tag = std::get<MeshDescCPUCopy>(mesh->getDesc());
+    size_t size = tag.getNumVertices() * tag.format.getVertexSize();
     if (size < targetSize) {
       return INT64_MAX;
     }

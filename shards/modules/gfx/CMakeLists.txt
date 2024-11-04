@@ -43,6 +43,6 @@ target_link_libraries(shards-module-gfx stb)
 
 # Link object libraries since they depend on rust code
 # and will be combined into the union lib
-target_link_libraries(shards-module-gfx gfx-core gfx-gltf gfx-data-format)
+target_link_libraries(shards-module-gfx gfx-core gfx-gltf)
 
 target_precompile_headers(shards-module-gfx PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/pch.cpp>")

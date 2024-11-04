@@ -54,6 +54,10 @@ struct ShardsDataCacheIO : public std::enable_shared_from_this<ShardsDataCacheIO
     inFile.seekg(0, std::ios::beg);
     inFile.read(reinterpret_cast<char *>(outData.data()), outData.size());
     inFile.close();
+
+    if (outData.empty()) {
+      throw std::runtime_error("Failed to retrieve asset: " + path.string());
+    }
   }
 
   // Do decoding/deserializing/etc.

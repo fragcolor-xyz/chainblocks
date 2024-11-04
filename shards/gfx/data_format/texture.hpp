@@ -29,17 +29,25 @@ struct SerializedTexture {
 
   SerializedTexture() = default;
   SerializedTexture(const TexturePtr &other) : SerializedTexture(*other) {}
+  SerializedTexture(const TextureDescCPUCopy &desc, std::string_view name = "") { init(desc, name); }
   SerializedTexture(const gfx::Texture &texture) {
     if (auto desc = std::get_if<TextureDescCPUCopy>(&texture.getDesc())) {
-      header.format = desc->format;
-      header.sourceChannels = desc->sourceChannels;
-      header.sourceRowStride = desc->sourceRowStride;
-      header.serializedFormat = SerializedTextureDataFormat::RawPixels;
-      rawImageData = ImmutableSharedBuffer(desc->sourceData.data(), desc->sourceData.size());
+      init(*desc, texture.getLabel());
     } else {
       throw std::logic_error("Unsupported texture for serialization");
     }
   }
+  void init(const TextureDescCPUCopy &desc, std::string_view name) {
+    header.format = desc.format;
+    header.sourceChannels = desc.sourceChannels;
+    header.sourceRowStride = desc.sourceRowStride;
+    header.serializedFormat = SerializedTextureDataFormat::RawPixels;
+    header.name = name;
+    rawImageData = ImmutableSharedBuffer(desc.sourceData.data(), desc.sourceData.size());
+  }
+
+  void decodeImageData();
+  void encodeImageData();
 };
 } // namespace gfx
 
