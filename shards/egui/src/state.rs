@@ -108,7 +108,7 @@ impl LegacyShard for Save {
     let egui_ctx = &util::get_current_context(&self.instance)?.egui_ctx;
     self.data = egui_ctx.memory(|mem| {
       Ok::<_, &str>(Some(
-        flexbuffers::to_vec(mem).map_err(|_| "Failed to serialize UI state")?,
+        bitcode::serialize(mem).map_err(|_| "Failed to serialize UI state")?,
       ))
     })?;
 
@@ -198,7 +198,7 @@ impl LegacyShard for Restore {
     let bytes: &[u8] = input.try_into()?;
     egui_ctx.memory_mut(|mem| {
       Ok::<_, &str>(
-        *mem = flexbuffers::from_slice(bytes).map_err(|_| "Failed to deserialize UI state")?,
+        *mem = bitcode::deserialize(bytes).map_err(|_| "Failed to deserialize UI state")?,
       )
     })?;
 
