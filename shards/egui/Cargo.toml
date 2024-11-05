@@ -25,7 +25,7 @@ enum-map = { version = "2.5.0" }
 shards = { path = "../rust" }
 shards-lang = { path = "../lang" }
 pest = "2.7.1"
-rmp-serde = { version = "1.1.1" }
+flexbuffers = "2.0.0"
 compile-time-crc32 = "0.1.2"
 nanoid = "0.4.0"
 num-traits = "0.2"
