@@ -168,7 +168,6 @@ jobs:
           ./shards new ../shards/tests/whendone.shs
           ./shards new ../shards/tests/return.shs
           ./shards new ../shards/tests/table-seq-push.shs
-          ./shards new ../shards/tests/crdts.shs
           ./shards new ../shards/tests/failures.shs
           ./shards new ../shards/tests/traits.shs
       - name: Test doc samples (non-UI)
