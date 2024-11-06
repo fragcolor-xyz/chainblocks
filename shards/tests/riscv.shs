@@ -1,6 +1,6 @@
-
-"data/hello.riscv"
+"data/fib"
 FS.Read(Bytes: true)
 RISC-V.Load = machine
 RISC-V.Simulate(machine)
+11 | RISC-V.Call(machine "test_func") | Log
 Msg("Done")
