@@ -255,7 +255,7 @@ fn load(
   shlog!("Parsing binary file: {}", file);
 
   let ast = {
-    // deserialize from flexbuffers, skipping the first 8 bytes
+    // deserialize from bitcode, skipping the first 8 bytes
     let mut file_content = std::fs::read(file).map_err(|_| "File not found")?;
     let magic: i32 = i32::from_be_bytes([
       file_content[0],
@@ -272,7 +272,7 @@ fn load(
     ]);
     assert_eq!(version, SHARDS_CURRENT_ABI); // todo backwards compatibility
     file_content.drain(0..8);
-    flexbuffers::from_slice(file_content.as_slice()).unwrap()
+    bitcode::deserialize(file_content.as_slice()).unwrap()
   };
 
   Ok(execute_seq(&args, ast, cancellation_token)?)
@@ -394,8 +394,7 @@ fn build(
     let mut writer = std::io::BufWriter::new(&mut file);
 
     if !as_json {
-      // Serialize using flexbuffers
-      let encoded_bin = flexbuffers::to_vec(&ast).unwrap();
+      let encoded_bin = bitcode::serialize(&ast).unwrap();
       writer
         .write(fourCharacterCode(*b"SHRD").to_be_bytes().as_ref())
         .unwrap();

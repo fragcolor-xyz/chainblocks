@@ -4216,7 +4216,7 @@ impl LegacyShard for EvalShard {
     let mut prog = match (maybe_bytes, maybe_string, maybe_object) {
       (Ok(bytes), _, _) => {
         // deserialize sequence from bytes
-        Some(flexbuffers::from_slice::<Program>(bytes).map_err(|e| {
+        Some(bitcode::deserialize::<Program>(bytes).map_err(|e| {
           shlog_error!("failed to deserialize Shards: {:?}", e);
           "failed to deserialize Shards"
         })?)

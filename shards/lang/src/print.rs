@@ -416,7 +416,7 @@ impl Shard for ShardsPrintShard {
         self.output = Var::ephemeral_string(formatted.as_str()).into();
       }
       (_, Ok(bytes), _) => {
-        let program = flexbuffers::from_slice::<Program>(bytes).map_err(|e| {
+        let program = bitcode::deserialize::<Program>(bytes).map_err(|e| {
           shlog_error!("Failed to deserialize shards code: {}", e);
           "Failed to deserialize Shards code"
         })?;
@@ -450,7 +450,7 @@ fn test1() {
   // let code = include_str!("nested.shs");
   let code = include_str!("sample1.shs");
   let successful_parse = crate::ShardsParser::parse(Rule::Program, code).unwrap();
-  let mut env = crate::read::ReadEnv::new("", ".", ".");
+  let mut env = crate::read::ReadEnv::new("", ".".to_string(), ".");
   let seq =
     crate::read::process_program(successful_parse.into_iter().next().unwrap(), &mut env).unwrap();
   let seq = seq.sequence;
