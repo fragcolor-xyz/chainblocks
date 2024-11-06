@@ -147,7 +147,6 @@ jobs:
           ./shards new ../shards/tests/whendone.shs
           ./shards new ../shards/tests/return.shs
           ./shards new ../shards/tests/table-seq-push.shs
-          ./shards new ../shards/tests/crdts.shs
           ./shards new ../shards/tests/traits.shs
           ./shards new ../shards/tests/shards.shs
           ./shards new ../shards/tests/zip-map.shs

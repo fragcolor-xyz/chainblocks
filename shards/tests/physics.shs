@@ -304,8 +304,10 @@
     
     @f4(1 1 1 1) = base-color
     
-    @f3(-1.0 3.0 0.0) >= body-p0
-    @f4(0 0 0 1) >= body-r0
+    Once({
+      @f3(-1.0 3.0 0.0) >= body-p0
+      @f4(0 0 0 1) >= body-r0
+    })
     Physics.Body(body-p0 body-r0 Shape: sphere-pshape
       AllowedDOFs: [
         PhysicsDOF::RotationX PhysicsDOF::RotationY PhysicsDOF::RotationZ
@@ -316,8 +318,10 @@
     GFX.Drawable(Mesh: sphere-mesh Params: {baseColor: base-color})
     GFX.Draw(queue)
     
-    @f3(1.0 3.5 0.0) >= body-p1
-    0.4 | Math.AxisAngleX >= body-r1
+    Once({
+      @f3(1.0 3.5 0.0) >= body-p1
+      0.4 | Math.AxisAngleX >= body-r1
+    })
     Physics.Body(body-p1 body-r1 Shape: cube-pshape) = body1
     
     body-p1 | Math.Translation | Math.MatMul((body-r1 | Math.Rotation))
@@ -339,8 +343,10 @@
     
     @f4(1 1 1 1) = base-color
     
-    @f3(-1.0 3.0 0.0) >= body-p0
-    @f4(0 0 0 1) >= body-r0
+    Once({
+      @f3(-1.0 3.0 0.0) >= body-p0
+      @f4(0 0 0 1) >= body-r0
+    })
     Physics.Body(body-p0 body-r0
       Shape: cube-pshape
       AllowedDOFs: [PhysicsDOF::RotationX PhysicsDOF::RotationY PhysicsDOF::RotationZ]
@@ -350,8 +356,10 @@
     GFX.Drawable(Mesh: cube-mesh Params: {baseColor: base-color})
     GFX.Draw(queue)
     
-    @f3(1.0 3.5 0.0) >= body-p1
-    0.4 | Math.AxisAngleX >= body-r1
+    Once({
+      @f3(1.0 3.5 0.0) >= body-p1
+      0.4 | Math.AxisAngleX >= body-r1
+    })
     Physics.Body(body-p1 body-r1 Shape: cube-pshape) = body1
     
     body-p1 | Math.Translation | Math.MatMul((body-r1 | Math.Rotation))

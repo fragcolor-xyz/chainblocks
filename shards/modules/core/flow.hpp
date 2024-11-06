@@ -486,7 +486,7 @@ struct Await : public BaseSubFlow {
 
   SHTypeInfo compose(const SHInstanceData &data) {
     if (data.onWorkerThread) {
-      SHLOG_DEBUG("Await shard is being used on a worker thread, ignoring, wire: {}", data.wire ? data.wire->name : "unknown");
+      SHLOG_TRACE("Await shard is being used on a worker thread, ignoring, wire: {}", data.wire ? data.wire->name : "unknown");
       _alreadyOnWorker = true;
       OVERRIDE_ACTIVATE(data, activateSync);
     } else {
