@@ -9,7 +9,7 @@ crate-type = ["rlib", "staticlib"]
 [dependencies] 
 shards = { path = "../rust" }
 shards-lang = { path = "../lang" }
-bitcode = { version = "0.6.3", features = ["serde"] }
+flexbuffers = "2.0.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.155"

@@ -9,7 +9,7 @@ crate-type = ["rlib", "staticlib"]
 [dependencies]
 pest = "2.7.1"
 pest_derive = "2.7.1"
-bitcode = { version = "0.6.3", features = ["serde"] }
+flexbuffers = "2.0.0"
 serde_json = "1.0.94"
 serde = { version = "1.0", features = ["derive"] }
 shards = { path = "../rust" }

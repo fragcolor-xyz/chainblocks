@@ -1097,8 +1097,8 @@ impl Shard for ReadShard {
 
     match output_type {
       Ok(AstType::Bytes) => {
-        // Serialize using bitcode
-        let encoded_bin: Vec<u8> = bitcode::serialize(&prog).map_err(|e| {
+        // Serialize using flexbuffers
+        let encoded_bin: Vec<u8> = flexbuffers::to_vec(&prog).map_err(|e| {
           shlog_error!("Failed to serialize shards code: {}", e);
           "Failed to serialize Shards code"
         })?;

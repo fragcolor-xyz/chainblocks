@@ -36,7 +36,7 @@ pest = { opt-level = 3, debug-assertions = false }  # This will apply to all pro
 syntect = { opt-level = 3 }
 flate2 = { opt-level = 3 }
 bincode = { opt-level = 3 }
-bitcode = { opt-level = 3 }
+flexbuffers = { opt-level = 3 }
 tokenizers = { opt-level = 3 }
 candle-core = { opt-level = 3 }
 candle-transformers = { opt-level = 3 }
