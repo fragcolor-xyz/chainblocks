@@ -2417,6 +2417,11 @@ void SHWire::cleanup(bool force) {
 
     warmedUp = false;
 
+    auto mesh_ = mesh.lock();
+    if (mesh_) {
+      mesh_->dispatcher.trigger(SHWire::OnCleanupEvent{this});
+    }
+
     // Run cleanup on all shards, prepare them for a new start if necessary
     // Do this in reverse to allow a safer cleanup
     for (auto it = shards.rbegin(); it != shards.rend(); ++it) {
@@ -2446,9 +2451,7 @@ void SHWire::cleanup(bool force) {
     variables.clear();
 
     // finally reset the mesh
-    auto mesh_ = mesh.lock();
     if (mesh_) {
-      mesh_->dispatcher.trigger(SHWire::OnCleanupEvent{this});
       mesh_->wireCleanedUp(this);
     }
     mesh.reset();
