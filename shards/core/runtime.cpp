@@ -582,8 +582,8 @@ inline SHVar *findVariable(SHContext *ctx, std::string_view name) {
 }
 
 SHVar *referenceVariable(SHContext *ctx, std::string_view name) {
-  SHVar* var = findVariable(ctx, name);
-  if (var) 
+  SHVar *var = findVariable(ctx, name);
+  if (var)
     return var;
 
   // worst case create in current top wire!
@@ -1473,9 +1473,7 @@ bool isDebuggerPresent() { return false; }
 
 // pub extern "C" fn setup_panic_hook()
 extern "C" void setup_panic_hook();
-extern "C" void shards_flush_logs () {
-  spdlog::default_logger()->flush();
-}
+extern "C" void shards_flush_logs() { spdlog::default_logger()->flush(); }
 
 void installSignalHandlers() {
   if (!isDebuggerPresent()) {
@@ -2414,7 +2412,7 @@ void SHWire::warmup(SHContext *context) {
 }
 
 void SHWire::cleanup(bool force) {
-  if (warmedUp && (force || wireUsers.size() == 0)) {
+  if (force || (warmedUp && wireUsers.size() == 0)) {
     SHLOG_TRACE("Running cleanup on wire: {} users count: {}", name, wireUsers.size());
 
     mesh.lock()->dispatcher.trigger(SHWire::OnCleanupEvent{this});
