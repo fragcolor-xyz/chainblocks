@@ -19,6 +19,22 @@
 #include <vector>
 #include <string.h>
 
+#ifdef HAS_BOOST_CONTAINER
+#ifdef __clang__
+#pragma clang attribute push(__attribute__((no_sanitize("undefined"))), apply_to = function)
+#endif
+#include <boost/container/stable_vector.hpp>
+#include <boost/container/flat_map.hpp>
+#include <boost/align/aligned_allocator.hpp>
+#ifdef __clang__
+#pragma clang attribute pop
+#endif
+template <typename K, typename V>
+using ShardsAlignedMap = boost::container::flat_map<
+    K, V, std::less<K>,
+    boost::container::stable_vector<std::pair<const K, V>, boost::alignment::aligned_allocator<std::pair<const K, V>, 16>>>;
+#endif
+
 namespace shards {
 // SHVar strings can have an optional len field populated
 #define SHSTRLEN(_v_)                                                                            \
@@ -468,11 +484,17 @@ template <class SH_CORE> struct TTableVar : public SHVar {
   }
 
   TTableVar(const TTableVar &others, std::initializer_list<std::pair<std::string_view, SHVar>> pairs) : TTableVar() {
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(others.payload.tableValue.opaque);
+    std::copy(map->begin(), map->end(), std::inserter(*this, this->begin()));
+#else
     const auto &table = others.payload.tableValue;
     ForEach(table, [&](auto &key, auto &val) {
       auto &rDst = (*this)[key];
       SH_CORE::cloneVar(rDst, val);
     });
+#endif
 
     for (auto &kv : pairs) {
       auto &rDst = (*this)[Var(kv.first)];
@@ -489,13 +511,25 @@ template <class SH_CORE> struct TTableVar : public SHVar {
   ~TTableVar() { SH_CORE::destroyVar(*this); }
 
   TOwnedVar<SH_CORE> &operator[](const SHVar &key) {
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(payload.tableValue.opaque);
+    return (*map)[key];
+#else
     auto vp = payload.tableValue.api->tableAt(payload.tableValue, key);
     return (TOwnedVar<SH_CORE> &)*vp;
+#endif
   }
 
   const TOwnedVar<SH_CORE> &operator[](const SHVar &key) const {
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(payload.tableValue.opaque);
+    return (*map)[key];
+#else
     auto vp = payload.tableValue.api->tableAt(payload.tableValue, key);
     return (const TOwnedVar<SH_CORE> &)*vp;
+#endif
   }
 
   TOwnedVar<SH_CORE> &operator[](std::string_view key) { return operator[](Var(key)); }
@@ -503,35 +537,61 @@ template <class SH_CORE> struct TTableVar : public SHVar {
   const TOwnedVar<SH_CORE> &operator[](std::string_view key) const { return operator[](Var(key)); }
 
   TOwnedVar<SH_CORE> &insert(const SHVar &key, const SHVar &val) {
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(payload.tableValue.opaque);
+    return (*map)[key] = val;
+#else
     auto vp = payload.tableValue.api->tableAt(payload.tableValue, key);
     SH_CORE::cloneVar(*vp, val);
     return (TOwnedVar<SH_CORE> &)*vp;
+#endif
   }
 
   TOwnedVar<SH_CORE> &insert(std::string_view key, const SHVar &val) { return insert(Var(key), val); }
 
   template <typename AS_VAR> TOwnedVar<SH_CORE> *find(AS_VAR key) const {
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(payload.tableValue.opaque);
+    auto it = map->find(Var(key));
+    if (it != map->end()) {
+      return &it->second;
+    } else {
+      return nullptr;
+    }
+#else
     return (TOwnedVar<SH_CORE> *)payload.tableValue.api->tableGet(payload.tableValue, Var(key));
+#endif
   }
 
   // Overload to handle compile-time string literals
-  template <std::size_t N> TOwnedVar<SH_CORE> *find(const char (&key)[N]) const {
-    return (TOwnedVar<SH_CORE> *)payload.tableValue.api->tableGet(payload.tableValue, Var(key));
-  }
+  template <std::size_t N> TOwnedVar<SH_CORE> *find(const char (&key)[N]) const { return find(Var(key)); }
 
   template <typename T> T &get(const SHVar &key) {
     static_assert(sizeof(T) == sizeof(SHVar), "Invalid T size, should be sizeof(SHVar)");
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(payload.tableValue.opaque);
+    auto &rDst = (*map)[key];
+    if (rDst.valueType == SHType::None) {
+      // try initialize in this case
+      new (&rDst) T();
+    }
+    return (T &)rDst;
+#else
     auto vp = payload.tableValue.api->tableAt(payload.tableValue, key);
     if (vp->valueType == SHType::None) {
       // try initialize in this case
       new (vp) T();
     }
     return (T &)*vp;
+#endif
   }
 
   template <typename T> const T &get(const SHVar &key) const {
     static_assert(sizeof(T) == sizeof(SHVar), "Invalid T size, should be sizeof(SHVar)");
-    auto vp = payload.tableValue.api->tableAt(payload.tableValue, key);
+    auto vp = find(key);
     return (const T &)*vp;
   }
 
@@ -539,22 +599,60 @@ template <class SH_CORE> struct TTableVar : public SHVar {
 
   template <typename T> const T &get(std::string_view key) const { return get<T>(Var(key)); }
 
-  bool hasKey(const SHVar &key) const { return payload.tableValue.api->tableContains(payload.tableValue, key); }
+  bool hasKey(const SHVar &key) const {
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(payload.tableValue.opaque);
+    return map->find(key) != map->end();
+#else
+    return payload.tableValue.api->tableContains(payload.tableValue, key);
+#endif
+  }
 
   bool hasKey(std::string_view key) const { return hasKey(Var(key)); }
 
-  void remove(const SHVar &key) { payload.tableValue.api->tableRemove(payload.tableValue, key); }
+  void remove(const SHVar &key) {
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(payload.tableValue.opaque);
+    map->erase(key);
+#else
+    payload.tableValue.api->tableRemove(payload.tableValue, key);
+#endif
+  }
 
   void remove(std::string_view key) { remove(Var(key)); }
 
-  void clear() { payload.tableValue.api->tableClear(payload.tableValue); }
+  void clear() {
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(payload.tableValue.opaque);
+    map->clear();
+#else
+    payload.tableValue.api->tableClear(payload.tableValue);
+#endif
+  }
 
-  size_t size() const { return payload.tableValue.api->tableSize(payload.tableValue); }
+  size_t size() const {
+#ifdef HAS_BOOST_CONTAINER
+    using MapType = ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>>;
+    auto *map = static_cast<MapType *>(payload.tableValue.opaque);
+    return map->size();
+#else
+    return payload.tableValue.api->tableSize(payload.tableValue);
+#endif
+  }
 
   TableIterator begin() const { return ::begin(payload.tableValue); }
   TableIterator end() const { return ::end(payload.tableValue); }
 
   TOwnedVar<SH_CORE> &asOwned() { return (TOwnedVar<SH_CORE> &)*this; }
+
+#ifdef HAS_BOOST_CONTAINER
+  ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>> &asFlatMap() {
+    return *static_cast<ShardsAlignedMap<TOwnedVar<SH_CORE>, TOwnedVar<SH_CORE>> *>(payload.tableValue.opaque);
+  }
+#endif
 };
 
 template <class SH_CORE> struct TSeqVar : public SHVar {
