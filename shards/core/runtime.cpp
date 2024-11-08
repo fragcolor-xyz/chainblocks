@@ -2415,8 +2415,6 @@ void SHWire::cleanup(bool force) {
   if (force || (warmedUp && wireUsers.size() == 0)) {
     SHLOG_TRACE("Running cleanup on wire: {} users count: {}", name, wireUsers.size());
 
-    mesh.lock()->dispatcher.trigger(SHWire::OnCleanupEvent{this});
-
     warmedUp = false;
 
     // Run cleanup on all shards, prepare them for a new start if necessary
@@ -2450,6 +2448,7 @@ void SHWire::cleanup(bool force) {
     // finally reset the mesh
     auto mesh_ = mesh.lock();
     if (mesh_) {
+      mesh_->dispatcher.trigger(SHWire::OnCleanupEvent{this});
       mesh_->wireCleanedUp(this);
     }
     mesh.reset();
