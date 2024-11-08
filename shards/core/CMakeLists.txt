@@ -38,6 +38,9 @@ if(SHARDS_INLINE_EVERYTHING)
   target_compile_definitions(shards-core PUBLIC SHARDS_INLINE_EVERYTHING=1)
 endif()
 
+# we are building with boost containers since we build shards, we can support this
+target_compile_definitions(shards-core PUBLIC HAS_BOOST_CONTAINER=1)
+
 if(CMAKE_BUILD_TYPE MATCHES Debug)
   set(SHARDS_DEBUG_THREAD_NAMES_DEFAULT ON)
 else()
