@@ -645,17 +645,10 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void wireCleanedUp(SHWire *wire) {
     scheduled.erase(wire->shared_from_this());
 
-    auto it = std::find_if(_flowPool.begin(), _flowPool.end(), [wire](const auto &f) { return f.wire == wire; });
-    if (it != _flowPool.end()) { // Remove from flow pool, while keeping the iteration state
-      size_t idxToRemove = _flowPool.index_of(it);
-      size_t itIdx = _flowPool.index_of(_flowPoolIt);
-      _flowPool.erase(it);
-      if (idxToRemove <= itIdx) {
-        if (itIdx >= _flowPool.size())
-          _flowPoolIt = _flowPool.end();
-        else
-          _flowPoolIt = _flowPool.begin() + itIdx;
-      }
+    auto it = std::lower_bound(_flowPool.begin(), _flowPool.end(), wire,
+                               [](const auto &flow, const auto *wirePtr) { return flow.wire < wirePtr; });
+    if (it != _flowPool.end() && it->wire == wire) { // Remove from flow pool, while keeping the iteration state
+      _flowPoolIt = _flowPool.erase(it);
     }
   }
 
@@ -781,7 +774,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     auto it = std::lower_bound(_flowPool.begin(), _flowPool.end(), wire.get(),
                                [](const auto &flow, const auto *wirePtr) { return flow.wire < wirePtr; });
     if (it != _flowPool.end() && it->wire == wire.get()) {
-      _flowPool.erase(it);
+      _flowPoolIt = _flowPool.erase(it);
     }
   }
 
