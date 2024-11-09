@@ -616,7 +616,12 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     observer.before_prepare(wire.get());
     // create a flow as well
-    auto &flow = *_flowPool.insert(SHFlow{0, wire.get(), false}).first;
+    auto result = _flowPool.insert(SHFlow{0, wire.get(), false});
+    if (!result.second) {
+      SHLOG_ERROR("Attempted to schedule a wire multiple times, wire: {}", wire->name);
+      throw shards::SHException("Multiple wire schedule");
+    }
+    auto &flow = *result.first;
     shards::prepare(wire.get(), &flow);
 
     // wire might fail on warmup during prepare
