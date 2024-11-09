@@ -1560,7 +1560,7 @@ void run(SHWire *wire, SHFlow *flow, shards::Coroutine *coro) {
   wire->finishedError.clear();
 
   // Create a new context and copy the sink in
-  SHFlow anonFlow{0, wire, false};
+  SHFlow anonFlow{wire->priority, wire, false};
   SHContext context(coro, wire, flow ? flow : &anonFlow);
   context.stackStart = &stackStart;
 
@@ -2842,6 +2842,11 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
   result->setWireLooped = [](SHWireRef wireref, SHBool looped) noexcept {
     auto &sc = SHWire::sharedFromRef(wireref);
     sc->looped = looped;
+  };
+
+  result->setWirePriority = [](SHWireRef wireref, int priority) noexcept {
+    auto &sc = SHWire::sharedFromRef(wireref);
+    sc->priority = priority;
   };
 
   result->setWireUnsafe = [](SHWireRef wireref, SHBool unsafe) noexcept {

@@ -957,6 +957,19 @@ fn finalize_wire(
     };
     wire.set_stack_size(stack_size as usize);
   }
+
+  let priority = param_helper
+    .get_param_by_name_or_index("Priority", 7)
+    .map(|param| match &param.value {
+      Value::Number(n) => match n {
+        Number::Integer(n) => Ok(*n),
+        _ => Err(("Priority parameter must be an integer", line_info).into()),
+      },
+      _ => Err(("Priority parameter must be an integer", line_info).into()),
+    })
+    .unwrap_or(Ok(0))?;
+  wire.set_priority(priority.clamp(i32::MIN as i64, i32::MAX as i64) as i32);
+
   Ok(())
 }
 

@@ -964,6 +964,7 @@ typedef void(__cdecl *SHSetWireLooped)(SHWireRef wire, SHBool looped);
 typedef void(__cdecl *SHSetWireUnsafe)(SHWireRef wire, SHBool unsafe);
 typedef void(__cdecl *SHSetWirePure)(SHWireRef wire, SHBool pure);
 typedef void(__cdecl *SHSetWireStackSize)(SHWireRef wire, uint64_t stackSize);
+typedef void(__cdecl *SHSetWirePriority)(SHWireRef wire, int priority);
 typedef void(__cdecl *SHSetWireTraits)(SHWireRef wire, SHSeq traits);
 typedef void(__cdecl *SHAddShard)(SHWireRef wire, ShardPtr shard);
 typedef void(__cdecl *SHRemShard)(SHWireRef wire, ShardPtr shard);
@@ -1119,6 +1120,7 @@ typedef struct _SHCore {
   SHSetWireUnsafe setWireUnsafe;
   SHSetWirePure setWirePure;
   SHSetWireStackSize setWireStackSize;
+  SHSetWirePriority setWirePriority;
   SHSetWireTraits setWireTraits;
   SHAddShard addShard;
   SHRemShard removeShard;

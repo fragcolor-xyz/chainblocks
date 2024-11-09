@@ -12,13 +12,13 @@
     "" | Stop
   })
   "Ok" | Network.Send
-} Looped: true)
+} Looped: true Priority: 100)
 
 @wire(network-test-server {
   Network.Server("127.0.0.1" 9191 handler OnDisconnect: Pass)
   Once({"Smaller" | Network.Broadcast | Log("Send smaller")} Every: 0.5)
   Once({@random1 | Network.Broadcast | Log("Send random1")} Every: 0.5)
-} Looped: true)
+} Looped: true Priority: 100)
 
 @wire(client-init {
   "Hey server" | Network.Send
@@ -29,8 +29,8 @@
   
   @random1 | Network.Send | Log("Big load")
   @random2 | Network.Send | Log("Even bigger load")
-  true > test/client-init-success
-})
+  true > test/client-init-success | Log("Client init success")
+} Priority: 100)
 
 @wire(network-test-client {
   Maybe({
@@ -50,15 +50,15 @@
     Once(Do(client-init))
     none
   } {Stop})
-} Looped: true)
+} Looped: true Priority: 100)
 
 @define(tick-count 200)
 @define(tick-count-1 #(@tick-count | Sub(1)))
 @wire(test-assert {
-  false | Set(test/client-init-success Global: true)
-  false | Set(test/client-received-smaller Global: true)
-  false | Set(test/client-received-random1 Global: true)
-  false | Set(test/server-received-end Global: true)
+  false | Set(test/client-init-success Global: true) | Log("Client init success Set")
+  false | Set(test/client-received-smaller Global: true) | Log("Client received smaller Set")
+  false | Set(test/client-received-random1 Global: true) | Log("Client received random1 Set")
+  false | Set(test/server-received-end Global: true) | Log("Server received end Set")
   ForRange(1 @tick-count-1 {
     Pause(0)
   })
