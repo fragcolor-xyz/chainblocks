@@ -1560,7 +1560,7 @@ void run(SHWire *wire, SHFlow *flow, shards::Coroutine *coro) {
   wire->finishedError.clear();
 
   // Create a new context and copy the sink in
-  SHFlow anonFlow{wire};
+  SHFlow anonFlow{0, wire, false};
   SHContext context(coro, wire, flow ? flow : &anonFlow);
   context.stackStart = &stackStart;
 

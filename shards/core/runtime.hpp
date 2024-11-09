@@ -34,6 +34,7 @@
 #include <vector>
 
 #include <boost/container/small_vector.hpp>
+#include <boost/container/flat_set.hpp>
 
 using SHClock = std::chrono::high_resolution_clock;
 using SHTime = decltype(SHClock::now());
@@ -97,6 +98,7 @@ const unsigned __tsan_switch_to_fiber_no_sync = 1 << 0;
   return shards::Var::Empty
 
 struct SHFlow {
+  int priority;
   struct SHWire *wire;
   SHBool paused;
 };
@@ -322,14 +324,22 @@ std::vector<SHWire *> &getCoroWireStack();
 #endif
 
 #ifdef SH_VERBOSE_COROUTINES_LOGGING
-#define SH_CORO_RESUMED_LOG(_wire) \
-  { SHLOG_TRACE("> Resumed wire {}", (_wire)->name); }
-#define SH_CORO_SUSPENDED_LOG(_wire) \
-  { SHLOG_TRACE("> Suspended wire {}", (_wire)->name); }
-#define SH_CORO_EXT_RESUME_LOG(_wire) \
-  { SHLOG_TRACE("Resuming wire {}", (_wire)->name); }
-#define SH_CORO_EXT_SUSPEND_LOG(_wire) \
-  { SHLOG_TRACE("Suspending wire {}", (_wire)->name); }
+#define SH_CORO_RESUMED_LOG(_wire)                   \
+  {                                                  \
+    SHLOG_TRACE("> Resumed wire {}", (_wire)->name); \
+  }
+#define SH_CORO_SUSPENDED_LOG(_wire)                   \
+  {                                                    \
+    SHLOG_TRACE("> Suspended wire {}", (_wire)->name); \
+  }
+#define SH_CORO_EXT_RESUME_LOG(_wire)               \
+  {                                                 \
+    SHLOG_TRACE("Resuming wire {}", (_wire)->name); \
+  }
+#define SH_CORO_EXT_SUSPEND_LOG(_wire)                \
+  {                                                   \
+    SHLOG_TRACE("Suspending wire {}", (_wire)->name); \
+  }
 #else
 #define SH_CORO_RESUMED_LOG(_wire)
 #define SH_CORO_SUSPENDED_LOG(_wire)
@@ -606,8 +616,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     observer.before_prepare(wire.get());
     // create a flow as well
-    auto &flow = _flowPool.emplace_back();
-    flow.wire = wire.get();
+    auto &flow = *_flowPool.insert(SHFlow{0, wire.get(), false}).first;
     shards::prepare(wire.get(), &flow);
 
     // wire might fail on warmup during prepare
@@ -763,10 +772,12 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     shassert(scheduled.count(wire) == 0 && "Wire still in scheduled!");
     shassert(wire->mesh.expired() && "Wire still has a mesh!");
 
-    // Erase-Remove Idiom
-    _flowPool.erase(
-        std::remove_if(_flowPool.begin(), _flowPool.end(), [wire](const auto &flow) { return flow.wire == wire.get(); }),
-        _flowPool.end());
+    // Since _flowPool is a flat_set, let's do a binary search
+    auto it = std::lower_bound(_flowPool.begin(), _flowPool.end(), wire.get(),
+                               [](const auto &flow, const auto *wirePtr) { return flow.wire < wirePtr; });
+    if (it != _flowPool.end() && it->wire == wire.get()) {
+      _flowPool.erase(it);
+    }
   }
 
   bool empty() { return _flowPool.empty(); }
@@ -876,7 +887,15 @@ private:
                      boost::alignment::aligned_allocator<std::pair<const shards::OwnedVar, SHVar *>, 16>>
       refs;
 
-  boost::container::stable_vector<SHFlow> _flowPool;
+  struct SHFlowLess {
+    bool operator()(const SHFlow &a, const SHFlow &b) const {
+      if (a.priority != b.priority)
+        return a.priority < b.priority;
+      return a.wire < b.wire;
+    }
+  };
+
+  boost::container::flat_set<SHFlow, SHFlowLess, boost::container::stable_vector<SHFlow>> _flowPool;
   decltype(_flowPool)::iterator _flowPoolIt = _flowPool.end();
 
   std::vector<std::string> _errors;
