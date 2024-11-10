@@ -1669,13 +1669,6 @@ endOfWire:
     wire->finishedOutput = wire->previousOutput; // cloning over! (OwnedVar)
   }
 
-  // if we have a resumer we return to it
-  if (wire->resumer) {
-    SHLOG_TRACE("Wire {} ending and resuming {}", wire->name, wire->resumer->name);
-    context.flow->wire = wire->resumer;
-    wire->resumer = nullptr;
-  }
-
   // run cleanup on all the shards
   // ensure stop state is set
   context.stopFlow(wire->previousOutput);
@@ -1692,6 +1685,13 @@ endOfWire:
 
   mesh->dispatcher.trigger(SHWire::OnStopEvent{wire});
   mesh.reset();
+
+  // if we have a resumer we return to it
+  if (wire->resumer) {
+    SHLOG_TRACE("Wire {} ending and resuming {}", wire->name, wire->resumer->name);
+    context.flow->wire = wire->resumer;
+    wire->resumer = nullptr;
+  }
 
   // Make sure to clear context at the end so it doesn't point to invalid stack memory
   wire->context = nullptr;
