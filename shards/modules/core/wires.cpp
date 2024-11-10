@@ -2057,6 +2057,7 @@ struct WhenDone : Spawn {
         cloneVar(*refVar, v.get());
       }
 
+      SHLOG_TRACE("WhenDone: scheduling {}, ptr: {}", c->wire->name, (void *)c->wire.get());
       mesh->schedule(c->wire, Var::Empty, false);
 
       SHWire *rootWire = context->rootWire();

@@ -260,9 +260,11 @@
   Assert.Is(@f3(8 2 4) true)
   Log("Float3 broadcast")
 
-  WhenDone({
+  @wire(when-done-wire {
     v-3 | Log("OnStop Copy")
-  })
+  } Priority: -1000)
+
+  WhenDone(when-done-wire) ; high on purpose to test lifetime issues
 
   @f2(10.3 2.1)
   Math.Multiply(2.0)

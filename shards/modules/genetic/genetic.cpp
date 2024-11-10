@@ -911,7 +911,7 @@ inline void Evolve::mutate(Evolve::Individual &individual) {
   auto wire = SHWire::sharedFromRef(individual.wire.payload.wireValue);
   // we need to hack this in as we run out of context
   Coroutine foo{};
-  SHFlow flow{};
+  SHFlow flow{0, nullptr, false};
   SHContext ctx(&foo, wire.get(), &flow);
   ctx.wireStack.push_back(wire.get());
   std::for_each(std::begin(individual.mutants), std::end(individual.mutants), [&](MutantInfo &info) {

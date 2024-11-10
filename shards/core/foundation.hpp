@@ -40,17 +40,6 @@
 
 #include <shards/shardwrapper.hpp>
 
-#ifdef __clang__
-#pragma clang attribute push(__attribute__((no_sanitize("undefined"))), apply_to = function)
-#endif
-
-#include <boost/container/stable_vector.hpp>
-#include <boost/container/flat_map.hpp>
-
-#ifdef __clang__
-#pragma clang attribute pop
-#endif
-
 // Needed specially for win32/32bit
 #include <boost/align/aligned_allocator.hpp>
 

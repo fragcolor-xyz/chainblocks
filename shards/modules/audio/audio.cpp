@@ -152,7 +152,7 @@ struct Device {
   std::vector<float> inputScratch;
   uint64_t inputHash;
   uint64_t outputHash;
-  SHFlow dpsFlow{};
+  SHFlow dpsFlow{0, nullptr, false};
   Coroutine dspStubCoro{};
   std::shared_ptr<SHMesh> dspMesh = SHMesh::make();
   std::shared_ptr<SHWire> dspWire = SHWire::make("Audio-DSP-Wire");
@@ -648,7 +648,8 @@ struct Channel {
 
 struct Oscillator {
   enum class Waveform { Sine, Square, Triangle, Sawtooth };
-  DECL_ENUM_INFO(Waveform, Waveform, "Type of waveform used in audio synthesis. Defines the shape of the oscillator's output signal.", 'wave');
+  DECL_ENUM_INFO(Waveform, Waveform,
+                 "Type of waveform used in audio synthesis. Defines the shape of the oscillator's output signal.", 'wave');
 
   ma_waveform _wave;
 

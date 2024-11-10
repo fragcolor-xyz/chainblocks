@@ -98,9 +98,21 @@ const unsigned __tsan_switch_to_fiber_no_sync = 1 << 0;
   return shards::Var::Empty
 
 struct SHFlow {
+  SHFlow(int priority, SHWire *wire, SHBool paused) : priority(priority), wire(wire), paused(paused), id(_idCounter++) {}
   int priority;
-  struct SHWire *wire;
+  SHWire *wire;
   SHBool paused;
+
+  bool operator<(const SHFlow &other) const {
+    // sort by priority, then by id
+    if (priority == other.priority)
+      return id < other.id;
+    return priority < other.priority;
+  }
+
+private:
+  uint64_t id;
+  static inline std::atomic_uint64_t _idCounter;
 };
 
 struct SHStateSnapshot {
@@ -643,12 +655,18 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   }
 
   void wireCleanedUp(SHWire *wire) {
-    scheduled.erase(wire->shared_from_this());
-
-    auto it = std::lower_bound(_flowPool.begin(), _flowPool.end(), wire,
-                               [](const auto &flow, const auto *wirePtr) { return flow.wire < wirePtr; });
-    if (it != _flowPool.end() && it->wire == wire) { // Remove from flow pool, while keeping the iteration state
-      _flowPoolIt = _flowPool.erase(it);
+    if (scheduled.erase(wire->shared_from_this())) {
+      SHLOG_TRACE("Wire {} cleaned up, removed from scheduled", wire->name);
+      shassert(wire->context && "Wire context is null");
+      auto flow = wire->context->flow;
+      shassert(flow && "Wire flow is null");
+      if (wire == flow->wire) {
+        auto it = _flowPool.find(*flow);
+        shassert(it != _flowPool.end() && "Flow not found in flow pool");
+        _flowPoolIt = _flowPool.erase(it);
+      } else {
+        SHLOG_ERROR("Wire {} not found in flow pool, ptr: {}", wire->name, (void *)wire);
+      }
     }
   }
 
@@ -766,16 +784,9 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
   void remove(const std::shared_ptr<SHWire> &wire) {
     shards::stop(wire.get());
-    // stop should have done the following:
+    // stop cause wireOnCleanup to be called
     shassert(scheduled.count(wire) == 0 && "Wire still in scheduled!");
     shassert(wire->mesh.expired() && "Wire still has a mesh!");
-
-    // Since _flowPool is a flat_set, let's do a binary search
-    auto it = std::lower_bound(_flowPool.begin(), _flowPool.end(), wire.get(),
-                               [](const auto &flow, const auto *wirePtr) { return flow.wire < wirePtr; });
-    if (it != _flowPool.end() && it->wire == wire.get()) {
-      _flowPoolIt = _flowPool.erase(it);
-    }
   }
 
   bool empty() { return _flowPool.empty(); }
@@ -885,15 +896,7 @@ private:
                      boost::alignment::aligned_allocator<std::pair<const shards::OwnedVar, SHVar *>, 16>>
       refs;
 
-  struct SHFlowLess {
-    bool operator()(const SHFlow &a, const SHFlow &b) const {
-      if (a.priority != b.priority)
-        return a.priority < b.priority;
-      return a.wire < b.wire;
-    }
-  };
-
-  boost::container::flat_set<SHFlow, SHFlowLess, boost::container::stable_vector<SHFlow>> _flowPool;
+  boost::container::flat_set<SHFlow, std::less<SHFlow>, boost::container::stable_vector<SHFlow>> _flowPool;
   decltype(_flowPool)::iterator _flowPoolIt = _flowPool.end();
 
   std::vector<std::string> _errors;
