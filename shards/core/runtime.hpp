@@ -739,7 +739,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     for (auto flow : _flowPool) {
       toStop.emplace_back(flow.wire->shared_from_this());
     }
-    _flowPool.clear();
 
     // now add scheduled, notice me might have duplicates!
     for (auto wire : scheduled) {
@@ -759,6 +758,8 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     // release all wires
     scheduled.clear();
+    // clear flow pool
+    _flowPool.clear();
 
     // find dangling variables and notice
     for (auto var : variables) {
