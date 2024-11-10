@@ -12,13 +12,13 @@
     "" | Stop
   })
   "Ok" | Network.Send
-} Looped: true Priority: 100)
+} Looped: true)
 
 @wire(network-test-server {
   Network.Server("127.0.0.1" 9191 handler OnDisconnect: Pass)
   Once({"Smaller" | Network.Broadcast | Log("Send smaller")} Every: 0.5)
   Once({@random1 | Network.Broadcast | Log("Send random1")} Every: 0.5)
-} Looped: true Priority: 100)
+} Looped: true)
 
 @wire(client-init {
   "Hey server" | Network.Send
@@ -30,7 +30,7 @@
   @random1 | Network.Send | Log("Big load")
   @random2 | Network.Send | Log("Even bigger load")
   true > test/client-init-success | Log("Client init success")
-} Priority: 100)
+})
 
 @wire(network-test-client {
   Maybe({
@@ -50,7 +50,7 @@
     Once(Do(client-init))
     none
   } {Stop})
-} Looped: true Priority: 100)
+} Looped: true)
 
 @define(tick-count 200)
 @define(tick-count-1 #(@tick-count | Sub(1)))
@@ -67,7 +67,7 @@
   test/server-received-end | Log("server-received-end") | Assert.Is(true)
   test/client-received-smaller | Log("client-received-smaller") | Assert.Is(true)
   test/client-received-random1 | Log("client-received-random1") | Assert.Is(true)
-})
+} Priority: -1)
 
 @mesh(main)
 @schedule(main test-assert)
