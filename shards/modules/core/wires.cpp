@@ -1393,6 +1393,7 @@ struct ManyWire : public std::enable_shared_from_this<ManyWire> {
   std::shared_ptr<SHWire> wire;
   std::shared_ptr<SHMesh> mesh; // used only if MT
   std::deque<SHVar *> injectedVariables;
+  entt::scoped_connection _onCleanupConnection;
 };
 
 struct ParallelBase : public CapturingSpawners {
@@ -1950,11 +1951,6 @@ struct Spawn : public CapturingSpawners {
     }
 
     _composer.context = nullptr;
-    
-    if (_onCleanupConnection) {
-      _onCleanupConnection.release();
-      _connectedMesh.reset();
-    }
 
     WireBase::cleanup(context);
   }
@@ -1985,13 +1981,8 @@ struct Spawn : public CapturingSpawners {
     _wireContainers[c->wire.get()] = c;
 
     // Connect the cleanup event
-    if (!_onCleanupConnection) {
-      SHLOG_TRACE("Spawn::activate: connecting wireOnCleanup to {}", mesh->getLabel());
-      _connectedMesh = mesh;
-      _onCleanupConnection = c->wire->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
-    } else {
-      if (_connectedMesh.lock() != mesh)
-        throw ActivationError("Spawn: mesh changed, this is not supported");
+    if (!c->_onCleanupConnection) {
+      c->_onCleanupConnection = c->wire->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
     }
 
     shassert(c->injectedVariables.empty() && "Spawn: injected variables should be empty");
@@ -2011,13 +2002,8 @@ struct Spawn : public CapturingSpawners {
     return Var(c->wire); // notice this is "weak"
   }
 
-
   std::unique_ptr<WireDoppelgangerPool<ManyWire>> _pool;
   SHTypeInfo _inputType{};
-
-  entt::scoped_connection _onCleanupConnection;
-  // Mesh that has the cleanup connection
-  std::weak_ptr<SHMesh> _connectedMesh;
 };
 
 struct WhenDone : Spawn {
@@ -2045,13 +2031,8 @@ struct WhenDone : Spawn {
       _wireContainers[c->wire.get()] = c;
 
       // Connect the cleanup event
-      if (!_onCleanupConnection) {
-        SHLOG_TRACE("Spawn::activate: connecting wireOnCleanup to {}", mesh->getLabel());
-        _connectedMesh = mesh;
-        _onCleanupConnection = c->wire->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
-      } else {
-        if (_connectedMesh.lock() != mesh)
-          throw ActivationError("WhenDone: mesh changed, this is not supported");
+      if (!c->_onCleanupConnection) {
+        c->_onCleanupConnection = c->wire->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
       }
 
       for (auto &v : _vars) {
