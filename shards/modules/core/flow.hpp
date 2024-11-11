@@ -503,7 +503,7 @@ struct Await : public BaseSubFlow {
   void warmup(SHContext *ctx) {
     BaseSubFlow::warmup(ctx);
     if (!_alreadyOnWorker) {
-      _context.emplace(nullptr, ctx->currentWire(), ctx->flow);
+      _context.emplace(nullptr, ctx->currentWire());
       _context->wireStack = ctx->wireStack;
       _context->parent = ctx;
     }

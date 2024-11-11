@@ -1540,7 +1540,7 @@ SHRunWireOutput runWire(SHWire *wire, SHContext *context, const SHVar &wireInput
   return {wire->previousOutput, SHRunWireOutputState::Running};
 }
 
-void run(SHWire *wire, SHFlow *flow, shards::Coroutine *coro) {
+void run(SHWire *wire, shards::Coroutine *coro) {
   SH_CORO_RESUMED(wire);
 
   // store stack start address here
@@ -1560,8 +1560,7 @@ void run(SHWire *wire, SHFlow *flow, shards::Coroutine *coro) {
   wire->finishedError.clear();
 
   // Create a new context and copy the sink in
-  SHFlow anonFlow{wire->priority, wire, false};
-  SHContext context(coro, wire, flow ? flow : &anonFlow);
+  SHContext context(coro, wire);
   context.stackStart = &stackStart;
 
   // if the wire had a context (Stepped wires in wires.cpp)
@@ -1676,8 +1675,7 @@ endOfWire:
   // if we have a resumer we return to it
   if (wire->resumer) {
     SHLOG_TRACE("Wire {} ending and resuming {}", wire->name, wire->resumer->name);
-    SHFlow newFlow{wire->resumer->priority, wire->resumer, false};
-    context.flow = &mesh->swapFlows(*context.flow, newFlow);
+    wire->resumer->paused = false;
     wire->resumer = nullptr;
   }
 
@@ -2450,7 +2448,7 @@ void SHWire::cleanup(bool force) {
 
     auto mesh_ = mesh.lock();
     if (mesh_) {
-      mesh_->scheduled.erase(shared_from_this());
+      mesh_->unschedule(shared_from_this());
     }
     mesh.reset();
 

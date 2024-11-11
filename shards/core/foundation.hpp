@@ -454,6 +454,17 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
   void addTrait(SHTrait trait);
   const std::vector<shards::Trait> &getTraits() const { return traits; }
 
+  // less operator, compare by priority fall back to self pointer
+  bool operator<(const SHWire &other) const {
+    if (priority != other.priority) {
+      return priority < other.priority;
+    } else {
+      return this < &other;
+    }
+  }
+
+  bool paused{false};
+
 private:
   SHWire(std::string_view wire_name) : name(wire_name) { SHLOG_TRACE("Creating wire: {}", name); }
 

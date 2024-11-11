@@ -152,11 +152,10 @@ struct Device {
   std::vector<float> inputScratch;
   uint64_t inputHash;
   uint64_t outputHash;
-  SHFlow dpsFlow{0, nullptr, false};
   Coroutine dspStubCoro{};
   std::shared_ptr<SHMesh> dspMesh = SHMesh::make();
   std::shared_ptr<SHWire> dspWire = SHWire::make("Audio-DSP-Wire");
-  SHContext dspContext{&dspStubCoro, dspWire.get(), &dpsFlow};
+  SHContext dspContext{&dspStubCoro, dspWire.get()};
   std::atomic_bool stopped{false};
   std::atomic_bool hasErrors{false};
   std::string errorMessage;

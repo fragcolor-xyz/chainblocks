@@ -305,7 +305,7 @@ struct BaseRunner : public WireBase {
       wire->context = context;
       // Notice we don't share our flow!
       // let the wire create one by passing null
-      shards::prepare(wire.get(), nullptr);
+      shards::prepare(wire.get());
       if (wire->state == SHWire::Failed) {
         throw ActivationError(fmt::format("Step: wire {} warmup failed", wire->name));
       }
@@ -326,7 +326,7 @@ struct BaseRunner : public WireBase {
 
     // Tick the wire on the flow that this Step wire created in prepare
     SHDuration now = SHClock::now().time_since_epoch();
-    shards::tick(wire->context->flow->getWire(), now);
+    shards::tick(wire.get(), now);
   }
 };
 

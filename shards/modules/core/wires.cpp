@@ -715,11 +715,11 @@ struct SuspendWire : public WireBase {
     ensureWire();
 
     if (unlikely(!wire)) {
-      // in this case we pause the current flow
-      context->flow->setPaused(true);
+      // in this case we pause the current wire
+      context->currentWire()->paused = true;
     } else {
-      // pause the wire's flow
-      wire->context->flow->setPaused(true);
+      // pause the wire directly
+      wire->paused = true;
     }
 
     return input;
@@ -790,15 +790,7 @@ struct ResumeWire : public WireBase {
   SHVar activate(SHContext *context, const SHVar &input) {
     ensureWire();
 
-    if (!wire->context) {
-      throw ActivationError("Wire has no context");
-    }
-
-    if (!wire->context->flow) {
-      throw ActivationError("Wire has no flow");
-    }
-
-    wire->context->flow->setPaused(false);
+    wire->paused = false;
 
     return input;
   }
@@ -987,12 +979,6 @@ struct SwitchTo : public WireBase {
       shards::stop(pWire);
     }
 
-    // assign the new wire as current wire on the flow
-    auto mesh = context->main->mesh.lock();
-    SHFlow newFlow{pWire->priority, pWire, false};
-    auto oldFlow = *context->flow;
-    context->flow = &mesh->swapFlows(oldFlow, newFlow);
-
     // capture variables
     for (auto &v : _vars) {
       auto &var = v.get();
@@ -1003,29 +989,24 @@ struct SwitchTo : public WireBase {
 
     // Prepare if no callc was called
     if (!coroutineValid(pWire->coro)) {
-      pWire->mesh = mesh;
-      shards::prepare(pWire, context->flow);
-
-      // handle early failure
-      if (pWire->state == SHWire::State::Failed) {
-        // destroy fresh cloned variables
-        for (auto &v : _vars) {
-          std::string_view name = v.variableNameView();
-          destroyVar(pWire->getVariable(toSWL(name)));
-        }
-        SHLOG_ERROR("Wire {} failed to start.", pWire->name);
-        throw ActivationError("Wire failed to start.");
-      }
+      // need to schedule it then
+      auto mesh = context->main->mesh.lock();
+      mesh->schedule(pWire->shared_from_this(), input, false); // no need to compose
     }
 
-    // we should be valid as this shard should be dependent on current
-    // do this here as stop/prepare might overwrite
-    if (pWire->resumer == nullptr)
-      pWire->resumer = previousWithCoro;
+    if (previousWithCoro->resumer == pWire) {
+      // we just unpause then
+      pWire->paused = false;
+    } else {
+      // we should be valid as this shard should be dependent on current
+      // do this here as stop/prepare might overwrite
+      if (pWire->resumer == nullptr)
+        pWire->resumer = previousWithCoro;
 
-    // Start it if not started
-    if (!shards::isRunning(pWire)) {
-      shards::start(pWire, input);
+      // set the previousWithCore as paused
+      if (previousWithCoro) {
+        previousWithCoro->paused = true;
+      }
     }
 
     // And normally we just delegate the Mesh + SHFlow
