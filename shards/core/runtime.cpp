@@ -1673,6 +1673,14 @@ endOfWire:
   // ensure stop state is set
   context.stopFlow(wire->previousOutput);
 
+  // if we have a resumer we return to it
+  if (wire->resumer) {
+    SHLOG_TRACE("Wire {} ending and resuming {}", wire->name, wire->resumer->name);
+    SHFlow newFlow{wire->resumer->priority, wire->resumer, false};
+    context.flow = &mesh->swapFlows(*context.flow, newFlow);
+    wire->resumer = nullptr;
+  }
+
   // Set onLastResume so tick keeps processing mesh tasks on cleanup
   context.onLastResume = true;
   wire->cleanup(true);
@@ -1685,13 +1693,6 @@ endOfWire:
 
   mesh->dispatcher.trigger(SHWire::OnStopEvent{wire});
   mesh.reset();
-
-  // if we have a resumer we return to it
-  if (wire->resumer) {
-    SHLOG_TRACE("Wire {} ending and resuming {}", wire->name, wire->resumer->name);
-    context.flow->wire = wire->resumer;
-    wire->resumer = nullptr;
-  }
 
   // Make sure to clear context at the end so it doesn't point to invalid stack memory
   wire->context = nullptr;

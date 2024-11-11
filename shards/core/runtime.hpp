@@ -98,21 +98,24 @@ const unsigned __tsan_switch_to_fiber_no_sync = 1 << 0;
   return shards::Var::Empty
 
 struct SHFlow {
-  SHFlow(int priority, SHWire *wire, SHBool paused) : priority(priority), wire(wire), paused(paused), id(_idCounter++) {}
-  int priority;
-  SHWire *wire;
-  SHBool paused;
+  SHFlow(int priority, SHWire *wire, SHBool paused) : priority(priority), wire(wire), paused(paused) {}
+
+  void setPaused(SHBool paused) { this->paused = paused; }
+  SHBool isPaused() const { return paused; }
+
+  SHWire *getWire() const { return wire; }
 
   bool operator<(const SHFlow &other) const {
     // sort by priority, then by id
     if (priority == other.priority)
-      return id < other.id;
+      return wire < other.wire;
     return priority < other.priority;
   }
 
 private:
-  uint64_t id;
-  static inline std::atomic_uint64_t _idCounter;
+  int priority;
+  SHWire *wire;
+  SHBool paused;
 };
 
 struct SHStateSnapshot {
@@ -655,18 +658,21 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   }
 
   void wireCleanedUp(SHWire *wire) {
+    // remove if scheduled
     if (scheduled.erase(wire->shared_from_this())) {
       SHLOG_TRACE("Wire {} cleaned up, removed from scheduled", wire->name);
-      shassert(wire->context && "Wire context is null");
-      auto flow = wire->context->flow;
-      shassert(flow && "Wire flow is null");
-      if (wire == flow->wire) {
-        auto it = _flowPool.find(*flow);
-        shassert(it != _flowPool.end() && "Flow not found in flow pool");
-        _flowPoolIt = _flowPool.erase(it);
-      } else {
-        SHLOG_ERROR("Wire {} not found in flow pool, ptr: {}", wire->name, (void *)wire);
-      }
+    } else {
+      SHLOG_TRACE("Wire {} cleaned up, not found in scheduled", wire->name);
+    }
+
+    // also search if on flow
+    SHFlow flow{wire->priority, wire, false};
+    auto it = _flowPool.find(flow);
+    if (it != _flowPool.end()) {
+      _flowPoolIt = _flowPool.erase(it);
+      SHLOG_TRACE("Wire {} cleaned up, removed from flow", wire->name);
+    } else {
+      SHLOG_TRACE("Wire {} cleaned up, not found in flow", wire->name);
     }
   }
 
@@ -685,34 +691,36 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
       while (_flowPoolIt != _flowPool.end()) {
         auto startFlowPoolIt = _flowPoolIt;
         auto &flow = *_flowPoolIt;
-        if (flow.paused) {
+        if (flow.isPaused()) {
           ++_flowPoolIt;
           continue; // simply skip
         }
 
-        observer.before_tick(flow.wire);
+        auto wire = flow.getWire();
 
-        shards::tick(flow.wire, now);
+        observer.before_tick(wire);
 
-        if (unlikely(!shards::isRunning(flow.wire))) {
-          if (flow.wire->finishedError.size() > 0) {
-            _errors.emplace_back(flow.wire->finishedError);
+        shards::tick(wire, now);
+
+        if (unlikely(!shards::isRunning(wire))) {
+          if (wire->finishedError.size() > 0) {
+            _errors.emplace_back(wire->finishedError);
           }
 
-          if (flow.wire->state == SHWire::State::Failed) {
-            _failedWires.emplace_back(flow.wire);
+          if (wire->state == SHWire::State::Failed) {
+            _failedWires.emplace_back(wire);
             noErrors = false;
           }
 
-          observer.before_stop(flow.wire);
-          if (!shards::stop(flow.wire)) {
+          observer.before_stop(wire);
+          if (!shards::stop(wire)) {
             noErrors = false;
           }
 
           // stop should have done the following:
-          SHLOG_TRACE("Wire {} ended while ticking", flow.wire->name);
-          shassert(scheduled.count(flow.wire->shared_from_this()) == 0 && "Wire still in scheduled!");
-          shassert(flow.wire->mesh.expired() && "Wire still has a mesh!");
+          SHLOG_TRACE("Wire {} ended while ticking", wire->name);
+          shassert(scheduled.count(wire->shared_from_this()) == 0 && "Wire still in scheduled!");
+          shassert(wire->mesh.expired() && "Wire still has a mesh!");
         }
 
         // Wire removal can change the iterator, in that case don't increment
@@ -737,7 +745,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     // scheduled might not be the full picture!
     for (auto flow : _flowPool) {
-      toStop.emplace_back(flow.wire->shared_from_this());
+      toStop.emplace_back(flow.getWire()->shared_from_this());
     }
 
     // now add scheduled, notice me might have duplicates!
@@ -882,6 +890,16 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
   void setLabel(std::string_view label) { this->label = label; }
   std::string_view getLabel() const { return label; }
+
+  SHFlow &swapFlows(SHFlow &oldFlow, SHFlow &newFlow) {
+    auto it = _flowPool.find(oldFlow);
+    if (it != _flowPool.end()) {
+      _flowPool.erase(it);
+      return *_flowPool.insert(newFlow).first;
+    } else {
+      SHLOG_FATAL("Swap flows, old flow not found: {}", oldFlow.getWire()->name);
+    }
+  }
 
 private:
   SHMesh(std::string_view label) : label(label) {}

@@ -716,10 +716,10 @@ struct SuspendWire : public WireBase {
 
     if (unlikely(!wire)) {
       // in this case we pause the current flow
-      context->flow->paused = true;
+      context->flow->setPaused(true);
     } else {
       // pause the wire's flow
-      wire->context->flow->paused = true;
+      wire->context->flow->setPaused(true);
     }
 
     return input;
@@ -798,7 +798,7 @@ struct ResumeWire : public WireBase {
       throw ActivationError("Wire has no flow");
     }
 
-    wire->context->flow->paused = false;
+    wire->context->flow->setPaused(false);
 
     return input;
   }
@@ -988,7 +988,10 @@ struct SwitchTo : public WireBase {
     }
 
     // assign the new wire as current wire on the flow
-    context->flow->wire = pWire;
+    auto mesh = context->main->mesh.lock();
+    SHFlow newFlow{pWire->priority, pWire, false};
+    auto oldFlow = *context->flow;
+    context->flow = &mesh->swapFlows(oldFlow, newFlow);
 
     // capture variables
     for (auto &v : _vars) {
@@ -1000,7 +1003,7 @@ struct SwitchTo : public WireBase {
 
     // Prepare if no callc was called
     if (!coroutineValid(pWire->coro)) {
-      pWire->mesh = context->main->mesh;
+      pWire->mesh = mesh;
       shards::prepare(pWire, context->flow);
 
       // handle early failure
