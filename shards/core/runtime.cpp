@@ -1602,7 +1602,7 @@ void run(SHWire *wire, SHFlow *flow, shards::Coroutine *coro) {
     goto endOfWire;
   }
 
-  mesh->dispatcher.trigger(SHWire::OnStartEvent{wire});
+  wire->dispatcher.trigger(SHWire::OnStartEvent{wire});
 
   while (running) {
     running = wire->looped;
@@ -2418,10 +2418,7 @@ void SHWire::cleanup(bool force) {
 
     warmedUp = false;
 
-    auto mesh_ = mesh.lock();
-    if (mesh_) {
-      mesh_->dispatcher.trigger(SHWire::OnCleanupEvent{this});
-    }
+    dispatcher.trigger(SHWire::OnCleanupEvent{this});
 
     // Run cleanup on all shards, prepare them for a new start if necessary
     // Do this in reverse to allow a safer cleanup
@@ -2451,9 +2448,9 @@ void SHWire::cleanup(bool force) {
     }
     variables.clear();
 
-    // finally reset the mesh
+    auto mesh_ = mesh.lock();
     if (mesh_) {
-      mesh_->wireCleanedUp(this);
+      mesh_->scheduled.erase(shared_from_this());
     }
     mesh.reset();
 

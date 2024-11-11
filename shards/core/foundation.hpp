@@ -245,10 +245,13 @@ typedef void(__cdecl *SHSetWireError)(const SHWire *, void *errorData, struct SH
 
 struct SHWire : public std::enable_shared_from_this<SHWire> {
   enum State { Stopped, Prepared, Starting, Iterating, IterationEnded, Failed, Ended };
+
+  // Triggered whenever the main wire of a context starts
   struct OnStartEvent {
     const SHWire *wire;
   };
 
+  // Triggered directly on each wire
   struct OnCleanupEvent {
     const SHWire *wire;
   };
@@ -268,6 +271,8 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
     const SHWire *wire;
     const SHWire *childWire;
   };
+
+  mutable entt::dispatcher dispatcher;
 
   // Storage of data used only during compose
   struct ComposeData {

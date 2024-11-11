@@ -1950,6 +1950,11 @@ struct Spawn : public CapturingSpawners {
     }
 
     _composer.context = nullptr;
+    
+    if (_onCleanupConnection) {
+      _onCleanupConnection.release();
+      _connectedMesh.reset();
+    }
 
     WireBase::cleanup(context);
   }
@@ -1975,19 +1980,19 @@ struct Spawn : public CapturingSpawners {
   SHVar activate(SHContext *context, const SHVar &input) {
     auto mesh = context->main->mesh.lock();
 
+    auto c = _pool->acquire(_composer, context);
+    shassert(!_wireContainers.contains(c->wire.get()));
+    _wireContainers[c->wire.get()] = c;
+
     // Connect the cleanup event
     if (!_onCleanupConnection) {
       SHLOG_TRACE("Spawn::activate: connecting wireOnCleanup to {}", mesh->getLabel());
       _connectedMesh = mesh;
-      _onCleanupConnection = mesh->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
+      _onCleanupConnection = c->wire->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
     } else {
       if (_connectedMesh.lock() != mesh)
         throw ActivationError("Spawn: mesh changed, this is not supported");
     }
-
-    auto c = _pool->acquire(_composer, context);
-    shassert(!_wireContainers.contains(c->wire.get()));
-    _wireContainers[c->wire.get()] = c;
 
     shassert(c->injectedVariables.empty() && "Spawn: injected variables should be empty");
     for (auto &v : _vars) {
@@ -2006,17 +2011,11 @@ struct Spawn : public CapturingSpawners {
     return Var(c->wire); // notice this is "weak"
   }
 
-  ~Spawn() {
-    if (_onCleanupConnection && !_connectedMesh.expired()) {
-      _onCleanupConnection.release();
-      _connectedMesh.reset();
-    }
-  }
 
   std::unique_ptr<WireDoppelgangerPool<ManyWire>> _pool;
   SHTypeInfo _inputType{};
 
-  entt::connection _onCleanupConnection;
+  entt::scoped_connection _onCleanupConnection;
   // Mesh that has the cleanup connection
   std::weak_ptr<SHMesh> _connectedMesh;
 };
@@ -2042,18 +2041,18 @@ struct WhenDone : Spawn {
       auto mesh = context->main->mesh.lock();
       shassert(mesh && "Mesh is null");
 
+      auto c = _pool->acquire(_composer, context);
+      _wireContainers[c->wire.get()] = c;
+
       // Connect the cleanup event
       if (!_onCleanupConnection) {
         SHLOG_TRACE("Spawn::activate: connecting wireOnCleanup to {}", mesh->getLabel());
         _connectedMesh = mesh;
-        _onCleanupConnection = mesh->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
+        _onCleanupConnection = c->wire->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
       } else {
         if (_connectedMesh.lock() != mesh)
           throw ActivationError("WhenDone: mesh changed, this is not supported");
       }
-
-      auto c = _pool->acquire(_composer, context);
-      _wireContainers[c->wire.get()] = c;
 
       for (auto &v : _vars) {
         SHVar *refVar = c->injectedVariables.emplace_back(referenceWireVariable(c->wire.get(), v.variableName()));

@@ -1177,7 +1177,7 @@ struct SetUpdateBase : public SetBase {
 
 struct Set : public SetUpdateBase {
   bool _tracked{false};
-  entt::connection _onStartConnection{};
+  entt::scoped_connection _onStartConnection{};
   struct OnStartHandler {
     Set *shard;
     SHWire *targetWire;
@@ -1275,10 +1275,6 @@ struct Set : public SetUpdateBase {
   void warmup(SHContext *context) {
     SetBase::warmup(context);
 
-    if (_onStartConnection) {
-      _onStartConnection.release();
-    }
-
     shassert_extended(context, _self && "Self should be valid at this point");
 
     if (_tracked) {
@@ -1290,7 +1286,7 @@ struct Set : public SetUpdateBase {
       // need to defer the check to before we actually start running
       setupDispatcher(context, _global);
       _startHandler = OnStartHandler{this, context->currentWire()};
-      _onStartConnection = _dispatcherPtr->sink<SHWire::OnStartEvent>().connect<&OnStartHandler::handle>(_startHandler);
+      _onStartConnection = context->main->dispatcher.sink<SHWire::OnStartEvent>().connect<&OnStartHandler::handle>(_startHandler);
 
       OnTrackedVarWarmup ev{context->main->id, _name, _key, _exposedInfo._innerInfo.elements[0], context->currentWire()};
       _dispatcherPtr->trigger(ev);
@@ -1335,9 +1331,7 @@ struct Set : public SetUpdateBase {
 
     SetBase::cleanup(context);
 
-    if (_onStartConnection) {
-      _onStartConnection.release();
-    }
+    _onStartConnection.release();
 
     // for (size_t i = 0; i < _tableType.table.keys.len; i++) {
     //   shards::destroyVar(_tableType.table.keys.elements[i]);
