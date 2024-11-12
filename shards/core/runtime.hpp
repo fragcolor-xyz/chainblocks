@@ -598,9 +598,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void schedule(Observer &observer, const std::shared_ptr<SHWire> &wire, SHVar input = shards::Var::Empty, bool compose = true) {
     ZoneScoped;
 
-    // set pristine flag to false
-    _pristine = false;
-
     SHLOG_TRACE("Scheduling wire {}", wire->name);
 
     if (wire->warmedUp || _scheduled.count(wire) > 0) {
@@ -735,9 +732,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
       }
     }
     variables.clear();
-
-    // set pristine flag
-    _pristine = true;
   }
 
   void terminate() {
@@ -762,8 +756,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   }
 
   bool empty() { return _scheduled.empty(); }
-
-  bool pristine() { return _pristine; }
 
   const std::vector<std::string> &errors() { return _errors; }
 
@@ -877,22 +869,19 @@ private:
 
   struct WireLess {
     bool operator()(const std::shared_ptr<SHWire> &a, const std::shared_ptr<SHWire> &b) const {
-      // can be null so deal with them first
-      if (!a)
-        return true;
-      if (!b)
-        return false;
+      shassert(a && b && "WireLess should not be called with a null pointer");
       return *a < *b;
     }
   };
-  std::set<std::shared_ptr<SHWire>, WireLess> _scheduled;
-  decltype(_scheduled)::iterator _scheduledIt;
+  // Notice, has to be stable_vector to ensure iterator stability
+  using WirePtr = std::shared_ptr<SHWire>;
+  using ScheduledSet = boost::container::flat_set<WirePtr, WireLess, boost::container::stable_vector<WirePtr>>;
+  ScheduledSet _scheduled;
+  ScheduledSet::iterator _scheduledIt;
 
   std::vector<std::string> _errors;
   std::vector<SHWire *> _failedWires;
   std::string label;
-
-  std::atomic_bool _pristine{true};
 };
 
 namespace shards {

@@ -316,6 +316,10 @@ struct BaseRunner : public WireBase {
 
     shassert(wire->context && "wire context should be valid at this point");
 
+    if (wire->paused) {
+      return;
+    }
+
     // Starting
     if (!shards::isRunning(wire.get())) {
       shards::start(wire.get(), input);
