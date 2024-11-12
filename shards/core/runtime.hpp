@@ -691,8 +691,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
           // remove from scheduled if we didn't move iterator, should have happened in stop
           if (preTickIt == _scheduledIt) {
             _scheduledIt = _scheduled.erase(preTickIt);
-          } else {
-            SHLOG_WARNING("Wire {} ended while ticking but we moved the iterator, should have happened in stop!", wire->name);
           }
         } else {
           // if we didn't move outside of this call, move forward

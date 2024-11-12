@@ -968,10 +968,10 @@ struct SwitchTo : public WireBase {
     auto pWire = [&] {
       if (!wire) {
         if (previousWithCoro->resumer) {
-          SHLOG_TRACE("Resume, wire not found, using resumer: {}", previousWithCoro->resumer->name);
+          SHLOG_TRACE("SwitchTo, wire not found, using resumer: {}", previousWithCoro->resumer->name);
           return previousWithCoro->resumer;
         } else {
-          throw ActivationError("Resume, wire not found.");
+          throw ActivationError("SwitchTo, wire not found.");
         }
       } else {
         return wire.get();
@@ -1013,8 +1013,9 @@ struct SwitchTo : public WireBase {
     if (pWire->resumer == nullptr)
       pWire->resumer = previousWithCoro;
 
-    if (pWire != previousWithCoro) {
+    if (pWire != previousWithCoro && pWire->childWire != previousWithCoro) {
       // all we need to do is set pWire as childWire of the previousWireCoro
+      shassert(previousWithCoro->childWire == nullptr && "SwitchTo: previousWireCoro already has a childWire");
       previousWithCoro->childWire = pWire;
     } else {
       // we are switching to ourselves, we need to set the childWire to nullptr
