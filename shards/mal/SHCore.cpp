@@ -1833,7 +1833,7 @@ BUILTIN("tick") {
   if (const malSHWire *v = DYNAMIC_CAST(malSHWire, first)) {
     auto wire = SHWire::sharedFromRef(v->value());
     SHDuration now = SHClock::now().time_since_epoch();
-    shards::tick(wire.get(), now);
+    shards::tick(wire->tickingWire(), now);
     return mal::boolean(true);
   } else if (const malSHMesh *v = DYNAMIC_CAST(malSHMesh, first)) {
     auto noErrors = v->value()->tick();
@@ -1903,7 +1903,7 @@ bool run(SHMesh *mesh, SHWire *wire, double sleepTime, int times, bool dec) {
   } else {
     SHDuration now = SHClock::now().time_since_epoch();
     do {
-      shards::tick(wire, now);
+      shards::tick(wire->tickingWire(), now);
       if (dec) {
         times--;
         if (times == 0) {

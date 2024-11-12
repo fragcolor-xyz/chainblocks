@@ -330,7 +330,7 @@ struct BaseRunner : public WireBase {
 
     // Tick the wire on the flow that this Step wire created in prepare
     SHDuration now = SHClock::now().time_since_epoch();
-    shards::tick(wire.get(), now);
+    shards::tick(wire->tickingWire(), now);
   }
 };
 

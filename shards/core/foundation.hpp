@@ -338,7 +338,9 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
   mutable std::unordered_map<std::string_view, SHExposedTypeInfo> requirements;
 
   SHContext *context{nullptr};
-  SHWire *resumer{nullptr}; // used in Resume/Start shards
+
+  SHWire *resumer{nullptr};   // used in SwitchTo shard
+  SHWire *childWire{nullptr}; // used in SwitchTo shard
 
   std::weak_ptr<SHMesh> mesh;
 
@@ -464,6 +466,8 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
   }
 
   bool paused{false};
+
+  constexpr SHWire *tickingWire() { return childWire ? childWire : this; }
 
 private:
   SHWire(std::string_view wire_name) : name(wire_name) { SHLOG_TRACE("Creating wire: {}", name); }

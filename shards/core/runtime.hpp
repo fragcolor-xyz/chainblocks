@@ -667,7 +667,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
         }
 
         observer.before_tick(wire);
-        shards::tick(wire, now);
+        shards::tick(wire->tickingWire(), now);
 
         if (unlikely(!shards::isRunning(wire))) {
           if (wire->finishedError.size() > 0) {
@@ -849,7 +849,8 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     if (it != _scheduled.end()) {
       _scheduledIt = _scheduled.erase(it);
     } else {
-      SHLOG_WARNING("Wire {} not scheduled, cannot unschedule!", wire->name);
+      // this case is common with Step/SwitchTo actually
+      SHLOG_TRACE("Wire {} not scheduled, nothing to unschedule!", wire->name);
     }
   }
 
@@ -917,7 +918,7 @@ inline bool stop(SHWire *wire, SHVar *result, SHContext *currentContext) {
       if (currentContext && currentContext == wire->context) {
         SHLOG_WARNING("Trying to stop wire {} from the same context it's running in!", wire->name);
       } else {
-        shards::tick<true>(wire, SHDuration{});
+        shards::tick<true>(wire->tickingWire(), SHDuration{});
       }
     }
 

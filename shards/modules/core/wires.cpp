@@ -961,6 +961,10 @@ struct SwitchTo : public WireBase {
       }
     }
 
+    if (!previousWithCoro) {
+      throw ActivationError("SwitchTo, no previous wire with coroutine found.");
+    }
+
     auto pWire = [&] {
       if (!wire) {
         if (previousWithCoro->resumer) {
@@ -989,24 +993,37 @@ struct SwitchTo : public WireBase {
 
     // Prepare if no callc was called
     if (!coroutineValid(pWire->coro)) {
-      // need to schedule it then
-      auto mesh = context->main->mesh.lock();
-      mesh->schedule(pWire->shared_from_this(), input, false); // no need to compose
+      pWire->mesh = context->main->mesh.lock();
+      shards::prepare(pWire);
+
+      // handle early failure
+      if (pWire->state == SHWire::State::Failed) {
+        // destroy fresh cloned variables
+        for (auto &v : _vars) {
+          std::string_view name = v.variableNameView();
+          destroyVar(pWire->getVariable(toSWL(name)));
+        }
+        SHLOG_ERROR("Wire {} failed to start.", pWire->name);
+        throw ActivationError("Wire failed to start.");
+      }
     }
 
-    if (previousWithCoro->resumer == pWire) {
-      // we just unpause then
-      pWire->paused = false;
-    } else {
-      // we should be valid as this shard should be dependent on current
-      // do this here as stop/prepare might overwrite
-      if (pWire->resumer == nullptr)
-        pWire->resumer = previousWithCoro;
+    // we should be valid as this shard should be dependent on current
+    // do this here as stop/prepare might overwrite
+    if (pWire->resumer == nullptr)
+      pWire->resumer = previousWithCoro;
 
-      // set the previousWithCore as paused
-      if (previousWithCoro) {
-        previousWithCoro->paused = true;
-      }
+    if (pWire != previousWithCoro) {
+      // all we need to do is set pWire as childWire of the previousWireCoro
+      previousWithCoro->childWire = pWire;
+    } else {
+      // we are switching to ourselves, we need to set the childWire to nullptr
+      pWire->childWire = nullptr;
+    }
+
+    // Start it if not started
+    if (!shards::isRunning(pWire)) {
+      shards::start(pWire, input);
     }
 
     // And normally we just delegate the Mesh + SHFlow
@@ -1018,7 +1035,8 @@ struct SwitchTo : public WireBase {
     // We will end here when we get resumed!
     // When we are here, pWire is suspended, (could be in the middle of a loop, anywhere!)
 
-    // reset resumer
+    // reset resumer and childWire
+    previousWithCoro->childWire = nullptr;
     pWire->resumer = nullptr;
 
     // return the last or final output of pWire

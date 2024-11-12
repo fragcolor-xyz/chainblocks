@@ -1675,7 +1675,7 @@ endOfWire:
   // if we have a resumer we return to it
   if (wire->resumer) {
     SHLOG_TRACE("Wire {} ending and resuming {}", wire->name, wire->resumer->name);
-    wire->resumer->paused = false;
+    wire->resumer->childWire = nullptr; // reset childWire, this will resume the wire
     wire->resumer = nullptr;
   }
 
