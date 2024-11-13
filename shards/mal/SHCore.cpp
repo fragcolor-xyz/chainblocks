@@ -162,7 +162,9 @@ public:
     SHLOG_TRACE("Created a SHWire - {}", name);
     auto wire = SHWire::make(name);
     m_wire = wire->newRef();
-    { shards::GetGlobals().GlobalWires[name] = wire; }
+    {
+      shards::GetGlobals().GlobalWires[name] = wire;
+    }
   }
 
   malSHWire(const std::shared_ptr<SHWire> &wire) : m_wire(wire->newRef()) { SHLOG_TRACE("Loaded a SHWire - {}", wire->name); }
@@ -1777,7 +1779,7 @@ BUILTIN("prepare") {
   auto composeResult = composeWire(wire.get(), data);
   wire->composedHash = Var(1, 1); // just to mark as composed
   shards::arrayFree(composeResult.exposedInfo);
-  shards::prepare(wire.get(), nullptr);
+  shards::prepare(wire.get());
   return mal::nilValue();
 }
 
@@ -1831,7 +1833,7 @@ BUILTIN("tick") {
   if (const malSHWire *v = DYNAMIC_CAST(malSHWire, first)) {
     auto wire = SHWire::sharedFromRef(v->value());
     SHDuration now = SHClock::now().time_since_epoch();
-    shards::tick(wire.get(), now);
+    shards::tick(wire->tickingWire(), now);
     return mal::boolean(true);
   } else if (const malSHMesh *v = DYNAMIC_CAST(malSHMesh, first)) {
     auto noErrors = v->value()->tick();
@@ -1901,7 +1903,7 @@ bool run(SHMesh *mesh, SHWire *wire, double sleepTime, int times, bool dec) {
   } else {
     SHDuration now = SHClock::now().time_since_epoch();
     do {
-      shards::tick(wire, now);
+      shards::tick(wire->tickingWire(), now);
       if (dec) {
         times--;
         if (times == 0) {
@@ -2847,7 +2849,9 @@ SHLISP_API __cdecl SHBool shLispAddToEnv(void *env, const char *str, SHVar input
 void setupObserver(std::shared_ptr<Observer> &obs, const malEnvPtr &env) {
   obs = std::make_shared<Observer>();
   obs->_env = env;
-  { shards::GetGlobals().Observers.emplace_back(obs); }
+  {
+    shards::GetGlobals().Observers.emplace_back(obs);
+  }
   {
     std::scoped_lock obsLock(observersMutex);
     observers[env.ptr()] = obs;

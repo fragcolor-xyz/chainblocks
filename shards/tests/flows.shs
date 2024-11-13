@@ -14,7 +14,7 @@
   Msg("one - 3")
   SwitchTo(two)
   Msg("one - Done")
-  SwitchTo("two")
+  SwitchTo(two)
 })
 
 @wire(two {

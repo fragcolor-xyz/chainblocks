@@ -1540,7 +1540,7 @@ SHRunWireOutput runWire(SHWire *wire, SHContext *context, const SHVar &wireInput
   return {wire->previousOutput, SHRunWireOutputState::Running};
 }
 
-void run(SHWire *wire, SHFlow *flow, shards::Coroutine *coro) {
+void run(SHWire *wire, shards::Coroutine *coro) {
   SH_CORO_RESUMED(wire);
 
   // store stack start address here
@@ -1560,8 +1560,7 @@ void run(SHWire *wire, SHFlow *flow, shards::Coroutine *coro) {
   wire->finishedError.clear();
 
   // Create a new context and copy the sink in
-  SHFlow anonFlow{wire};
-  SHContext context(coro, wire, flow ? flow : &anonFlow);
+  SHContext context(coro, wire);
   context.stackStart = &stackStart;
 
   // if the wire had a context (Stepped wires in wires.cpp)
@@ -1602,7 +1601,7 @@ void run(SHWire *wire, SHFlow *flow, shards::Coroutine *coro) {
     goto endOfWire;
   }
 
-  mesh->dispatcher.trigger(SHWire::OnStartEvent{wire});
+  wire->dispatcher.trigger(SHWire::OnStartEvent{wire});
 
   while (running) {
     running = wire->looped;
@@ -1669,16 +1668,16 @@ endOfWire:
     wire->finishedOutput = wire->previousOutput; // cloning over! (OwnedVar)
   }
 
-  // if we have a resumer we return to it
-  if (wire->resumer) {
-    SHLOG_TRACE("Wire {} ending and resuming {}", wire->name, wire->resumer->name);
-    context.flow->wire = wire->resumer;
-    wire->resumer = nullptr;
-  }
-
   // run cleanup on all the shards
   // ensure stop state is set
   context.stopFlow(wire->previousOutput);
+
+  // if we have a resumer we return to it
+  if (wire->resumer) {
+    SHLOG_TRACE("Wire {} ending and resuming {}", wire->name, wire->resumer->name);
+    wire->resumer->childWire = nullptr; // reset childWire, this will resume the wire
+    wire->resumer = nullptr;
+  }
 
   // Set onLastResume so tick keeps processing mesh tasks on cleanup
   context.onLastResume = true;
@@ -2417,10 +2416,7 @@ void SHWire::cleanup(bool force) {
 
     warmedUp = false;
 
-    auto mesh_ = mesh.lock();
-    if (mesh_) {
-      mesh_->dispatcher.trigger(SHWire::OnCleanupEvent{this});
-    }
+    dispatcher.trigger(SHWire::OnCleanupEvent{this});
 
     // Run cleanup on all shards, prepare them for a new start if necessary
     // Do this in reverse to allow a safer cleanup
@@ -2450,9 +2446,9 @@ void SHWire::cleanup(bool force) {
     }
     variables.clear();
 
-    // finally reset the mesh
+    auto mesh_ = mesh.lock();
     if (mesh_) {
-      mesh_->wireCleanedUp(this);
+      mesh_->unschedule(shared_from_this());
     }
     mesh.reset();
 
@@ -2842,6 +2838,11 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
   result->setWireLooped = [](SHWireRef wireref, SHBool looped) noexcept {
     auto &sc = SHWire::sharedFromRef(wireref);
     sc->looped = looped;
+  };
+
+  result->setWirePriority = [](SHWireRef wireref, int priority) noexcept {
+    auto &sc = SHWire::sharedFromRef(wireref);
+    sc->priority = priority;
   };
 
   result->setWireUnsafe = [](SHWireRef wireref, SHBool unsafe) noexcept {

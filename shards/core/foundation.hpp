@@ -40,17 +40,6 @@
 
 #include <shards/shardwrapper.hpp>
 
-#ifdef __clang__
-#pragma clang attribute push(__attribute__((no_sanitize("undefined"))), apply_to = function)
-#endif
-
-#include <boost/container/stable_vector.hpp>
-#include <boost/container/flat_map.hpp>
-
-#ifdef __clang__
-#pragma clang attribute pop
-#endif
-
 // Needed specially for win32/32bit
 #include <boost/align/aligned_allocator.hpp>
 
@@ -256,10 +245,13 @@ typedef void(__cdecl *SHSetWireError)(const SHWire *, void *errorData, struct SH
 
 struct SHWire : public std::enable_shared_from_this<SHWire> {
   enum State { Stopped, Prepared, Starting, Iterating, IterationEnded, Failed, Ended };
+
+  // Triggered whenever the main wire of a context starts
   struct OnStartEvent {
     const SHWire *wire;
   };
 
+  // Triggered directly on each wire
   struct OnCleanupEvent {
     const SHWire *wire;
   };
@@ -279,6 +271,8 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
     const SHWire *wire;
     const SHWire *childWire;
   };
+
+  mutable entt::dispatcher dispatcher;
 
   // Storage of data used only during compose
   struct ComposeData {
@@ -306,6 +300,7 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
   uint64_t debugId{0};            // used for debugging
   shards::OwnedVar astObject;     // optional, used for debugging
   std::shared_ptr<SHWire> parent; // used in doppelganger pool, we keep track of the template wire
+  int priority{0};                // used in scheduler
 
   // The wire's running coroutine
   shards::Coroutine coro;
@@ -343,7 +338,9 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
   mutable std::unordered_map<std::string_view, SHExposedTypeInfo> requirements;
 
   SHContext *context{nullptr};
-  SHWire *resumer{nullptr}; // used in Resume/Start shards
+
+  SHWire *resumer{nullptr};   // used in SwitchTo shard
+  SHWire *childWire{nullptr}; // used in SwitchTo shard
 
   std::weak_ptr<SHMesh> mesh;
 
@@ -459,8 +456,34 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
   void addTrait(SHTrait trait);
   const std::vector<shards::Trait> &getTraits() const { return traits; }
 
+  // less operator, compare by priority fall back to wire id
+  bool operator<(const SHWire &other) const {
+    if (priority != other.priority) {
+      return priority < other.priority;
+    } else {
+      return uniqueId < other.uniqueId;
+    }
+  }
+
+  bool paused{false};
+
+  SHWire *tickingWire() {
+    SHWire *wire = this;
+    while (wire->childWire) {
+      wire = wire->childWire;
+    }
+    return wire;
+  }
+
+  // regenerate the id, SHMesh uses flat_set which is sorted by id
+  // this allows us to regenerate when acquiring from pools in order to keep adding new wires at the end of the list
+  uint64_t regenerateId() { return uniqueId = idCounter.fetch_add(1); }
+
 private:
-  SHWire(std::string_view wire_name) : name(wire_name) { SHLOG_TRACE("Creating wire: {}", name); }
+  SHWire(std::string_view wire_name) : name(wire_name) {
+    SHLOG_TRACE("Creating wire: {}", name);
+    regenerateId();
+  }
 
   std::unordered_map<shards::OwnedVar, SHVar, std::hash<shards::OwnedVar>, std::equal_to<shards::OwnedVar>,
                      boost::alignment::aligned_allocator<std::pair<const shards::OwnedVar, SHVar>, 16>>
@@ -473,8 +496,10 @@ private:
 
   std::vector<shards::Trait> traits;
 
-private:
   void destroy();
+
+  uint64_t uniqueId;
+  static inline std::atomic_uint64_t idCounter{0};
 };
 
 namespace shards {

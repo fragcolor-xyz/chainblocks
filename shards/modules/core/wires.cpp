@@ -715,11 +715,11 @@ struct SuspendWire : public WireBase {
     ensureWire();
 
     if (unlikely(!wire)) {
-      // in this case we pause the current flow
-      context->flow->paused = true;
+      // in this case we pause the current wire
+      context->currentWire()->paused = true;
     } else {
-      // pause the wire's flow
-      wire->context->flow->paused = true;
+      // pause the wire directly
+      wire->paused = true;
     }
 
     return input;
@@ -790,15 +790,7 @@ struct ResumeWire : public WireBase {
   SHVar activate(SHContext *context, const SHVar &input) {
     ensureWire();
 
-    if (!wire->context) {
-      throw ActivationError("Wire has no context");
-    }
-
-    if (!wire->context->flow) {
-      throw ActivationError("Wire has no flow");
-    }
-
-    wire->context->flow->paused = false;
+    wire->paused = false;
 
     return input;
   }
@@ -969,13 +961,17 @@ struct SwitchTo : public WireBase {
       }
     }
 
+    if (!previousWithCoro) {
+      throw ActivationError("SwitchTo, no previous wire with coroutine found.");
+    }
+
     auto pWire = [&] {
       if (!wire) {
         if (previousWithCoro->resumer) {
-          SHLOG_TRACE("Resume, wire not found, using resumer: {}", previousWithCoro->resumer->name);
+          SHLOG_TRACE("SwitchTo, wire not found, using resumer: {}", previousWithCoro->resumer->name);
           return previousWithCoro->resumer;
         } else {
-          throw ActivationError("Resume, wire not found.");
+          throw ActivationError("SwitchTo, wire not found.");
         }
       } else {
         return wire.get();
@@ -987,9 +983,6 @@ struct SwitchTo : public WireBase {
       shards::stop(pWire);
     }
 
-    // assign the new wire as current wire on the flow
-    context->flow->wire = pWire;
-
     // capture variables
     for (auto &v : _vars) {
       auto &var = v.get();
@@ -1000,8 +993,8 @@ struct SwitchTo : public WireBase {
 
     // Prepare if no callc was called
     if (!coroutineValid(pWire->coro)) {
-      pWire->mesh = context->main->mesh;
-      shards::prepare(pWire, context->flow);
+      pWire->mesh = context->main->mesh.lock();
+      shards::prepare(pWire);
 
       // handle early failure
       if (pWire->state == SHWire::State::Failed) {
@@ -1020,12 +1013,21 @@ struct SwitchTo : public WireBase {
     if (pWire->resumer == nullptr)
       pWire->resumer = previousWithCoro;
 
+    if (pWire != previousWithCoro && pWire->childWire != previousWithCoro) {
+      // all we need to do is set pWire as childWire of the previousWireCoro
+      shassert(previousWithCoro->childWire == nullptr && "SwitchTo: previousWireCoro already has a childWire");
+      previousWithCoro->childWire = pWire;
+    } else {
+      // we are switching to ourselves, we need to set the childWire to nullptr
+      pWire->childWire = nullptr;
+    }
+
     // Start it if not started
     if (!shards::isRunning(pWire)) {
       shards::start(pWire, input);
     }
 
-    // And normally we just delegate the Mesh + SHFlow
+    // And normally we just delegate the Mesh
     // the following will suspend this current wire
     // and in mesh tick when re-evaluated tick will
     // resume with the wire we just set above!
@@ -1034,7 +1036,8 @@ struct SwitchTo : public WireBase {
     // We will end here when we get resumed!
     // When we are here, pWire is suspended, (could be in the middle of a loop, anywhere!)
 
-    // reset resumer
+    // reset resumer and childWire
+    previousWithCoro->childWire = nullptr;
     pWire->resumer = nullptr;
 
     // return the last or final output of pWire
@@ -1390,6 +1393,7 @@ struct ManyWire : public std::enable_shared_from_this<ManyWire> {
   std::shared_ptr<SHWire> wire;
   std::shared_ptr<SHMesh> mesh; // used only if MT
   std::deque<SHVar *> injectedVariables;
+  entt::scoped_connection _onCleanupConnection;
 };
 
 struct ParallelBase : public CapturingSpawners {
@@ -1972,19 +1976,14 @@ struct Spawn : public CapturingSpawners {
   SHVar activate(SHContext *context, const SHVar &input) {
     auto mesh = context->main->mesh.lock();
 
-    // Connect the cleanup event
-    if (!_onCleanupConnection) {
-      SHLOG_TRACE("Spawn::activate: connecting wireOnCleanup to {}", mesh->getLabel());
-      _connectedMesh = mesh;
-      _onCleanupConnection = mesh->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
-    } else {
-      if (_connectedMesh.lock() != mesh)
-        throw ActivationError("Spawn: mesh changed, this is not supported");
-    }
-
     auto c = _pool->acquire(_composer, context);
     shassert(!_wireContainers.contains(c->wire.get()));
     _wireContainers[c->wire.get()] = c;
+
+    // Connect the cleanup event
+    if (!c->_onCleanupConnection) {
+      c->_onCleanupConnection = c->wire->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
+    }
 
     shassert(c->injectedVariables.empty() && "Spawn: injected variables should be empty");
     for (auto &v : _vars) {
@@ -2003,19 +2002,8 @@ struct Spawn : public CapturingSpawners {
     return Var(c->wire); // notice this is "weak"
   }
 
-  ~Spawn() {
-    if (_onCleanupConnection && !_connectedMesh.expired()) {
-      _onCleanupConnection.release();
-      _connectedMesh.reset();
-    }
-  }
-
   std::unique_ptr<WireDoppelgangerPool<ManyWire>> _pool;
   SHTypeInfo _inputType{};
-
-  entt::connection _onCleanupConnection;
-  // Mesh that has the cleanup connection
-  std::weak_ptr<SHMesh> _connectedMesh;
 };
 
 struct WhenDone : Spawn {
@@ -2039,24 +2027,20 @@ struct WhenDone : Spawn {
       auto mesh = context->main->mesh.lock();
       shassert(mesh && "Mesh is null");
 
-      // Connect the cleanup event
-      if (!_onCleanupConnection) {
-        SHLOG_TRACE("Spawn::activate: connecting wireOnCleanup to {}", mesh->getLabel());
-        _connectedMesh = mesh;
-        _onCleanupConnection = mesh->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
-      } else {
-        if (_connectedMesh.lock() != mesh)
-          throw ActivationError("WhenDone: mesh changed, this is not supported");
-      }
-
       auto c = _pool->acquire(_composer, context);
       _wireContainers[c->wire.get()] = c;
+
+      // Connect the cleanup event
+      if (!c->_onCleanupConnection) {
+        c->_onCleanupConnection = c->wire->dispatcher.sink<SHWire::OnCleanupEvent>().connect<&Spawn::wireOnCleanup>(this);
+      }
 
       for (auto &v : _vars) {
         SHVar *refVar = c->injectedVariables.emplace_back(referenceWireVariable(c->wire.get(), v.variableName()));
         cloneVar(*refVar, v.get());
       }
 
+      SHLOG_TRACE("WhenDone: scheduling {}, ptr: {}", c->wire->name, (void *)c->wire.get());
       mesh->schedule(c->wire, Var::Empty, false);
 
       SHWire *rootWire = context->rootWire();

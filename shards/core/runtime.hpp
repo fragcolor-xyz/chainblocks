@@ -34,6 +34,7 @@
 #include <vector>
 
 #include <boost/container/small_vector.hpp>
+#include <boost/container/flat_set.hpp>
 
 using SHClock = std::chrono::high_resolution_clock;
 using SHTime = decltype(SHClock::now());
@@ -96,11 +97,6 @@ const unsigned __tsan_switch_to_fiber_no_sync = 1 << 0;
   if (_suspend_state != SHWireState::Continue)                \
   return shards::Var::Empty
 
-struct SHFlow {
-  struct SHWire *wire;
-  SHBool paused;
-};
-
 struct SHStateSnapshot {
   SHWireState state;
   SHVar flowStorage;
@@ -108,12 +104,11 @@ struct SHStateSnapshot {
 };
 
 struct SHContext {
-  SHContext(shards::Coroutine *coro, const SHWire *starter, SHFlow *flow) : main(starter), flow(flow), continuation(coro) {
+  SHContext(shards::Coroutine *coro, const SHWire *starter) : main(starter), continuation(coro) {
     wireStack.push_back(const_cast<SHWire *>(starter));
   }
 
   const SHWire *main;
-  SHFlow *flow;
   SHContext *parent{nullptr};
   std::vector<SHWire *> wireStack;
   bool onLastResume{false};
@@ -299,7 +294,7 @@ inline SHRunWireOutput runSubWire(SHWire *wire, SHContext *context, const SHVar 
   return runRes;
 }
 
-void run(SHWire *wire, SHFlow *flow, shards::Coroutine *coro);
+void run(SHWire *wire, shards::Coroutine *coro);
 
 #ifdef TRACY_ENABLE
 // Defined in the gfx rust crate
@@ -322,14 +317,22 @@ std::vector<SHWire *> &getCoroWireStack();
 #endif
 
 #ifdef SH_VERBOSE_COROUTINES_LOGGING
-#define SH_CORO_RESUMED_LOG(_wire) \
-  { SHLOG_TRACE("> Resumed wire {}", (_wire)->name); }
-#define SH_CORO_SUSPENDED_LOG(_wire) \
-  { SHLOG_TRACE("> Suspended wire {}", (_wire)->name); }
-#define SH_CORO_EXT_RESUME_LOG(_wire) \
-  { SHLOG_TRACE("Resuming wire {}", (_wire)->name); }
-#define SH_CORO_EXT_SUSPEND_LOG(_wire) \
-  { SHLOG_TRACE("Suspending wire {}", (_wire)->name); }
+#define SH_CORO_RESUMED_LOG(_wire)                   \
+  {                                                  \
+    SHLOG_TRACE("> Resumed wire {}", (_wire)->name); \
+  }
+#define SH_CORO_SUSPENDED_LOG(_wire)                   \
+  {                                                    \
+    SHLOG_TRACE("> Suspended wire {}", (_wire)->name); \
+  }
+#define SH_CORO_EXT_RESUME_LOG(_wire)               \
+  {                                                 \
+    SHLOG_TRACE("Resuming wire {}", (_wire)->name); \
+  }
+#define SH_CORO_EXT_SUSPEND_LOG(_wire)                \
+  {                                                   \
+    SHLOG_TRACE("Suspending wire {}", (_wire)->name); \
+  }
 #else
 #define SH_CORO_RESUMED_LOG(_wire)
 #define SH_CORO_SUSPENDED_LOG(_wire)
@@ -375,14 +378,14 @@ std::vector<SHWire *> &getCoroWireStack();
   }
 #endif
 
-inline void prepare(SHWire *wire, SHFlow *flow) {
+inline void prepare(SHWire *wire) {
   shassert(!coroutineValid(wire->coro) && "Wire already prepared!");
 
-  auto runner = [wire, flow]() {
+  auto runner = [wire]() {
 #if SH_USE_THREAD_FIBER
     pushThreadName(fmt::format("<suspended wire> \"{}\"", wire->name));
 #endif
-    run(wire, flow, &wire->coro);
+    run(wire, &wire->coro);
   };
 
 #if SH_CORO_NEED_STACK_MEM
@@ -574,12 +577,9 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void schedule(Observer &observer, const std::shared_ptr<SHWire> &wire, SHVar input = shards::Var::Empty, bool compose = true) {
     ZoneScoped;
 
-    // set pristine flag to false
-    _pristine = false;
-
     SHLOG_TRACE("Scheduling wire {}", wire->name);
 
-    if (wire->warmedUp || scheduled.count(wire) > 0) {
+    if (wire->warmedUp || _scheduled.count(wire) > 0) {
       SHLOG_ERROR("Attempted to schedule a wire multiple times, wire: {}", wire->name);
       throw shards::SHException("Multiple wire schedule");
     }
@@ -605,10 +605,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     }
 
     observer.before_prepare(wire.get());
-    // create a flow as well
-    auto &flow = _flowPool.emplace_back();
-    flow.wire = wire.get();
-    shards::prepare(wire.get(), &flow);
+    shards::prepare(wire.get());
 
     // wire might fail on warmup during prepare
     if (wire->state == SHWire::State::Failed) {
@@ -618,7 +615,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     observer.before_start(wire.get());
     shards::start(wire.get(), input);
 
-    scheduled.insert(wire);
+    _scheduledIt = _scheduled.insert(wire).first;
 
     SHLOG_TRACE("Wire {} scheduled", wire->name);
   }
@@ -626,23 +623,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void schedule(const std::shared_ptr<SHWire> &wire, SHVar input = shards::Var::Empty, bool compose = true) {
     EmptyObserver obs;
     schedule(obs, wire, input, compose);
-  }
-
-  void wireCleanedUp(SHWire *wire) {
-    scheduled.erase(wire->shared_from_this());
-
-    auto it = std::find_if(_flowPool.begin(), _flowPool.end(), [wire](const auto &f) { return f.wire == wire; });
-    if (it != _flowPool.end()) { // Remove from flow pool, while keeping the iteration state
-      size_t idxToRemove = _flowPool.index_of(it);
-      size_t itIdx = _flowPool.index_of(_flowPoolIt);
-      _flowPool.erase(it);
-      if (idxToRemove <= itIdx) {
-        if (itIdx >= _flowPool.size())
-          _flowPoolIt = _flowPool.end();
-        else
-          _flowPoolIt = _flowPool.begin() + itIdx;
-      }
-    }
   }
 
   template <class Observer> bool tick(Observer &observer) {
@@ -656,43 +636,46 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
       terminate();
     } else {
       SHDuration now = SHClock::now().time_since_epoch();
-      _flowPoolIt = _flowPool.begin();
-      while (_flowPoolIt != _flowPool.end()) {
-        auto startFlowPoolIt = _flowPoolIt;
-        auto &flow = *_flowPoolIt;
-        if (flow.paused) {
-          ++_flowPoolIt;
+      _scheduledIt = _scheduled.begin();
+      while (_scheduledIt != _scheduled.end()) {
+        auto preTickIt = _scheduledIt;
+        auto wire = (*_scheduledIt).get();
+        if (wire->paused) {
+          ++_scheduledIt;
           continue; // simply skip
         }
 
-        observer.before_tick(flow.wire);
+        observer.before_tick(wire);
+        shards::tick(wire->tickingWire(), now);
 
-        shards::tick(flow.wire, now);
-
-        if (unlikely(!shards::isRunning(flow.wire))) {
-          if (flow.wire->finishedError.size() > 0) {
-            _errors.emplace_back(flow.wire->finishedError);
+        if (unlikely(!shards::isRunning(wire))) {
+          if (wire->finishedError.size() > 0) {
+            _errors.emplace_back(wire->finishedError);
           }
 
-          if (flow.wire->state == SHWire::State::Failed) {
-            _failedWires.emplace_back(flow.wire);
+          if (wire->state == SHWire::State::Failed) {
+            _failedWires.emplace_back(wire);
             noErrors = false;
           }
 
-          observer.before_stop(flow.wire);
-          if (!shards::stop(flow.wire)) {
+          observer.before_stop(wire);
+          if (!shards::stop(wire)) {
             noErrors = false;
           }
 
           // stop should have done the following:
-          SHLOG_TRACE("Wire {} ended while ticking", flow.wire->name);
-          shassert(scheduled.count(flow.wire->shared_from_this()) == 0 && "Wire still in scheduled!");
-          shassert(flow.wire->mesh.expired() && "Wire still has a mesh!");
-        }
+          SHLOG_TRACE("Wire {} ended while ticking", wire->name);
+          shassert(wire->mesh.expired() && "Wire still has a mesh!");
 
-        // Wire removal can change the iterator, in that case don't increment
-        if (_flowPoolIt == startFlowPoolIt) {
-          ++_flowPoolIt;
+          // remove from scheduled if we didn't move iterator, should have happened in stop
+          if (preTickIt == _scheduledIt) {
+            _scheduledIt = _scheduled.erase(preTickIt);
+          }
+        } else {
+          // if we didn't move outside of this call, move forward
+          if (preTickIt == _scheduledIt) {
+            ++_scheduledIt;
+          }
         }
       }
     }
@@ -707,33 +690,17 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
   friend struct SHWire;
   void clear() {
-    // clear all wires!
-    boost::container::small_vector<std::shared_ptr<SHWire>, 16> toStop;
-
-    // scheduled might not be the full picture!
-    for (auto flow : _flowPool) {
-      toStop.emplace_back(flow.wire->shared_from_this());
-    }
-    _flowPool.clear();
-
-    // now add scheduled, notice me might have duplicates!
-    for (auto wire : scheduled) {
-      toStop.emplace_back(wire);
-    }
-
-    // remove dupes
-    std::sort(toStop.begin(), toStop.end());
-    toStop.erase(std::unique(toStop.begin(), toStop.end()), toStop.end());
-
-    for (auto wire : toStop) {
-      shards::stop(wire.get());
-      // stop should have done the following:
-      shassert(scheduled.count(wire) == 0 && "Wire still in scheduled!");
-      shassert(wire->mesh.expired() && "Wire still has a mesh!");
+    _scheduledIt = _scheduled.begin();
+    while (_scheduledIt != _scheduled.end()) {
+      auto preTickIt = _scheduledIt;
+      shards::stop((*_scheduledIt).get());
+      if (preTickIt == _scheduledIt) {
+        ++_scheduledIt;
+      }
     }
 
     // release all wires
-    scheduled.clear();
+    _scheduled.clear();
 
     // find dangling variables and notice
     for (auto var : variables) {
@@ -742,9 +709,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
       }
     }
     variables.clear();
-
-    // set pristine flag
-    _pristine = true;
   }
 
   void terminate() {
@@ -759,25 +723,22 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
   void remove(const std::shared_ptr<SHWire> &wire) {
     shards::stop(wire.get());
-    // stop should have done the following:
-    shassert(scheduled.count(wire) == 0 && "Wire still in scheduled!");
+    // stop cause wireOnCleanup to be called
     shassert(wire->mesh.expired() && "Wire still has a mesh!");
-
-    // Erase-Remove Idiom
-    _flowPool.erase(
-        std::remove_if(_flowPool.begin(), _flowPool.end(), [wire](const auto &flow) { return flow.wire == wire.get(); }),
-        _flowPool.end());
+    // remove from scheduled
+    auto it = _scheduled.find(wire);
+    if (it != _scheduled.end()) {
+      _scheduledIt = _scheduled.erase(it);
+    }
   }
 
-  bool empty() { return _flowPool.empty(); }
+  bool empty() { return _scheduled.empty(); }
 
-  bool pristine() { return _pristine; }
+  bool allCleared() { return _scheduled.empty() && variables.empty() && refs.empty() && anyStorage.empty(); }
 
   const std::vector<std::string> &errors() { return _errors; }
 
   const std::vector<SHWire *> &failedWires() { return _failedWires; }
-
-  std::unordered_set<std::shared_ptr<SHWire>> scheduled;
 
   SHInstanceData instanceData{};
 
@@ -862,6 +823,16 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void setLabel(std::string_view label) { this->label = label; }
   std::string_view getLabel() const { return label; }
 
+  void unschedule(const std::shared_ptr<SHWire> &wire) {
+    auto it = _scheduled.find(wire);
+    if (it != _scheduled.end()) {
+      _scheduledIt = _scheduled.erase(it);
+    } else {
+      // this case is common with Step/SwitchTo actually
+      SHLOG_TRACE("Wire {} not scheduled, nothing to unschedule!", wire->name);
+    }
+  }
+
 private:
   SHMesh(std::string_view label) : label(label) {}
 
@@ -876,14 +847,21 @@ private:
                      boost::alignment::aligned_allocator<std::pair<const shards::OwnedVar, SHVar *>, 16>>
       refs;
 
-  boost::container::stable_vector<SHFlow> _flowPool;
-  decltype(_flowPool)::iterator _flowPoolIt = _flowPool.end();
+  struct WireLess {
+    bool operator()(const std::shared_ptr<SHWire> &a, const std::shared_ptr<SHWire> &b) const {
+      shassert(a && b && "WireLess should not be called with a null pointer");
+      return *a < *b;
+    }
+  };
+  // Notice, has to be stable_vector to ensure iterator stability
+  using WirePtr = std::shared_ptr<SHWire>;
+  using ScheduledSet = boost::container::flat_set<WirePtr, WireLess, boost::container::stable_vector<WirePtr>>;
+  ScheduledSet _scheduled;
+  ScheduledSet::iterator _scheduledIt;
 
   std::vector<std::string> _errors;
   std::vector<SHWire *> _failedWires;
   std::string label;
-
-  std::atomic_bool _pristine{true};
 };
 
 namespace shards {
@@ -919,7 +897,7 @@ inline bool stop(SHWire *wire, SHVar *result, SHContext *currentContext) {
       if (currentContext && currentContext == wire->context) {
         SHLOG_WARNING("Trying to stop wire {} from the same context it's running in!", wire->name);
       } else {
-        shards::tick<true>(wire, SHDuration{});
+        shards::tick<true>(wire->tickingWire(), SHDuration{});
       }
     }
 
