@@ -1027,7 +1027,7 @@ struct SwitchTo : public WireBase {
       shards::start(pWire, input);
     }
 
-    // And normally we just delegate the Mesh + SHFlow
+    // And normally we just delegate the Mesh
     // the following will suspend this current wire
     // and in mesh tick when re-evaluated tick will
     // resume with the wire we just set above!

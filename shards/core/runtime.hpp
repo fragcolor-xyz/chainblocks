@@ -97,27 +97,6 @@ const unsigned __tsan_switch_to_fiber_no_sync = 1 << 0;
   if (_suspend_state != SHWireState::Continue)                \
   return shards::Var::Empty
 
-struct SHFlow {
-  SHFlow(int priority, SHWire *wire, SHBool paused) : priority(priority), wire(wire), paused(paused) {}
-
-  void setPaused(SHBool paused) { this->paused = paused; }
-  SHBool isPaused() const { return paused; }
-
-  SHWire *getWire() const { return wire; }
-
-  bool operator<(const SHFlow &other) const {
-    // sort by priority, then by id
-    if (priority == other.priority)
-      return wire < other.wire;
-    return priority < other.priority;
-  }
-
-private:
-  int priority;
-  SHWire *wire;
-  SHBool paused;
-};
-
 struct SHStateSnapshot {
   SHWireState state;
   SHVar flowStorage;
