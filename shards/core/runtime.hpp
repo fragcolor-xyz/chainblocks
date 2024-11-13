@@ -632,12 +632,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     _errors.clear();
     _failedWires.clear();
 
-    // unschedule first
-    for (const auto &item : _pendingUnschedule) {
-      _scheduled.erase(item);
-    }
-    _pendingUnschedule.clear();
-
     // schedule next
     _scheduled.insert(_pendingSchedule.begin(), _pendingSchedule.end());
     _pendingSchedule.clear();
@@ -681,6 +675,12 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
         ++it;
       }
+
+      // unschedule at the end
+      for (const auto &item : _pendingUnschedule) {
+        _scheduled.erase(item);
+      }
+      _pendingUnschedule.clear();
     }
 
     return noErrors;
