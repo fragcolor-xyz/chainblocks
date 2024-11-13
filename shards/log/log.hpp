@@ -25,6 +25,8 @@ void setSinkLevel(spdlog::level::level_enum level);
 // Setup the default logger if it's not setup already
 void setupDefaultLoggerConditional(std::string fileName);
 
+void flush();
+
 // Set default log level and redirect to main logger
 // !! Do not call directly since this registers the logger
 // !! use getOrCreate instead to prevent race conditions

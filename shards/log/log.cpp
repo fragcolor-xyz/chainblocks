@@ -14,6 +14,7 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include "../core/platform.hpp"
+
 #if SH_ANDROID
 #include <spdlog/sinks/android_sink.h>
 #elif SH_EMSCRIPTEN
@@ -216,6 +217,10 @@ struct Sinks {
 Sinks &globalSinks() {
   static Sinks sinks;
   return sinks;
+}
+
+void flush() {
+  globalSinks().distSink->flush();
 }
 
 void __init(Logger logger) {
