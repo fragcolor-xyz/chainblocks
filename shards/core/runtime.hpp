@@ -615,7 +615,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     observer.before_start(wire.get());
     shards::start(wire.get(), input);
 
-    _scheduledIt = _scheduled.insert(wire).first;
+    insertWire(wire);
 
     SHLOG_TRACE("Wire {} scheduled", wire->name);
   }
@@ -632,13 +632,14 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     _errors.clear();
     _failedWires.clear();
 
+    // remove whatever is to be removed
+
     if (shards::GetGlobals().SigIntTerm > 0) {
       terminate();
     } else {
       SHDuration now = SHClock::now().time_since_epoch();
       _scheduledIt = _scheduled.begin();
       while (_scheduledIt != _scheduled.end()) {
-        auto preTickIt = _scheduledIt;
         auto wire = (*_scheduledIt).get();
         if (wire->paused) {
           ++_scheduledIt;
@@ -667,13 +668,13 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
           SHLOG_TRACE("Wire {} ended while ticking", wire->name);
           shassert(wire->mesh.expired() && "Wire still has a mesh!");
 
-          // remove from scheduled if we didn't move iterator, should have happened in stop
-          if (preTickIt == _scheduledIt) {
-            _scheduledIt = _scheduled.erase(preTickIt);
+          // might actually be already removed
+          if (_scheduledIt != _scheduled.end() && (*_scheduledIt).get() == wire) {
+            removeWire(_scheduledIt);
           }
         } else {
           // if we didn't move outside of this call, move forward
-          if (preTickIt == _scheduledIt) {
+          if (_scheduledIt != _scheduled.end() && (*_scheduledIt).get() == wire) {
             ++_scheduledIt;
           }
         }
@@ -728,7 +729,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     // remove from scheduled
     auto it = _scheduled.find(wire);
     if (it != _scheduled.end()) {
-      _scheduledIt = _scheduled.erase(it);
+      removeWire(it);
     }
   }
 
@@ -826,7 +827,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void unschedule(const std::shared_ptr<SHWire> &wire) {
     auto it = _scheduled.find(wire);
     if (it != _scheduled.end()) {
-      _scheduledIt = _scheduled.erase(it);
+      removeWire(it);
     } else {
       // this case is common with Step/SwitchTo actually
       SHLOG_TRACE("Wire {} not scheduled, nothing to unschedule!", wire->name);
@@ -858,6 +859,32 @@ private:
   using ScheduledSet = boost::container::flat_set<WirePtr, WireLess, boost::container::stable_vector<WirePtr>>;
   ScheduledSet _scheduled;
   ScheduledSet::iterator _scheduledIt;
+
+  void insertWire(const WirePtr &wire) {
+    auto offset = std::distance(_scheduled.begin(), _scheduledIt);
+    auto newIt = _scheduled.insert(wire).first;
+    auto newOffset = std::distance(_scheduled.begin(), newIt);
+    if (newOffset < offset) {
+      // we shifted left, update iterator
+      _scheduledIt = _scheduled.begin() + offset + 1;
+    } else {
+      // we shifted right, do nothing
+      _scheduledIt = _scheduled.begin() + offset;
+    }
+  }
+
+  void removeWire(ScheduledSet::iterator it) {
+    auto offset = std::distance(_scheduled.begin(), _scheduledIt);
+    auto newIt = _scheduled.erase(it);
+    auto newOffset = std::distance(_scheduled.begin(), newIt);
+    if (newOffset < offset) {
+      // we shifted left, update iterator
+      _scheduledIt = _scheduled.begin() + offset - 1;
+    } else {
+      // we shifted right, do nothing
+      _scheduledIt = _scheduled.begin() + offset;
+    }
+  }
 
   std::vector<std::string> _errors;
   std::vector<SHWire *> _failedWires;
