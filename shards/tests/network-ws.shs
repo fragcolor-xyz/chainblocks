@@ -1,16 +1,11 @@
 ; Run the same network test except use Network.WS client & server
 @mesh(root)
 
-@wire(main-test {
-  "network.shs" | FS.Read = base-script
-  Regex.Replace("Network.Client\\(\".*\" [0-9]+" "Network.WS.Client(\"ws://127.0.0.1:9191\"")
-  Regex.Replace("Network.Server\\(" "Network.WS.Server(") = new-script
-  Shards.Read | Shards.Distill("runner") = runner
-  WireRunner(runner)
-})
-
-@schedule(root main-test)
-@run(root) | Assert.Is(true)
+"network.shs" | FS.Read = base-script
+Regex.Replace("Network.Client\\(\".*\" [0-9]+" "Network.WS.Client(\"ws://127.0.0.1:9191\"")
+Regex.Replace("Network.Server\\(" "Network.WS.Server(") = new-script
+Shards.Read | Shards.Distill("runner") = runner
+WireRunner(runner)
 
 @template(base [wire-name addr] {
   @wire(wire-name {
