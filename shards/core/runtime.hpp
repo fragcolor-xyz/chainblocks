@@ -579,7 +579,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     SHLOG_TRACE("Scheduling wire {}", wire->name);
 
-    if (wire->warmedUp || _scheduled.count(wire) > 0) {
+    if (wire->warmedUp || _scheduled.count(wire) > 0 || _pendingSchedule.count(wire) > 0) {
       SHLOG_ERROR("Attempted to schedule a wire multiple times, wire: {}", wire->name);
       throw shards::SHException("Multiple wire schedule");
     }
@@ -615,7 +615,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     observer.before_start(wire.get());
     shards::start(wire.get(), input);
 
-    _scheduledIt = _scheduled.insert(wire).first;
+    _pendingSchedule.insert(wire);
 
     SHLOG_TRACE("Wire {} scheduled", wire->name);
   }
@@ -632,16 +632,25 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     _errors.clear();
     _failedWires.clear();
 
+    // unschedule first
+    for (const auto &item : _pendingUnschedule) {
+      _scheduled.erase(item);
+    }
+    _pendingUnschedule.clear();
+
+    // schedule next
+    _scheduled.insert(_pendingSchedule.begin(), _pendingSchedule.end());
+    _pendingSchedule.clear();
+
     if (shards::GetGlobals().SigIntTerm > 0) {
       terminate();
     } else {
       SHDuration now = SHClock::now().time_since_epoch();
-      _scheduledIt = _scheduled.begin();
-      while (_scheduledIt != _scheduled.end()) {
-        auto preTickIt = _scheduledIt;
-        auto wire = (*_scheduledIt).get();
+      auto it = _scheduled.begin();
+      while (it != _scheduled.end()) {
+        auto wire = (*it).get();
         if (wire->paused) {
-          ++_scheduledIt;
+          ++it;
           continue; // simply skip
         }
 
@@ -667,16 +676,10 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
           SHLOG_TRACE("Wire {} ended while ticking", wire->name);
           shassert(wire->mesh.expired() && "Wire still has a mesh!");
 
-          // remove from scheduled if we didn't move iterator, should have happened in stop
-          if (preTickIt == _scheduledIt) {
-            _scheduledIt = _scheduled.erase(preTickIt);
-          }
-        } else {
-          // if we didn't move outside of this call, move forward
-          if (preTickIt == _scheduledIt) {
-            ++_scheduledIt;
-          }
+          _pendingUnschedule.insert(wire->shared_from_this());
         }
+
+        ++it;
       }
     }
 
@@ -690,17 +693,16 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
   friend struct SHWire;
   void clear() {
-    _scheduledIt = _scheduled.begin();
-    while (_scheduledIt != _scheduled.end()) {
-      auto preTickIt = _scheduledIt;
-      shards::stop((*_scheduledIt).get());
-      if (preTickIt == _scheduledIt) {
-        ++_scheduledIt;
-      }
+    auto it = _scheduled.begin();
+    while (it != _scheduled.end()) {
+      shards::stop((*it).get());
+      ++it;
     }
 
     // release all wires
     _scheduled.clear();
+    _pendingSchedule.clear();
+    _pendingUnschedule.clear();
 
     // find dangling variables and notice
     for (auto var : variables) {
@@ -725,14 +727,11 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     shards::stop(wire.get());
     // stop cause wireOnCleanup to be called
     shassert(wire->mesh.expired() && "Wire still has a mesh!");
-    // remove from scheduled
-    auto it = _scheduled.find(wire);
-    if (it != _scheduled.end()) {
-      _scheduledIt = _scheduled.erase(it);
-    }
+    // queue for unschedule
+    _pendingUnschedule.insert(wire);
   }
 
-  bool empty() { return _scheduled.empty(); }
+  bool empty() { return _scheduled.empty() && _pendingSchedule.empty(); }
 
   bool isCleared() { return _scheduled.empty() && variables.empty(); }
 
@@ -823,15 +822,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void setLabel(std::string_view label) { this->label = label; }
   std::string_view getLabel() const { return label; }
 
-  void unschedule(const std::shared_ptr<SHWire> &wire) {
-    auto it = _scheduled.find(wire);
-    if (it != _scheduled.end()) {
-      _scheduledIt = _scheduled.erase(it);
-    } else {
-      // this case is common with Step/SwitchTo actually
-      SHLOG_TRACE("Wire {} not scheduled, nothing to unschedule!", wire->name);
-    }
-  }
+  void unschedule(const std::shared_ptr<SHWire> &wire) { _pendingUnschedule.insert(wire); }
 
 private:
   SHMesh(std::string_view label) : label(label) {}
@@ -855,9 +846,10 @@ private:
   };
   // Notice, has to be stable_vector to ensure iterator stability
   using WirePtr = std::shared_ptr<SHWire>;
-  using ScheduledSet = boost::container::flat_set<WirePtr, WireLess, boost::container::stable_vector<WirePtr>>;
+  using ScheduledSet = boost::container::flat_set<WirePtr, WireLess>;
   ScheduledSet _scheduled;
-  ScheduledSet::iterator _scheduledIt;
+  ScheduledSet _pendingSchedule;
+  ScheduledSet _pendingUnschedule;
 
   std::vector<std::string> _errors;
   std::vector<SHWire *> _failedWires;
