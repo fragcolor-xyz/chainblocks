@@ -755,6 +755,8 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
   bool empty() { return _scheduled.empty(); }
 
+  bool allCleared() { return _scheduled.empty() && variables.empty() && refs.empty() && anyStorage.empty(); }
+
   const std::vector<std::string> &errors() { return _errors; }
 
   const std::vector<SHWire *> &failedWires() { return _failedWires; }

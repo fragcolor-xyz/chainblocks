@@ -118,7 +118,13 @@ template <typename T> struct WireDoppelgangerPool {
         destroyVar(vwire);
       }
 
-      wire->parent = _master; // keep a reference to the master wire
+      // ensure things are setup correctly
+      shassert(wire != nullptr && "Wire is null");
+      shassert(wire->mesh.expired() && "Wire already has a mesh!");
+      // keep a reference to the master wire
+      wire->parent = _master;
+      // regenerate the id for the new wire, in order to keep adding new wires at the end of the list of mesh scheduled wires
+      wire->regenerateId();
       poolItem.wire = wire;
       poolItem.wire->name = fmt::format("{}-{}", wire->name, item.newItemIndex);
       if constexpr (WireDataDeps<T>) {
@@ -160,7 +166,13 @@ template <typename T> struct WireDoppelgangerPool {
         destroyVar(vwire);
       }
 
-      wire->parent = _master; // keep a reference to the master wire
+      // ensure things are setup correctly
+      shassert(wire != nullptr && "Wire is null");
+      shassert(wire->mesh.expired() && "Wire already has a mesh!");
+      // keep a reference to the master wire
+      wire->parent = _master;
+      // regenerate the id for the new wire, in order to keep adding new wires at the end of the list of mesh scheduled wires
+      wire->regenerateId();
       poolItem.wire = wire;
       poolItem.wire->name = fmt::format("{}-{}", wire->name, item.newItemIndex);
       if constexpr (WireDataDeps<T>) {
