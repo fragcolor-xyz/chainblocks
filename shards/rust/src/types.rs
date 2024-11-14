@@ -467,10 +467,6 @@ impl Wire {
     unsafe { (*Core).setWireLooped.unwrap_unchecked()(self.0 .0, looped) }
   }
 
-  pub fn set_priority(&self, priority: i32) {
-    unsafe { (*Core).setWirePriority.unwrap_unchecked()(self.0 .0, priority) }
-  }
-
   pub fn set_traits(&self, traits: SHSeq) {
     unsafe { (*Core).setWireTraits.unwrap_unchecked()(self.0 .0, traits) }
   }

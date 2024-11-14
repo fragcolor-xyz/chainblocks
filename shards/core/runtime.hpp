@@ -615,7 +615,9 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     observer.before_start(wire.get());
     shards::start(wire.get(), input);
 
-    _pendingSchedule.insert(wire);
+    // safe to push back as it's a stable_vector
+    _scheduled.push_back(wire);
+    // and immediately insert into set for hash lookup
     _scheduledSet.insert(wire.get());
 
     SHLOG_TRACE("Wire {} scheduled", wire->name);
@@ -633,19 +635,17 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     _errors.clear();
     _failedWires.clear();
 
-    // schedule next
-    _scheduled.insert(_pendingSchedule.begin(), _pendingSchedule.end());
-    _pendingSchedule.clear();
-
     if (shards::GetGlobals().SigIntTerm > 0) {
       terminate();
     } else {
       SHDuration now = SHClock::now().time_since_epoch();
       auto it = _scheduled.begin();
+      size_t idx = 0;
       while (it != _scheduled.end()) {
         auto wire = (*it).get();
         if (wire->paused) {
           ++it;
+          idx++;
           continue; // simply skip
         }
 
@@ -671,16 +671,18 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
           SHLOG_TRACE("Wire {} ended while ticking", wire->name);
           shassert(wire->mesh.expired() && "Wire still has a mesh!");
 
-          _pendingUnschedule.insert(wire->shared_from_this());
-          _scheduledSet.erase(wire);
+          _pendingUnschedule.push_back(idx);
+          // should be already removed by stop
+          shassert(_scheduledSet.count(wire) == 0 && "Wire still in scheduled set after stop!");
         }
 
         ++it;
+        idx++;
       }
 
-      // unschedule at the end
-      for (const auto &item : _pendingUnschedule) {
-        _scheduled.erase(item);
+      // do it in reverse order as we are erasing, should be easy memory moves
+      for (auto it = _pendingUnschedule.rbegin(); it != _pendingUnschedule.rend(); ++it) {
+        _scheduled.erase(_scheduled.begin() + *it);
       }
       _pendingUnschedule.clear();
     }
@@ -704,7 +706,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     // release all wires
     _scheduled.clear();
     _scheduledSet.clear();
-    _pendingSchedule.clear();
     _pendingUnschedule.clear();
 
     // find dangling variables and notice
@@ -730,8 +731,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     shards::stop(wire.get());
     // stop cause wireOnCleanup to be called
     shassert(wire->mesh.expired() && "Wire still has a mesh!");
-    // queue for unschedule
-    _pendingUnschedule.insert(wire);
+    // immediately remove from scheduled set
     _scheduledSet.erase(wire.get());
   }
 
@@ -826,10 +826,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void setLabel(std::string_view label) { this->label = label; }
   std::string_view getLabel() const { return label; }
 
-  void unschedule(const std::shared_ptr<SHWire> &wire) {
-    _pendingUnschedule.insert(wire);
-    _scheduledSet.erase(wire.get());
-  }
+  void unschedule(const std::shared_ptr<SHWire> &wire) { _scheduledSet.erase(wire.get()); }
 
 private:
   SHMesh(std::string_view label) : label(label) {}
@@ -845,19 +842,12 @@ private:
                      boost::alignment::aligned_allocator<std::pair<const shards::OwnedVar, SHVar *>, 16>>
       refs;
 
-  struct WireLess {
-    bool operator()(const std::shared_ptr<SHWire> &a, const std::shared_ptr<SHWire> &b) const {
-      shassert(a && b && "WireLess should not be called with a null pointer");
-      return *a < *b;
-    }
-  };
   // Notice, has to be stable_vector to ensure iterator stability
   using WirePtr = std::shared_ptr<SHWire>;
-  using ScheduledSet = boost::container::flat_set<WirePtr, WireLess>;
-  ScheduledSet _scheduled;
+  // we can add while iterating, we delete in a second pass
+  boost::container::stable_vector<WirePtr> _scheduled;
   std::unordered_set<SHWire *> _scheduledSet;
-  ScheduledSet _pendingSchedule;
-  ScheduledSet _pendingUnschedule;
+  std::vector<size_t> _pendingUnschedule;
 
   std::vector<std::string> _errors;
   std::vector<SHWire *> _failedWires;
