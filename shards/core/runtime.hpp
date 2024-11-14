@@ -639,13 +639,11 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
       terminate();
     } else {
       SHDuration now = SHClock::now().time_since_epoch();
-      auto it = _scheduled.begin();
-      size_t idx = 0;
-      while (it != _scheduled.end()) {
-        auto wire = (*it).get();
+
+      // Use a for loop with index-based iteration
+      for (size_t idx = 0; idx < _scheduled.size(); idx++) {
+        auto wire = _scheduled[idx].get();
         if (wire->paused) {
-          ++it;
-          idx++;
           continue; // simply skip
         }
 
@@ -675,9 +673,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
           // should be already removed by stop
           shassert(_scheduledSet.count(wire) == 0 && "Wire still in scheduled set after stop!");
         }
-
-        ++it;
-        idx++;
       }
 
       // do it in reverse order as we are erasing, should be easy memory moves
@@ -731,8 +726,8 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     shards::stop(wire.get());
     // stop cause wireOnCleanup to be called
     shassert(wire->mesh.expired() && "Wire still has a mesh!");
-    // immediately remove from scheduled set
-    _scheduledSet.erase(wire.get());
+    // this should be already removed by stop
+    shassert(_scheduledSet.count(wire.get()) == 0 && "Wire still in scheduled set after stop!");
   }
 
   bool empty() { return _scheduledSet.empty(); }
@@ -826,8 +821,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void setLabel(std::string_view label) { this->label = label; }
   std::string_view getLabel() const { return label; }
 
-  void unschedule(const std::shared_ptr<SHWire> &wire) { _scheduledSet.erase(wire.get()); }
-
 private:
   SHMesh(std::string_view label) : label(label) {}
 
@@ -852,6 +845,9 @@ private:
   std::vector<std::string> _errors;
   std::vector<SHWire *> _failedWires;
   std::string label;
+
+  friend struct SHWire;
+  void unschedule(const std::shared_ptr<SHWire> &wire) { _scheduledSet.erase(wire.get()); }
 };
 
 namespace shards {
