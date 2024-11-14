@@ -676,14 +676,13 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
           SHLOG_TRACE("Wire {} ended while ticking", wire->name);
           shassert(wire->mesh.expired() && "Wire still has a mesh!");
 
-          _pendingUnschedule.push_back(idx);
+          _pendingUnschedule.insert(idx);
           // should be already removed by stop
           shassert(_scheduledSet.count(wire) == 0 && "Wire still in scheduled set after stop!");
         }
       }
 
       // do it in reverse order as we are erasing, should be easy memory moves
-      std::sort(_pendingUnschedule.begin(), _pendingUnschedule.end());
       for (auto it = _pendingUnschedule.rbegin(); it != _pendingUnschedule.rend(); ++it) {
         _scheduled.erase(_scheduled.begin() + *it);
       }
@@ -847,7 +846,7 @@ private:
   // we can add while iterating, we delete in a second pass
   boost::container::stable_vector<WirePtr> _scheduled;
   std::unordered_set<SHWire *> _scheduledSet;
-  std::vector<size_t> _pendingUnschedule;
+  boost::container::flat_set<size_t> _pendingUnschedule;
 
   std::vector<std::string> _errors;
   std::vector<SHWire *> _failedWires;
