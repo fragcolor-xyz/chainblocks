@@ -300,7 +300,7 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
   uint64_t debugId{0};            // used for debugging
   shards::OwnedVar astObject;     // optional, used for debugging
   std::shared_ptr<SHWire> parent; // used in doppelganger pool, we keep track of the template wire
-  int priority{0};                // used in scheduler
+  bool paused{false};
 
   // The wire's running coroutine
   shards::Coroutine coro;
@@ -455,17 +455,6 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
 
   void addTrait(SHTrait trait);
   const std::vector<shards::Trait> &getTraits() const { return traits; }
-
-  // less operator, compare by priority fall back to wire id
-  bool operator<(const SHWire &other) const {
-    if (priority != other.priority) {
-      return priority < other.priority;
-    } else {
-      return uniqueId < other.uniqueId;
-    }
-  }
-
-  bool paused{false};
 
   SHWire *tickingWire() {
     SHWire *wire = this;

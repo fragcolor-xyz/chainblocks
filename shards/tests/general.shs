@@ -262,7 +262,7 @@
 
   @wire(when-done-wire {
     v-3 | Log("OnStop Copy")
-  } Priority: -1000)
+  })
 
   WhenDone(when-done-wire) ; high on purpose to test lifetime issues
 
