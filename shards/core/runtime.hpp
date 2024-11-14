@@ -676,6 +676,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
       }
 
       // do it in reverse order as we are erasing, should be easy memory moves
+      std::sort(_pendingUnschedule.begin(), _pendingUnschedule.end());
       for (auto it = _pendingUnschedule.rbegin(); it != _pendingUnschedule.rend(); ++it) {
         _scheduled.erase(_scheduled.begin() + *it);
       }
