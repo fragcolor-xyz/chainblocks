@@ -579,7 +579,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     SHLOG_TRACE("Scheduling wire {}", wire->name);
 
-    if (wire->warmedUp || _scheduled.count(wire) > 0 || _pendingSchedule.count(wire) > 0) {
+    if (wire->warmedUp || _scheduledSet.count(wire.get())) {
       SHLOG_ERROR("Attempted to schedule a wire multiple times, wire: {}", wire->name);
       throw shards::SHException("Multiple wire schedule");
     }
@@ -616,6 +616,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     shards::start(wire.get(), input);
 
     _pendingSchedule.insert(wire);
+    _scheduledSet.insert(wire.get());
 
     SHLOG_TRACE("Wire {} scheduled", wire->name);
   }
@@ -671,6 +672,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
           shassert(wire->mesh.expired() && "Wire still has a mesh!");
 
           _pendingUnschedule.insert(wire->shared_from_this());
+          _scheduledSet.erase(wire);
         }
 
         ++it;
@@ -701,6 +703,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     // release all wires
     _scheduled.clear();
+    _scheduledSet.clear();
     _pendingSchedule.clear();
     _pendingUnschedule.clear();
 
@@ -729,9 +732,10 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     shassert(wire->mesh.expired() && "Wire still has a mesh!");
     // queue for unschedule
     _pendingUnschedule.insert(wire);
+    _scheduledSet.erase(wire.get());
   }
 
-  bool empty() { return _scheduled.empty() && _pendingSchedule.empty(); }
+  bool empty() { return _scheduledSet.empty(); }
 
   bool isCleared() { return _scheduled.empty() && variables.empty(); }
 
@@ -822,7 +826,10 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void setLabel(std::string_view label) { this->label = label; }
   std::string_view getLabel() const { return label; }
 
-  void unschedule(const std::shared_ptr<SHWire> &wire) { _pendingUnschedule.insert(wire); }
+  void unschedule(const std::shared_ptr<SHWire> &wire) {
+    _pendingUnschedule.insert(wire);
+    _scheduledSet.erase(wire.get());
+  }
 
 private:
   SHMesh(std::string_view label) : label(label) {}
@@ -848,6 +855,7 @@ private:
   using WirePtr = std::shared_ptr<SHWire>;
   using ScheduledSet = boost::container::flat_set<WirePtr, WireLess>;
   ScheduledSet _scheduled;
+  std::unordered_set<SHWire *> _scheduledSet;
   ScheduledSet _pendingSchedule;
   ScheduledSet _pendingUnschedule;
 

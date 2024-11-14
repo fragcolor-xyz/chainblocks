@@ -500,7 +500,7 @@
 @run(root) | Assert.Is(true)
 
 @wire(detach-restart-worker {
-  Msg("detach-restart-worker")
+  Msg("detach-restart-worker-ok")
   Pause(10.0)
 })
 
