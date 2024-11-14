@@ -691,7 +691,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     return tick(obs);
   }
 
-  friend struct SHWire;
   void clear() {
     auto it = _scheduled.begin();
     while (it != _scheduled.end()) {
