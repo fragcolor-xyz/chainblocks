@@ -615,6 +615,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     observer.before_start(wire.get());
     shards::start(wire.get(), input);
 
+    _pendingUnschedule.erase(wire);
     _pendingSchedule.insert(wire);
     _scheduledSet.insert(wire.get());
 
@@ -738,6 +739,9 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   bool empty() { return _scheduledSet.empty(); }
 
   bool isCleared() { return _scheduled.empty() && variables.empty(); }
+
+  size_t scheduledSetCount() { return _scheduledSet.size(); }
+  size_t scheduledCount() { return _scheduled.size(); }
 
   const std::vector<std::string> &errors() { return _errors; }
 
