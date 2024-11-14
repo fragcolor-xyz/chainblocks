@@ -415,12 +415,14 @@ inline void start(SHWire *wire, SHVar input = {}) {
   wire->state = SHWire::State::Starting;
 }
 
+inline bool isRunning(SHWire::State state) { return state >= SHWire::State::Starting && state <= SHWire::State::IterationEnded; }
+
 inline bool isRunning(SHWire *wire) {
   const auto state = wire->state.load(); // atomic
-  return state >= SHWire::State::Starting && state <= SHWire::State::IterationEnded;
+  return isRunning(state);
 }
 
-template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHDuration now) {
+template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHWire::State state, SHDuration now) {
   ZoneScoped;
   ZoneName(wire->name.c_str(), wire->name.size());
 
@@ -429,7 +431,7 @@ template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHDurati
     if constexpr (IsCleanupContext) {
       canRun = true;
     } else {
-      canRun = (isRunning(wire) && now >= wire->context->next) || unlikely(wire->context && wire->context->onLastResume);
+      canRun = (isRunning(state) && now >= wire->context->next) || unlikely(wire->context && wire->context->onLastResume);
     }
 
     if (canRun) {
@@ -456,6 +458,8 @@ template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHDurati
     }
   }
 }
+
+template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHDuration now) { tick(wire, wire->state.load(), now); }
 
 bool stop(SHWire *wire, SHVar *result = nullptr, SHContext *currentContext = nullptr);
 
@@ -643,19 +647,22 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
       // Use a for loop with index-based iteration
       for (size_t idx = 0; idx < _scheduled.size(); idx++) {
         auto wire = _scheduled[idx].get();
-        if (wire->paused) {
+        if (unlikely(wire->paused)) {
           continue; // simply skip
         }
 
+        auto state = wire->state.load(); // atomic
         observer.before_tick(wire);
-        shards::tick(wire->tickingWire(), now);
+        shards::tick(wire->tickingWire(), state, now);
 
-        if (unlikely(!shards::isRunning(wire))) {
+        // get the new state
+        state = wire->state.load(); // atomic
+        if (unlikely(!shards::isRunning(state))) {
           if (wire->finishedError.size() > 0) {
             _errors.emplace_back(wire->finishedError);
           }
 
-          if (wire->state == SHWire::State::Failed) {
+          if (state == SHWire::State::Failed) {
             _failedWires.emplace_back(wire);
             noErrors = false;
           }
