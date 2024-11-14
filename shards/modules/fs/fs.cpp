@@ -27,7 +27,7 @@ void portable_fsync(const boost::filesystem::path &filePath) {
 #if defined(_WIN32) || defined(_WIN64)
   HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (hFile == INVALID_HANDLE_VALUE) {
-    SHLOG_ERROR("Error opening file: {}", GetLastError());
+    SHLOG_ERROR("Error opening file: {} ({})", GetLastError(), filePath);
     return;
   }
 
