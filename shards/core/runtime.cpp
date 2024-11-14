@@ -2840,6 +2840,11 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
     sc->looped = looped;
   };
 
+  result->setWirePriority = [](SHWireRef wireref, int priority) noexcept {
+    auto &sc = SHWire::sharedFromRef(wireref);
+    sc->priority = priority;
+  };
+
   result->setWireUnsafe = [](SHWireRef wireref, SHBool unsafe) noexcept {
     auto &sc = SHWire::sharedFromRef(wireref);
     sc->unsafe = unsafe;

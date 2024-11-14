@@ -415,14 +415,12 @@ inline void start(SHWire *wire, SHVar input = {}) {
   wire->state = SHWire::State::Starting;
 }
 
-inline bool isRunning(SHWire::State state) { return state >= SHWire::State::Starting && state <= SHWire::State::IterationEnded; }
-
 inline bool isRunning(SHWire *wire) {
   const auto state = wire->state.load(); // atomic
-  return isRunning(state);
+  return state >= SHWire::State::Starting && state <= SHWire::State::IterationEnded;
 }
 
-template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHWire::State state, SHDuration now) {
+template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHDuration now) {
   ZoneScoped;
   ZoneName(wire->name.c_str(), wire->name.size());
 
@@ -431,7 +429,7 @@ template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHWire::
     if constexpr (IsCleanupContext) {
       canRun = true;
     } else {
-      canRun = (isRunning(state) && now >= wire->context->next) || unlikely(wire->context && wire->context->onLastResume);
+      canRun = (isRunning(wire) && now >= wire->context->next) || unlikely(wire->context && wire->context->onLastResume);
     }
 
     if (canRun) {
@@ -458,8 +456,6 @@ template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHWire::
     }
   }
 }
-
-template <bool IsCleanupContext = false> inline void tick(SHWire *wire, SHDuration now) { tick(wire, wire->state.load(), now); }
 
 bool stop(SHWire *wire, SHVar *result = nullptr, SHContext *currentContext = nullptr);
 
@@ -619,9 +615,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     observer.before_start(wire.get());
     shards::start(wire.get(), input);
 
-    // safe to push back as it's a stable_vector
-    _scheduled.push_back(wire);
-    // and immediately insert into set for hash lookup
+    _pendingSchedule.insert(wire);
     _scheduledSet.insert(wire.get());
 
     SHLOG_TRACE("Wire {} scheduled", wire->name);
@@ -639,30 +633,31 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     _errors.clear();
     _failedWires.clear();
 
+    // schedule next
+    _scheduled.insert(_pendingSchedule.begin(), _pendingSchedule.end());
+    _pendingSchedule.clear();
+
     if (shards::GetGlobals().SigIntTerm > 0) {
       terminate();
     } else {
       SHDuration now = SHClock::now().time_since_epoch();
-
-      // Use a for loop with index-based iteration
-      for (size_t idx = 0; idx < _scheduled.size(); idx++) {
-        auto wire = _scheduled[idx].get();
-        if (unlikely(wire->paused)) {
+      auto it = _scheduled.begin();
+      while (it != _scheduled.end()) {
+        auto wire = (*it).get();
+        if (wire->paused) {
+          ++it;
           continue; // simply skip
         }
 
-        auto state = wire->state.load(); // atomic
         observer.before_tick(wire);
-        shards::tick(wire->tickingWire(), state, now);
+        shards::tick(wire->tickingWire(), now);
 
-        // get the new state
-        state = wire->state.load(); // atomic
-        if (unlikely(!shards::isRunning(state))) {
+        if (unlikely(!shards::isRunning(wire))) {
           if (wire->finishedError.size() > 0) {
             _errors.emplace_back(wire->finishedError);
           }
 
-          if (state == SHWire::State::Failed) {
+          if (wire->state == SHWire::State::Failed) {
             _failedWires.emplace_back(wire);
             noErrors = false;
           }
@@ -676,15 +671,16 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
           SHLOG_TRACE("Wire {} ended while ticking", wire->name);
           shassert(wire->mesh.expired() && "Wire still has a mesh!");
 
-          _pendingUnschedule.insert(idx);
-          // should be already removed by stop
-          shassert(_scheduledSet.count(wire) == 0 && "Wire still in scheduled set after stop!");
+          _pendingUnschedule.insert(wire->shared_from_this());
+          _scheduledSet.erase(wire);
         }
+
+        ++it;
       }
 
-      // do it in reverse order as we are erasing, should be easy memory moves
-      for (auto it = _pendingUnschedule.rbegin(); it != _pendingUnschedule.rend(); ++it) {
-        _scheduled.erase(_scheduled.begin() + *it);
+      // unschedule at the end
+      for (const auto &item : _pendingUnschedule) {
+        _scheduled.erase(item);
       }
       _pendingUnschedule.clear();
     }
@@ -697,6 +693,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     return tick(obs);
   }
 
+  friend struct SHWire;
   void clear() {
     auto it = _scheduled.begin();
     while (it != _scheduled.end()) {
@@ -707,6 +704,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     // release all wires
     _scheduled.clear();
     _scheduledSet.clear();
+    _pendingSchedule.clear();
     _pendingUnschedule.clear();
 
     // find dangling variables and notice
@@ -732,8 +730,9 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     shards::stop(wire.get());
     // stop cause wireOnCleanup to be called
     shassert(wire->mesh.expired() && "Wire still has a mesh!");
-    // this should be already removed by stop
-    shassert(_scheduledSet.count(wire.get()) == 0 && "Wire still in scheduled set after stop!");
+    // queue for unschedule
+    _pendingUnschedule.insert(wire);
+    _scheduledSet.erase(wire.get());
   }
 
   bool empty() { return _scheduledSet.empty(); }
@@ -827,6 +826,11 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void setLabel(std::string_view label) { this->label = label; }
   std::string_view getLabel() const { return label; }
 
+  void unschedule(const std::shared_ptr<SHWire> &wire) {
+    _pendingUnschedule.insert(wire);
+    _scheduledSet.erase(wire.get());
+  }
+
 private:
   SHMesh(std::string_view label) : label(label) {}
 
@@ -841,19 +845,23 @@ private:
                      boost::alignment::aligned_allocator<std::pair<const shards::OwnedVar, SHVar *>, 16>>
       refs;
 
+  struct WireLess {
+    bool operator()(const std::shared_ptr<SHWire> &a, const std::shared_ptr<SHWire> &b) const {
+      shassert(a && b && "WireLess should not be called with a null pointer");
+      return *a < *b;
+    }
+  };
   // Notice, has to be stable_vector to ensure iterator stability
   using WirePtr = std::shared_ptr<SHWire>;
-  // we can add while iterating, we delete in a second pass
-  boost::container::stable_vector<WirePtr> _scheduled;
+  using ScheduledSet = boost::container::flat_set<WirePtr, WireLess>;
+  ScheduledSet _scheduled;
   std::unordered_set<SHWire *> _scheduledSet;
-  boost::container::flat_set<size_t> _pendingUnschedule;
+  ScheduledSet _pendingSchedule;
+  ScheduledSet _pendingUnschedule;
 
   std::vector<std::string> _errors;
   std::vector<SHWire *> _failedWires;
   std::string label;
-
-  friend struct SHWire;
-  void unschedule(const std::shared_ptr<SHWire> &wire) { _scheduledSet.erase(wire.get()); }
 };
 
 namespace shards {

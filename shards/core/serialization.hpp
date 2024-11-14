@@ -405,6 +405,7 @@ struct Serialization {
       read((uint8_t *)&wire->looped, 1);
       read((uint8_t *)&wire->unsafe, 1);
       read((uint8_t *)&wire->pure, 1);
+      read((uint8_t *)&wire->priority, sizeof(int32_t));
       // shards len
       read((uint8_t *)&len, sizeof(uint32_t));
       // shards
@@ -710,6 +711,8 @@ struct Serialization {
         total += 1;
         write((const uint8_t *)&wire->pure, 1);
         total += 1;
+        write((const uint8_t *)&wire->priority, sizeof(int32_t));
+        total += sizeof(int32_t);
       }
       { // Shards len
         uint32_t len = uint32_t(wire->shards.size());
