@@ -2125,4 +2125,7 @@ TEST_CASE("Mesh restart wire") {
   REQUIRE(v.payload.intValue == 6);
   REQUIRE(mesh->scheduledSetCount() == 1);
   REQUIRE(mesh->scheduledCount() == 1);
+
+  wire.reset();
+  mesh.reset();
 }
