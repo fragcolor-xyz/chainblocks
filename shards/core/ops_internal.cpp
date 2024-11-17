@@ -106,10 +106,7 @@ std::ostream &DocsFriendlyFormatter::format(std::ostream &os, const SHVar &var) 
   case SHType::Int16:
     os << "@i16(";
     for (auto i = 0; i < 16; i++) {
-      if (i == 0)
-        os << int(var.payload.int16Value[i]);
-      else
-        os << " " << int(var.payload.int16Value[i]);
+      os << std::hex << std::setw(2) << std::setfill('0') << static_cast<unsigned>(var.payload.int16Value[i] & 0xFF);
     }
     os << ")";
     break;

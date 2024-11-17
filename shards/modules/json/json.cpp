@@ -94,11 +94,12 @@ void to_json(json &j, const SHVar &var) {
     break;
   }
   case SHType::Int16: {
-    auto vec = {var.payload.int16Value[0],  var.payload.int16Value[1],  var.payload.int16Value[2],  var.payload.int16Value[3],
-                var.payload.int16Value[4],  var.payload.int16Value[5],  var.payload.int16Value[6],  var.payload.int16Value[7],
-                var.payload.int16Value[8],  var.payload.int16Value[9],  var.payload.int16Value[10], var.payload.int16Value[11],
-                var.payload.int16Value[12], var.payload.int16Value[13], var.payload.int16Value[14], var.payload.int16Value[15]};
-    j = json{{"type", valType}, {"value", vec}};
+    std::stringstream ss;
+    for (int i = 0; i < 16; i++) {
+        ss << std::setfill('0') << std::setw(2) << std::hex 
+           << (static_cast<int>(var.payload.int16Value[i]) & 0xFF);
+    }
+    j = json{{"type", valType}, {"value", ss.str()}};
     break;
   }
   case SHType::Float: {
@@ -304,8 +305,13 @@ void from_json(const json &j, SHVar &var) {
   }
   case SHType::Int16: {
     var.valueType = SHType::Int16;
-    for (auto i = 0; i < 16; i++) {
-      var.payload.int16Value[i] = j.at("value")[i].get<int8_t>();
+    auto hexStr = j.at("value").get<std::string>();
+    if (hexStr.length() != 32) { // 16 bytes = 32 hex chars
+        throw shards::ActivationError("Int16 hex string must be exactly 32 characters long (16 bytes)");
+    }
+    for (int i = 0; i < 16; i++) {
+        std::string byteStr = hexStr.substr(i * 2, 2);
+        var.payload.int16Value[i] = static_cast<int8_t>(std::stoi(byteStr, nullptr, 16));
     }
     break;
   }

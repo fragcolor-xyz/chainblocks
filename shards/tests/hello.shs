@@ -257,3 +257,5 @@ DecCounter("test-counter" 1) | Log | Assert.Is(1)
 GetCounter("test-counter") | Log | Assert.Is(1)
 10 | SetCounter("test-counter") | Log | Assert.Is(1) ; old value
 GetCounter("test-counter") | Log | Assert.Is(10)
+
+UUID | ToJson(Pure: false) | Log | FromJson(Pure: false) | Log
