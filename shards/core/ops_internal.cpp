@@ -5,6 +5,7 @@
 #include <shards/ops.hpp>
 #include "runtime.hpp"
 #include <unordered_set>
+#include <iomanip>
 
 namespace shards {
 std::ostream &DocsFriendlyFormatter::format(std::ostream &os, const SHVar &var) {
