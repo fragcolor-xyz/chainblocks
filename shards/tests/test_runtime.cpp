@@ -2064,6 +2064,7 @@ TEST_CASE("WireDoppelgangerPool acquire and release", "[WireDoppelgangerPool]") 
   }
 }
 
+#ifndef SHARDS_VALGRIND
 TEST_CASE("Mesh restart wire") {
   auto mesh = SHMesh::make();
   std::shared_ptr<SHWire> wire = Wire("main")
@@ -2129,3 +2130,4 @@ TEST_CASE("Mesh restart wire") {
   wire.reset();
   mesh.reset();
 }
+#endif
