@@ -350,14 +350,12 @@ impl Shard for ForwardShard {
     match model {
       Model::Bert(model) => {
         if tensors.len() == 2 {
-          let input_ids = unsafe {
-            &mut *Var::from_ref_counted_object::<Tensor>(&tensors[0], &*TENSOR_TYPE)?
-          };
-          let input_type_ids = unsafe {
-            &mut *Var::from_ref_counted_object::<Tensor>(&tensors[1], &*TENSOR_TYPE)?
-          };
+          let input_ids =
+            unsafe { &mut *Var::from_ref_counted_object::<Tensor>(&tensors[0], &*TENSOR_TYPE)? };
+          let input_type_ids =
+            unsafe { &mut *Var::from_ref_counted_object::<Tensor>(&tensors[1], &*TENSOR_TYPE)? };
           let output = model
-            .forward(&input_ids.0, &input_type_ids.0)
+            .forward(&input_ids.0, &input_type_ids.0, None)
             .map_err(|e| {
               shlog_error!("Failed to forward: {}", e);
               "Failed to forward"
