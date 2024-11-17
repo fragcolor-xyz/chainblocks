@@ -201,7 +201,7 @@
     Wire: {ToString}
     Policy: WaitUntil::SomeSuccess
   )
-  Assert.Is((["5" "@i2(5 5)" "@i3(5 5 5)" "@i4(5 5 5 5)" "@i8(5 5 5 5 5 5 5 5)" "@i16(5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5)" "5" "@f2(5 5)" "@f3(5 5 5)" "@f4(5 5 5 5)" "@color(255 255 255 255)" "<Wire: spawn>" "{table: 1}" "[1 2 3 4 5]" "[1 2 3 4 5]" "Audio SampleRate: 44100 Samples: 1024 Channels: 2" "true" img-string "<1 SHType::Bytes>" "Hello" "none"]))
+  Assert.Is((["5" "@i2(5 5)" "@i3(5 5 5)" "@i4(5 5 5 5)" "@i8(5 5 5 5 5 5 5 5)" "@i16(05050505050505050505050505050505)" "5" "@f2(5 5)" "@f3(5 5 5)" "@f4(5 5 5 5)" "@color(255 255 255 255)" "<Wire: spawn>" "{table: 1}" "[1 2 3 4 5]" "[1 2 3 4 5]" "Audio SampleRate: 44100 Samples: 1024 Channels: 2" "true" img-string "<1 SHType::Bytes>" "Hello" "none"]))
   Log("String TryMany Result")
 
   1 | ToHex | Assert.Is("0x01") | Log("Int ToHex")
