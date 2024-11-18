@@ -95,8 +95,10 @@ struct VariableStorage {
   // Retrieves globally unique variable name from a regular variable name
   const std::string &resolveUniqueVariableName(const std::string &varName) const {
     auto it = uniqueVariableNames.find(varName);
-    if (it == uniqueVariableNames.end())
-      throw std::logic_error("Variable does not exist in this scope"); // Should not happen here, catch externally
+    if (it == uniqueVariableNames.end()) {
+      // Should not happen here, catch externally
+      SHLOG_FATAL("Variable {} does not exist in this scope", varName);
+    }
     return it->second;
   }
 };

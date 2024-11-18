@@ -234,7 +234,7 @@ WGSLBlock TranslationContext::assignVariable(const std::string &varName, bool gl
         auto tmpName = getUniqueVariableName(varName);
         outVariableName = &storage.mapUniqueVariableName(varName, tmpName);
       } else {
-        outVariableName = &varName;
+        outVariableName = &storage.mapUniqueVariableName(varName, varName);
       }
     } else {
       if (allowUpdate) {
