@@ -32,7 +32,7 @@ struct WSServer final : public Server {
   pollnet_ctx *ctx{};
   sockethandle_t socket{};
   std::unordered_map<sockethandle_t, struct WSHandler *> handle2Peer;
-  std::unordered_set<int64_t> _blacklist;
+  std::unordered_set<int64_t> _list;
 
   WSServer() { ctx = pollnet_init(); }
   ~WSServer() { pollnet_shutdown(ctx); }
@@ -48,7 +48,7 @@ struct WSServer final : public Server {
     socket = pollnet_invalid_handle();
   }
 
-  void broadcast(boost::span<const uint8_t> data, const SHVar &exclude) override;
+  void broadcast(boost::span<const uint8_t> data, const SHVar &nodes, bool include) override;
 };
 
 struct WSPeer : public Peer {
@@ -79,17 +79,27 @@ struct WSHandler : public WSPeer {
   OwnedVar recvBuffer;
 };
 
-void WSServer::broadcast(boost::span<const uint8_t> data, const SHVar &exclude) {
-  if (exclude.valueType == SHType::Seq) {
-    _blacklist.clear();
+void WSServer::broadcast(boost::span<const uint8_t> data, const SHVar &nodes, bool include) {
+  if (nodes.valueType == SHType::Seq) {
+    _list.clear();
 
-    for (auto &excluded : exclude) {
-      _blacklist.insert(excluded.payload.intValue);
+    for (auto &included : nodes) {
+      _list.insert(included.payload.intValue);
     }
 
-    for (auto &[handle, peer] : handle2Peer) {
-      if (_blacklist.find(peer->getId()) == _blacklist.end()) {
-        peer->send(data);
+    if (!include) {
+      // excluding
+      for (auto &[handle, peer] : handle2Peer) {
+        if (_list.find(peer->getId()) == _list.end()) {
+          peer->send(data);
+        }
+      }
+    } else {
+      // including
+      for (auto &[handle, peer] : handle2Peer) {
+        if (_list.find(peer->getId()) != _list.end()) {
+          peer->send(data);
+        }
       }
     }
   } else {
@@ -146,8 +156,8 @@ struct WSServerShard {
   PARAM_VAR(_timeout, "Timeout",
             ("The timeout in seconds after which a peer will be disconnected if there is no network activity."),
             {CoreInfo::FloatType});
-  PARAM(ShardsVar, _onDisconnect, "OnDisconnect", ("The shards to execute when a peer disconnects, The Peer ID will be the input."),
-        {CoreInfo::ShardsOrNone});
+  PARAM(ShardsVar, _onDisconnect, "OnDisconnect",
+        ("The shards to execute when a peer disconnects, The Peer ID will be the input."), {CoreInfo::ShardsOrNone});
   PARAM_IMPL(PARAM_IMPL_FOR(_address), PARAM_IMPL_FOR(_port), PARAM_IMPL_FOR(_handler), PARAM_IMPL_FOR(_timeout),
              PARAM_IMPL_FOR(_onDisconnect));
 
@@ -414,7 +424,8 @@ struct WSClientShard {
 
   PARAM_PARAMVAR(_address, "Address", ("The local bind address or the remote address."), {CoreInfo::StringOrStringVar});
   PARAM(ShardsVar, _handler, "Handler", ("The shards to execute when a packet is received."), {CoreInfo::ShardsOrNone});
-  PARAM_VAR(_raw, "Raw", ("If set to true, the client will receive raw byte packets instead of serialized objects."), {CoreInfo::NoneType, CoreInfo::BoolType});
+  PARAM_VAR(_raw, "Raw", ("If set to true, the client will receive raw byte packets instead of serialized objects."),
+            {CoreInfo::NoneType, CoreInfo::BoolType});
   PARAM_IMPL(PARAM_IMPL_FOR(_address), PARAM_IMPL_FOR(_handler), PARAM_IMPL_FOR(_raw));
 
   std::shared_ptr<WSClient> _client;

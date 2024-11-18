@@ -96,8 +96,10 @@ private:
 };
 
 struct Server {
-  virtual void broadcast(boost::span<const uint8_t> data, const SHVar &exclude) = 0;
-  void broadcastVar(const SHVar &input, const SHVar &exclude) { broadcast(getSendWriter().varToSendBuffer(input), exclude); }
+  virtual void broadcast(boost::span<const uint8_t> data, const SHVar &nodes, bool include) = 0;
+  void broadcastVar(const SHVar &input, const SHVar &nodes, bool include) {
+    broadcast(getSendWriter().varToSendBuffer(input), nodes, include);
+  }
 };
 
 struct OnPeerConnected {
