@@ -116,5 +116,5 @@
 
 @mesh(root)
 @schedule(root test-wire)
-; @run(root FPS: 60 Iterations: 100) | Assert.Is(true)
-@run(root FPS: 120) | Assert.Is(true)
+@run(root FPS: 60 Iterations: 100) | Assert.Is(true)
+; @run(root FPS: 120) | Assert.Is(true)
