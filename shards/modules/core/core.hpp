@@ -1491,12 +1491,22 @@ struct Update : public SetUpdateBase {
 
   static SHOptionalString help() { return SHCCSTR("Modifies the value of an existing mutable variable."); }
 
+  static SHTypeInfo *findTableNoneEntry(const SHTypeInfo *ti) {
+    for (size_t i = 0; i < ti->table.keys.len; i++) {
+      if (ti->table.keys.elements[i].valueType == SHType::None) {
+        return &ti->table.types.elements[i];
+      }
+    }
+    return nullptr;
+  }
+
   SHTypeInfo compose(const SHInstanceData &data) {
     _self = data.shard;
 
     setBaseCompose(data, false, false, false);
 
     SHTypeInfo *originalTableType{};
+    SHTypeInfo *tableInnerValueType{};
 
     // make sure we update to the same type
     if (_isTable) {
@@ -1509,14 +1519,19 @@ struct Update : public SetUpdateBase {
 
           auto &tableKeys = data.shared.elements[i].exposedType.table.keys;
           auto &tableTypes = data.shared.elements[i].exposedType.table.types;
-          for (uint32_t y = 0; y < tableKeys.len; y++) {
-            // if keys are populated they are not variables
-            auto &key = tableKeys.elements[y];
-            if (key == *_key) {
-              if (data.inputType != tableTypes.elements[y]) {
-                throw SHException(fmt::format("Update: error, update is changing the variable type for key {} from {} => {}",
-                                              *_key, tableTypes.elements[y], data.inputType));
+          if (_key.isVariable()) {
+            tableInnerValueType = findTableNoneEntry(originalTableType);
+          } else {
+            for (uint32_t y = 0; y < tableKeys.len; y++) {
+              // if keys are populated they are not variables
+              auto &key = tableKeys.elements[y];
+              if (key == *_key) {
+                tableInnerValueType = &tableTypes.elements[y];
               }
+            }
+            // Fallback to none type
+            if (!tableInnerValueType) {
+              tableInnerValueType = findTableNoneEntry(originalTableType);
             }
           }
           _isGlobal = data.shared.elements[i].global;
@@ -1525,6 +1540,23 @@ struct Update : public SetUpdateBase {
 
       if (!originalTableType) {
         throw ComposeError("Update: error, original table type not found.");
+      }
+
+      if (!tableInnerValueType) {
+        if (_key.isVariable()) {
+          throw SHException(fmt::format(
+              "Update: can not update table with variable key \"{}\" because it has no \"none\" type field information ({}).",
+              *_key, *originalTableType));
+        } else {
+          throw SHException(fmt::format(
+              "Update: can not update table with variable key \"{}\" because it is not present in the table type({}).", *_key,
+              *originalTableType));
+        }
+      }
+
+      if (!matchTypes(data.inputType, *tableInnerValueType, true, true, true)) {
+        throw SHException(fmt::format("Update: error, update is changing table field for key {} from {} => {}", *_key,
+                                      *tableInnerValueType, data.inputType));
       }
 
       const_cast<Shard *>(data.shard)->inlineShardId = InlineShard::CoreSetUpdateTable;
@@ -1545,12 +1577,7 @@ struct Update : public SetUpdateBase {
     // bake exposed types
     if (_isTable) {
       // we are a table!
-      if (_key.isVariable()) {
-        // only add types info, we don't know keys
-        _tableTypeInfo = SHTypeInfo{SHType::Table, {.table = {.types = {&_tableContentInfo, 1, 0}}}};
-      } else {
-        _tableTypeInfo = *originalTableType;
-      }
+      _tableTypeInfo = *originalTableType;
       _exposedInfo = ExposedInfo(ExposedInfo::Variable(_name.c_str(), SHCCSTR("The updated table."), _tableTypeInfo, true));
     } else {
       // just a variable!
