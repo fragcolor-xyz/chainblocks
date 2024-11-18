@@ -1,6 +1,7 @@
 @include("cubemap-utils.shs" Once: true)
 @define(pbr-wgsl @read("pbr.wgsl"))
 
+; === BEGIN SHARDS COMMON ===
 
 @template(shader-integrate [texture sampler base-dir body num-samples args] {
   Shader.Literal(

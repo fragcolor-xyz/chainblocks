@@ -1,4 +1,4 @@
-; everything in here is exposed to USER SCRIPTS!
+; === BEGIN SHARDS COMMON ===
 
 @define(pi 3.141592653589)
 @define(pi2 #(@pi | Math.Multiply(2.0)))
@@ -75,7 +75,7 @@
   Name: "initLighting"
   Stage: ProgrammableGraphicsStage::Fragment
   EntryPoint: {
-    @f3(0.0) | Shader.WriteGlobal("lighting")
+    @f3(0.0) | Set(lighting Global: true)
   }
 })
 
@@ -84,7 +84,6 @@
   Name: "applyLighting"
   Stage: ProgrammableGraphicsStage::Fragment
   EntryPoint: {
-    ; Shader.ReadGlobal("lighting") | ToFloat3 = lighting
     Shader.ReadGlobal("color") | Take(3) = a
     
     @f3(0.0) >= emissive
@@ -106,8 +105,8 @@
   EntryPoint: {
     Shader.ReadBuffer("ambientLightColor") | ToFloat3 = ambient-light-color
     Shader.ReadGlobal("color") | ToFloat3 = base-color
-    base-color | Math.Multiply(ambient-light-color) = lighting
-    Shader.ReadGlobal("lighting") | Math.Add(lighting) | Shader.WriteGlobal("lighting")
+    base-color | Math.Multiply(ambient-light-color) = lighting-tmp
+    lighting | Math.Add(lighting-tmp) > lighting
   }
 })
 
@@ -121,7 +120,7 @@
     Shader.ReadBuffer("lightDirection") = light-dir
     light-dir | Math.Negate = inv-light-dir
     normal | Math.Normalize | Math.Dot(inv-light-dir) | Max(0.0) = n-dot-l
-    Shader.ReadBuffer("lightColor") | Math.Multiply(n-dot-l) >= lighting
+    Shader.ReadBuffer("lightColor") | Math.Multiply(n-dot-l) >= lighting-tmp
     Shader.ReadGlobal("color") | ToFloat3 = base-color
     Shader.WithTexture("shadowTexture" {
       Shader.ReadInput("worldPosition") | @fbl/float4-with-alpha(1.0) = world-pos-4
@@ -145,11 +144,11 @@
       expected-shadow-depth | Math.Subtract(sampled-shadow-depth) = delta
       Shader.ReadBuffer("shadowSampleThreshold") = sample-threshold
       When({delta | IsMore(sample-threshold)} {
-        shadow-factor | Math.Lerp(lighting @f3(0 0 0)) > lighting
+        shadow-factor | Math.Lerp(lighting-tmp @f3(0 0 0)) > lighting-tmp
       })
     })
-    base-color | Math.Multiply(lighting) > lighting
-    Shader.ReadGlobal("lighting") | Math.Add(lighting) | Shader.WriteGlobal("lighting")
+    base-color | Math.Multiply(lighting-tmp) > lighting-tmp
+    lighting | Math.Add(lighting-tmp) > lighting
   }
 })
 
