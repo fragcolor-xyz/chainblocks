@@ -216,7 +216,7 @@ namespace shards {
 
 bool validateSetParam(Shard *shard, int index, const SHVar &value);
 bool matchTypes(const SHTypeInfo &inputType, const SHTypeInfo &receiverType, bool isParameter, bool strict,
-                bool relaxEmptySeqCheck);
+                bool relaxEmptySeqCheck, bool ignoreFixedSeq = false);
 void triggerVarValueChange(SHContext *context, const SHVar *name, bool isGlobal, const SHVar *var);
 void triggerVarValueChange(SHWire *wire, const SHVar *name, bool isGlobal, const SHVar *var);
 

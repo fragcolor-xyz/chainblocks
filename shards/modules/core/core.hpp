@@ -1554,7 +1554,7 @@ struct Update : public SetUpdateBase {
         }
       }
 
-      if (!matchTypes(data.inputType, *tableInnerValueType, true, true, true)) {
+      if (!matchTypes(data.inputType, *tableInnerValueType, true, true, true, true)) {
         throw SHException(fmt::format("Update: error, update is changing table field for key {} from {} => {}", *_key,
                                       *tableInnerValueType, data.inputType));
       }
