@@ -35,7 +35,8 @@ struct DynamicBlockFromShards : public blocks::Block {
   VariableMap composeWith;
   VariableRemapping globalVariableRemapping;
 
-  DynamicBlockFromShards(std::vector<ShardPtr> &&shards, const VariableMap &composeWith, const VariableRemapping& globalVariableRemapping)
+  DynamicBlockFromShards(std::vector<ShardPtr> &&shards, const VariableMap &composeWith,
+                         const VariableRemapping &globalVariableRemapping)
       : shards(std::move(shards)), composeWith(composeWith), globalVariableRemapping(globalVariableRemapping) {}
 
   virtual void apply(IGeneratorContext &context) const {
@@ -89,6 +90,19 @@ struct DynamicBlockFromShards : public blocks::Block {
       auto &tmpAlloc = shaderCtx.getTempVariableAllocator();
       tmpAlloc.stateSet(context.getTempVariableAllocator());
 
+      for (auto &global : definitions.globals) {
+        auto remappedName = globalVariableRemapping.find(global.first);
+        if (remappedName != globalVariableRemapping.end()) {
+          std::string str{remappedName->second};
+          shaderCtx.globals.variables.emplace(str, VariableInfo{global.second, false});
+          shaderCtx.globals.mapUniqueVariableName(str, str);
+        } else {
+          std::string str{global.first};
+          shaderCtx.globals.variables.emplace(str, VariableInfo{global.second, false});
+          shaderCtx.globals.mapUniqueVariableName(str, str);
+        }
+      }
+
       for (ShardPtr shard : shards) {
         shaderCtx.processShard(shard);
       }
@@ -108,7 +122,7 @@ struct DynamicBlockFromShards : public blocks::Block {
 };
 
 void applyShaderEntryPoint(SHContext *context, shader::EntryPoint &entryPoint, const SHVar &input,
-                           const VariableMap &composeWithVariables, const VariableRemapping& globalVariableRemapping) {
+                           const VariableMap &composeWithVariables, const VariableRemapping &globalVariableRemapping) {
   checkType(input.valueType, SHType::Seq, ":Shaders EntryPoint");
 
   // Check input type is a shard sequence
