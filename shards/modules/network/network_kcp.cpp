@@ -302,19 +302,29 @@ struct KCPServer : public Server {
   std::unordered_map<udp::endpoint, KCPPeer *> _end2Peer;
   std::unordered_map<const SHWire *, KCPPeer *> _wire2Peer;
 
-  std::unordered_set<int64_t> _blacklist;
+  std::unordered_set<int64_t> _list;
 
-  void broadcast(boost::span<const uint8_t> data, const SHVar &exclude) {
-    if (exclude.valueType == SHType::Seq) {
-      _blacklist.clear();
+  void broadcast(boost::span<const uint8_t> data, const SHVar &nodes, bool include) {
+    if (nodes.valueType == SHType::Seq) {
+      _list.clear();
 
-      for (auto &excluded : exclude) {
-        _blacklist.insert(excluded.payload.intValue);
+      for (auto &included : nodes) {
+        _list.insert(included.payload.intValue);
       }
 
-      for (auto &[end, peer] : _end2Peer) {
-        if (_blacklist.find(peer->getId()) == _blacklist.end()) {
-          peer->send(data);
+      if (!include) {
+        // excluding
+        for (auto &[end, peer] : _end2Peer) {
+          if (_list.find(peer->getId()) == _list.end()) {
+            peer->send(data);
+          }
+        }
+      } else {
+        // including
+        for (auto &[end, peer] : _end2Peer) {
+          if (_list.find(peer->getId()) != _list.end()) {
+            peer->send(data);
+          }
         }
       }
     } else {

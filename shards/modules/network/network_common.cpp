@@ -86,7 +86,8 @@ struct Broadcast {
 
   PARAM_PARAMVAR(_server, "Server", "The server to send the input to.", {Types::ServerVar});
   PARAM_PARAMVAR(_exclude, "Exclude", "The list of Peer IDs to exclude from the broadcast.", {CoreInfo::IntVarSeqType, CoreInfo::IntSeqType, CoreInfo::NoneType});
-  PARAM_IMPL(PARAM_IMPL_FOR(_server), PARAM_IMPL_FOR(_exclude));
+  PARAM_PARAMVAR(_include, "Include", "The list of Peer IDs to include in the broadcast. If set, only these peers will receive the broadcast.", {CoreInfo::IntVarSeqType, CoreInfo::IntSeqType, CoreInfo::NoneType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_server), PARAM_IMPL_FOR(_exclude), PARAM_IMPL_FOR(_include));
 
   Broadcast() {
     _server = Var("Network.Server");
@@ -106,7 +107,11 @@ struct Broadcast {
 
   SHVar activate(SHContext *context, const SHVar &input) {
     auto &server = getServer();
-    server.broadcastVar(input, _exclude.get());
+    if (_include.get().valueType != SHType::None) {
+      server.broadcastVar(input, _include.get(), true);
+    } else {
+      server.broadcastVar(input, _exclude.get(), false);
+    }
     return input;
   }
 };
