@@ -90,25 +90,21 @@ fn importanceSampleLambert(uv: vec2<f32>) -> ImportanceSample {
   return result;
 }
 
-fn normalDistributionGGX(nDotH: f32, roughness: f32) -> f32 {
-  let roughnessSq = roughness * roughness;
-  let f = (nDotH * nDotH) * (roughnessSq - 1.0) + 1.0;
-  return roughnessSq / (PI * f * f);
-}
-
 fn importanceSampleGGX(uv: vec2<f32>, roughness: f32) -> ImportanceSample {
   var result: ImportanceSample;
-  let roughnessSq = roughness * roughness;
-  let phi = PI2 * uv.x;
-  let cosTheta = sqrt((1.0 - uv.y) / (1.0 + (roughnessSq * roughnessSq - 1.0) * uv.y));
+  let alpha = roughness * roughness;
+  let cosTheta = sqrt((1.0 - uv.y) / (1.0 + (alpha * alpha - 1.0) * uv.y));
   let sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+  let phi = PI2 * uv.x;
 
-  result.pdf = normalDistributionGGX(cosTheta, roughness * roughness);
+  let a = cosTheta * alpha;
+  let k = alpha / (1.0 - cosTheta * cosTheta + a * a);
+  result.pdf = k * k * (1.0 / PI) / 4.0;
   result.localDirection = localHemisphereDirectionHelper(cosTheta, sinTheta, phi);
   return result;
 }
 
-fn visibilitySmithGGXCorrelated(nDotL: f32, nDotV: f32, roughness: f32) -> f32 {
+fn visibilitySmithGGXCorrelated(nDotV: f32, nDotL: f32, roughness: f32) -> f32 {
   let roughness4 = pow(roughness, 4.0);
   let GGXV = nDotL * sqrt(nDotV * nDotV * (1.0 - roughness4) + roughness4);
   let GGXL = nDotV * sqrt(nDotL * nDotL * (1.0 - roughness4) + roughness4);
@@ -150,10 +146,6 @@ fn visiblitySheen(nDotL: f32, nDotV: f32, sheenRoughness_: f32) -> f32 {
   return clamp(1.0 / ((1.0 + lambdaSheen(nDotV, alphaG) + lambdaSheen(nDotL, alphaG)) * (4.0 * nDotV * nDotL)), 0.0, 1.0);
 }
 
-fn fresnelSchlick(f0: vec3<f32>, f90: vec3<f32>, nDotV: f32) -> vec3<f32> {
-  return f0 + (f90 - f0) * pow(clamp(1.0 - nDotV, 0.0, 1.0), 5.0);
-}
-
 fn getIBLRadianceGGX(ggxSample: vec3<f32>, ggxLUT: vec2<f32>, fresnelColor: vec3<f32>, specularWeight: f32) -> vec3<f32> {
   let FssEss = fresnelColor * ggxLUT.x + ggxLUT.y;
   return specularWeight * ggxSample * FssEss;
@@ -182,6 +174,7 @@ fn getDefaultMaterialInfo() -> MaterialInfo {
   var material: MaterialInfo;
   material.baseColor = vec3<f32>(f32(1), f32(1), f32(1));
   material.ior = 1.5;
+  // The default index of refraction of 1.5 yields a dielectric normal incidence reflectance of 0.04.
   material.specularColor0 = vec3<f32>(0.04);
   material.specularWeight = 1.0;
   return material;
@@ -220,27 +213,30 @@ fn computeEnvironmentLighting(material_: MaterialInfo,
   envGGX: texture_cube<f32>,
   envGGXSampler: sampler,
   ggxLUT: texture_2d<f32>,
-  ggxLUTSampler: sampler) -> vec3<f32> {
+  ggxLUTSampler: sampler,
+  intensity: f32) -> vec3<f32> {
   var material = material_;
   let viewDir = params.viewDirection;
-  let reflDir = reflect(-viewDir, params.surfaceNormal);
+  let reflDir = -reflect(viewDir, params.surfaceNormal);
   let nDotV = dot(viewDir, params.surfaceNormal);
 
-  let roughness = material.perceptualRoughness * material.perceptualRoughness;
-  let reflectance = max(max(material.specularColor0.r, material.specularColor0.g), material.specularColor0.b);
+  let roughness = material.perceptualRoughness;
 
   let numMipLevels = f32(textureNumLevels(envGGX));
   let ggxLUTSample = textureSample(ggxLUT, ggxLUTSampler, vec2<f32>(nDotV, roughness)).xy;
-  let ggxSample = sampleEnvironmentLod(envGGX, envGGXSampler, reflDir, numMipLevels * material.perceptualRoughness);
+  let ggxSample = sampleEnvironmentLod(envGGX, envGGXSampler, reflDir, (numMipLevels-1.0) * material.perceptualRoughness);
   let lambertianSample = sampleEnvironmentLod(envLambert, envLambertSampler, params.surfaceNormal, 0.0);
 
-  let specularColor90 = max(vec3<f32>(1.0 - roughness), material.specularColor0);
-  let fresnelColor = fresnelSchlick(material.specularColor0, specularColor90, nDotV);
+  let f0 = material.specularColor0;
+  let f90 = max(vec3<f32>(1.0 - roughness), material.specularColor0);
+
+  let fr = max(vec3(1.0 - roughness), f0) - f0;
+  let fresnelColor = f0 + fr * pow(1.0 - nDotV, 5.0);
 
   let specularLight = getIBLRadianceGGX(ggxSample, ggxLUTSample, fresnelColor, material.specularWeight);
   let diffuseLight = getIBLRadianceLambertian(lambertianSample, ggxLUTSample, fresnelColor, material.diffuseColor, material.specularColor0, material.specularWeight);
 
-  return specularLight + diffuseLight;
+  return specularLight + diffuseLight * intensity;
 }
 
 fn getWeightedLod(pdf: f32, num_samples: i32, texture: texture_cube<f32>) -> f32 {
@@ -296,7 +292,7 @@ fn computeLUT(in: vec2<f32>, numSamples:i32) -> vec2<f32> {
     let vDotH = dot(localViewDir, sampleNormal);
 
     if(nDotL > 0.0) {
-      let pdf = visibilitySmithGGXCorrelated(nDotL, nDotV, roughness) * vDotH * nDotL / nDotH;
+      let pdf = visibilitySmithGGXCorrelated(nDotV, nDotL, roughness) * vDotH * nDotL / nDotH;
       let fc = pow(1.0 - vDotH, 5.0);
       result.x = result.x + (1.0 - fc) * pdf;
       result.y = result.y + fc * pdf;
@@ -317,11 +313,17 @@ fn ggx(roughness: f32, mci: IntegrateInput) -> IntegrateOutput {
 
   // Use N = V for precomputed map
   let localViewDir = vec3(0.0, 0.0, 1.0);
-  let localLightDir = reflect(localViewDir, result.localDirection);
+  let localLightDir = reflect(-localViewDir, result.localDirection);
   let nDotL = dot(localLightDir, result.localDirection);
 
-  result.sampleWeight = nDotL;
-  result.sampleScale = nDotL;
+  if(nDotL < 0.0) {
+    result.sampleWeight = 0.0;
+    result.sampleScale = 0.0;
+  } else 
+  {
+    result.sampleWeight = nDotL;
+    result.sampleScale = nDotL;
+  }
 
   return result;
 }

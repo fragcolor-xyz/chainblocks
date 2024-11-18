@@ -145,7 +145,7 @@ struct BinaryBase : public Base {
         }
       }
       if (!variableFound)
-        throw ComposeError(fmt::format("Operand variable {} not found", SHSTRVIEW(operandSpec)));
+        throw ComposeError(fmt::format("Operand variable \"{}\" not found", SHSTRVIEW(operandSpec)));
     } else {
       _opType = validator.validateTypes(data.inputType, operandSpec.valueType, resultType);
     }

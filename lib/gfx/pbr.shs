@@ -1,6 +1,7 @@
 @include("cubemap-utils.shs" Once: true)
 @define(pbr-wgsl @read("pbr.wgsl"))
 
+
 @template(shader-integrate [texture sampler base-dir body num-samples args] {
   Shader.Literal(
     Type: ShaderLiteralType::Header
@@ -8,21 +9,21 @@
       "fn integrate(args: vec4<f32>, baseDir: vec3<f32>, _texture: texture_cube<f32>, _sampler: sampler) -> vec3<f32> {
         let tbn = generateFrameFromZDirection(baseDir);
         var weight = 0.0;
-        var result = vec3<f32>(0.0);" "
+        var result = vec3<f32>(0.0);
         var sampleIndex = 0;
         loop {
             if(sampleIndex >= " num-samples ") {
             break;
-            }" "
+            }
             var mci: IntegrateInput;
             mci.baseDirection = baseDir;
             mci.coord = hammersley2d(sampleIndex, " num-samples ");
             let mco = " body ";
-            let lod = getWeightedLod(mco.pdf, " num-samples ", _texture);" "
+            let lod = getWeightedLod(mco.pdf, " num-samples ", _texture);
             let direction = tbn * mco.localDirection;
-            let s = sampleEnvironmentLod(_texture, _sampler, direction, lod);" "
+            let s = sampleEnvironmentLod(_texture, _sampler, direction, lod);
             result = result + s * mco.sampleScale;
-            weight = weight + mco.sampleWeight;" "
+            weight = weight + mco.sampleWeight;
             sampleIndex = sampleIndex + 1;
         }
         return result / weight;
@@ -35,8 +36,9 @@
 @template(compute-specular-lut [out-texture] {
   Msg("Computing specular split-sum LUT")
   GFX.EffectPass(
+    ComposeWith: {"gfx-pbr/shader-src": @pbr-wgsl}
     EntryPoint: {
-      Shader.Literal(Type: ShaderLiteralType::Header Source: @pbr-wgsl)
+      Shader.Literal(Type: ShaderLiteralType::Header Source: gfx-pbr/shader-src)
       Shader.ReadInput("texCoord0") >= uv
       Shader.Literal(OutputDimension: 2 Source: ["computeLUT(" uv ", 1024)"])
       ToFloat2 | Shader.WriteOutput("color")
@@ -61,7 +63,7 @@
 })
 
 @template(compute-integrated-specular-fs [] {
-  Shader.Literal(Type: ShaderLiteralType::Header Source: @pbr-wgsl)
+  Shader.Literal(Type: ShaderLiteralType::Header Source: gfx-pbr/shader-src)
   Shader.ReadInput("worldNormal") >= world-normal
   Shader.RefTexture("source") = source-texture
   Shader.RefSampler("source") = source-sampler
@@ -71,12 +73,12 @@
 })
 
 @template(compute-integrated-lambert-fs [] {
-  Shader.Literal(Type: ShaderLiteralType::Header Source: @pbr-wgsl)
+  Shader.Literal(Type: ShaderLiteralType::Header Source: gfx-pbr/shader-src)
   Shader.ReadInput("worldNormal") >= world-normal
   Shader.RefTexture("source") = source-texture
   Shader.RefSampler("source") = source-sampler
   1.0 | ToFloat4 = args
-  @shader-integrate(source-texture source-sampler world-normal "lambert(mci)" "256" args)
+  @shader-integrate(source-texture source-sampler world-normal "lambert(mci)" "2000" args)
   ToFloat4 | Math.Add(@f4(0 0 0 1)) | Shader.WriteOutput("color")
 })
 
@@ -86,13 +88,17 @@
   current-mip | ToFloat | Math.Divide(div) = roughness
   roughness | Log("Roughness")
   GFX.Feature(
-    Params: {source: in-texture roughness: roughness}
+    ; Params: {source: in-texture roughness: roughness}
+    ComposeWith: {"gfx-pbr/shader-src": @pbr-wgsl}
     Shaders: [{
         Stage: ProgrammableGraphicsStage::Fragment
         EntryPoint: {@compute-integrated-specular-fs()}
       }]
+    ViewGenerators: {
+      {source: in-texture roughness: roughness}
+    }
   ) = filter-feature
-  @filter-cubemap(filter-feature out-texture current-mip {})
+  @gfx/filter-cubemap(filter-feature out-texture current-mip {})
   current-mip | Log("Done")
   
   Pause(#(1.0 | Math.Divide(60.0)))
@@ -101,19 +107,22 @@
 @template(compute-integrated-lambert [in-texture out-texture] {
   Msg("Computing integrated lambert")
   GFX.Feature(
-    Params: {source: in-texture}
+    ComposeWith: {"gfx-pbr/shader-src": @pbr-wgsl}
     Shaders: [{
         Stage: ProgrammableGraphicsStage::Fragment
         EntryPoint: {@compute-integrated-lambert-fs()}
       }]
+    ViewGenerators: {
+      {source: in-texture}
+    }
   ) = filter-feature
-  @filter-cubemap(filter-feature out-texture 0 {})
+  @gfx/filter-cubemap(filter-feature out-texture 0 {})
 })
 
 @template(generate-probes [probe-inner-steps probe-offset] {
   Msg("Generating pre-rendered PBR textures")
   GFX.Texture(Format: TextureFormat::RGBA8UnormSrgb Resolution: @i2(512) Dimension: TextureDimension::Cube) = baked-input-tex
-  @render-cubemap-0(probe-inner-steps baked-input-tex probe-offset)
+  @gfx/render-cubemap-0(probe-inner-steps baked-input-tex probe-offset)
   
   ; Precompute reflective
   @i2(256) = size
@@ -125,13 +134,13 @@
   ForRange(1 num-mips {>> mip-seq})
   
   GFX.Texture(Format: TextureFormat::RGBA8UnormSrgb Resolution: size MipLevels: num-mips Dimension: TextureDimension::Cube) = cube-tex
-  mip-seq | DoMany({
+  mip-seq | ForEach({
     Math.Subtract(1) = current-mip
     @compute-integrated-specular-mip(current-mip num-mips baked-input-tex cube-tex)
   })
   
   ; Precompute lambertian
-  @i2(256) = size-1
+  @i2(128) = size-1
   GFX.Texture(Format: TextureFormat::RGBA8UnormSrgb Resolution: size-1 Dimension: TextureDimension::Cube) = cube-tex-2
   
   @compute-integrated-lambert(baked-input-tex cube-tex-2)
@@ -140,75 +149,81 @@
   {lambert: cube-tex-2 ggx: cube-tex ggxLUT: ggx-lut}
 })
 
-@template(pbr-main-shader [] {
-  Shader.ReadBuffer("invView" BufferName: "view") >= camera-matrix
-  Shader.Literal([camera-matrix "[3].xyz"] OutputDimension: 3) >= eye-pos
-  Shader.ReadInput("worldPosition") >= world-position
-  eye-pos | Math.Subtract(world-position) | Math.Normalize >= view-direction
-  
-  Shader.ReadBuffer("roughness") >= roughness
-  Shader.ReadBuffer("metallic") >= metallic
-  Shader.ReadGlobal("color") >= base-color
-  
-  Shader.Literal(Type: ShaderLiteralType::Header Source: @pbr-wgsl)
-  Shader.RefTexture("lambert") = lambert-texture
-  Shader.RefSampler("lambert") = lambert-sampler
-  Shader.RefTexture("ggx") = ggx-texture
-  Shader.RefSampler("ggx") = ggx-sampler
-  Shader.RefTexture("ggxLUT") = ggx-lut-texture
-  Shader.RefSampler("ggxLUT") = ggx-lut-sampler
-  
-  ; Apply metallic-roughness texture
-  ; glTF Spec:
-  ; The metalness values are sampled from the B channel. The roughness values are sampled from the G channel.
-  Shader.SampleTexture("metallicRoughnessTexture") = metallic-roughness
-  metallic-roughness:2 | Math.Multiply(metallic) > metallic
-  metallic-roughness:1 | Math.Multiply(roughness) > roughness
-  
-  @f3(0.0) >= emissive-color
-  Shader.WithTexture("emissiveTexture" {
-    Shader.SampleTexture("emissiveTexture") | ToFloat3 > emissive-color
-  })
-  
-  
-  ; Apply normal map
-  ; glTF Spec:
-  ; The normal vectors use the convention +X is right and +Y is up. +Z points toward the viewer.
-  ; The scalar parameter applied to each normal vector of the texture.
-  ; This value scales the normal vector in X and Y directions using the formula: 
-  ; scaledNormal =  normalize((<sampled normal texture value> * 2.0 - 1.0) * vec3(<normal scale>, <normal scale>, 1.0))
-  Shader.ReadBuffer("normalScale") = normal-scale
-  @f3(normal-scale normal-scale 1.0) = normal-scale-3
-  Shader.SampleTexture("normalTexture") | ToFloat3
-  Math.Multiply(@f3(2.0 2.0 1.0))
-  Math.Subtract(@f3(1 1 0))
-  Math.Multiply(normal-scale-3) | Math.Normalize = local-normal
-  
-  Shader.ReadInput("worldNormal") >= world-normal
-  Shader.ReadInput("worldTangent") = world-tangent
-  Shader.ReadInput("biTangentSign") = bi-tangent-sign
-  
-  Shader.ReadBuffer("world") = world-mat
-  Shader.Literal(["var biTangent = normalize(cross(" world-normal "," world-tangent ") * " bi-tangent-sign ");"
-                  "var tbnMat = mat3x3<f32>(" world-tangent ", biTangent ," world-normal ");"
-                  world-normal " = normalize((tbnMat * " local-normal ").xyz);"])
-  
-  Shader.Literal(["var lgp: LightingGeneralParams;
-                    lgp.surfaceNormal = " world-normal ";
-                    lgp.viewDirection = " view-direction ";"])
-  
-  Shader.Literal(["var mi = getDefaultMaterialInfo();
+@define(pbr-main-shader {
+  Stage: ProgrammableGraphicsStage::Fragment
+  After: ["initLighting" "readColor"]
+  Before: ["applyLighting"]
+  EntryPoint: {
+    Shader.ReadBuffer("invView" BufferName: "view") >= camera-matrix
+    Shader.Literal([camera-matrix "[3].xyz"] OutputDimension: 3) >= eye-pos
+    Shader.ReadInput("worldPosition") >= world-position
+    eye-pos | Math.Subtract(world-position) | Math.Normalize >= view-direction
+    
+    Shader.ReadBuffer("roughness") >= roughness
+    Shader.ReadBuffer("metallic") >= metallic
+    Shader.ReadGlobal("color") | ToFloat3 >= base-color
+    
+    Shader.Literal(Type: ShaderLiteralType::Header Source: gfx-pbr/shader-src)
+    Shader.RefTexture("lambert") = lambert-texture
+    Shader.RefSampler("lambert") = lambert-sampler
+    Shader.RefTexture("ggx") = ggx-texture
+    Shader.RefSampler("ggx") = ggx-sampler
+    Shader.RefTexture("ggxLUT") = ggx-lut-texture
+    Shader.RefSampler("ggxLUT") = ggx-lut-sampler
+    
+    ; Apply metallic-roughness texture
+    ; glTF Spec:
+    ; The metalness values are sampled from the B channel. The roughness values are sampled from the G channel.
+    Shader.SampleTexture("metallicRoughnessTexture") = metallic-roughness
+    metallic-roughness:2 | Math.Multiply(metallic) > metallic
+    metallic-roughness:1 | Math.Multiply(roughness) > roughness
+    
+    ; Apply normal map
+    ; glTF Spec:
+    ; The normal vectors use the convention +X is right and +Y is up. +Z points toward the viewer.
+    ; The scalar parameter applied to each normal vector of the texture.
+    ; This value scales the normal vector in X and Y directions using the formula: 
+    ; scaledNormal =  normalize((<sampled normal texture value> * 2.0 - 1.0) * vec3(<normal scale>, <normal scale>, 1.0))
+    Shader.ReadBuffer("normalScale") = normal-scale
+    @f3(normal-scale normal-scale 1.0) = normal-scale-3
+    Shader.SampleTexture("normalTexture") | ToFloat3
+    Math.Multiply(@f3(2.0 2.0 1.0))
+    Math.Subtract(@f3(1 1 0))
+    Math.Multiply(normal-scale-3) | Math.Normalize = local-normal
+    
+    ; @f3(0 0 1.0) >= local-normal
+    
+    Shader.ReadInput("worldNormal") >= world-normal
+    Shader.ReadInput("worldTangent") = world-tangent
+    Shader.ReadInput("biTangentSign") = bi-tangent-sign
+    
+    Shader.ReadBuffer("world") = world-mat
+    Shader.Literal([
+      "var biTangent = normalize(cross(" world-normal "," world-tangent ") * " bi-tangent-sign ");"
+      "var tbnMat = mat3x3<f32>(" world-tangent ", biTangent ," world-normal ");"
+      "let ln = " local-normal ";"
+      world-normal "= normalize(ln.x * " world-tangent " + ln.y * biTangent + ln.z * " world-normal ");"
+    ])
+    
+    Shader.Literal(["var lgp: LightingGeneralParams;"
+                    "lgp.surfaceNormal = " world-normal ";"
+                    "lgp.viewDirection = " view-direction ";"])
+    
+    Shader.Literal(["var mi = getDefaultMaterialInfo();
                     mi.baseColor = (" base-color ").xyz;
                     materialSetMetallicRoughness(&mi, " metallic ", " roughness ");
                     "])
-  
-  Shader.Literal(["computeEnvironmentLighting(mi, lgp, "
-                  lambert-texture "," lambert-sampler ","
-                  ggx-texture "," ggx-sampler ","
-                  ggx-lut-texture "," ggx-lut-sampler ")"] OutputDimension: 3) >= light-color
-  
-  light-color | Math.Add(emissive-color)
-  ToFloat4 | Math.Add(@f4(0 0 0 1)) | Shader.WriteOutput("color")
+    
+    Shader.ReadBuffer("iblIntensity") = ibl-intensity
+    
+    Shader.Literal(["computeEnvironmentLighting(mi, lgp, "
+                    lambert-texture "," lambert-sampler ","
+                    ggx-texture "," ggx-sampler ","
+                    ggx-lut-texture "," ggx-lut-sampler "," ibl-intensity ")"] OutputDimension: 3) >= light-color
+    
+    Shader.ReadGlobal("lighting") | Math.Add(light-color) | Shader.WriteGlobal("lighting")
+    ; base-color | Shader.WriteGlobal("lighting")
+  }
 })
 
 @template(setup-pbr-feature [pbr-probes] {
@@ -219,45 +234,42 @@
     @f4(0.5 0.5 1 0) = init-n
     [init-n init-n init-n init-n] | Flatten | FloatsToImage(2 2 4)
     GFX.Texture(InterpretAs: TextureType::UNorm) = normal-placeholder-texture
-    
-    @f4(0 0 0 0) = init-0
-    [init-0 init-0 init-0 init-0] | Flatten | FloatsToImage(2 2 4)
-    GFX.Texture = zero-placeholder-texture
+    @fbl/placeholder-texture-2(@f4(0.0)) = zero-placeholder-texture
   })
   
   normal-placeholder-texture | Set(parameters "normalTexture")
   {Type: TextureDimension::D2} | Set(parameters "metallicRoughnessTexture")
   zero-placeholder-texture | Set(parameters "emissiveTexture")
   1.0 | Set(parameters "normalScale")
-  
+
   GFX.Feature(
     Params: parameters
     RequiredAttributes: [RequiredAttributes::Tangent]
+    ComposeWith: {"gfx-pbr/shader-src": @pbr-wgsl}
     Shaders: [
-      {
-        Stage: ProgrammableGraphicsStage::Fragment
-        After: ["writeColor"]
-        EntryPoint: {
-          @pbr-main-shader()
-        }
-      }]
+      @pbr-main-shader ;
+    ]
+    ViewGenerators: {
+      {iblIntensity: ibl-intensity}
+    }
   )
 })
 
 @template(render-pbr-base [capture-steps probe-location hash-in out-features] {
+  Sequence(last-features Type: @type([@type(GFX.Feature)]) Clear: false)
+
   @wire(update-probes {
     [probe-location hash-in] | Memoize({
       @generate-probes(capture-steps probe-location)
+      Log("got probes")
     }) = pbr-probes
+    
+    Clear(last-features)
     @setup-pbr-feature(pbr-probes)
+    >> last-features 
   } Looped: true)
-  Step(update-probes) = out 
+  Step(update-probes)
   
-  Sequence(last-features Type: @type([@type(GFX.Feature)]) Clear: false)
-  Maybe({
-    out | Expect(@type(GFX.Feature))
-    {Clear(last-features)} >> last-features
-  } Silent: true)
   last-features | ForEach({
     >> out-features
   })
