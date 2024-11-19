@@ -28,8 +28,15 @@ void TranslationContext::processShard(ShardPtr shard) {
   if (!handler) {
     throw ShaderComposeError(fmt::format("No shader translation available for shard {}", shard->name(shard)), shard);
   }
-
-  handler->translate(shard, *this);
+  try {
+    handler->translate(shard, *this);
+  } catch (ShaderComposeError &e) {
+    if (!e.shard)
+      e.shard = shard;
+    throw e;
+  } catch (std::exception &ex) {
+    throw ShaderComposeError(ex.what(), shard);
+  }
 }
 
 void TranslationContext::finalize() {
@@ -211,7 +218,7 @@ WGSLBlock TranslationContext::assignVariable(const std::string &varName, bool gl
   Type valueType = value->getType();
 
   auto updateStorage = [&](VariableStorage &storage, const std::string &varName, const Type &fieldType,
-                           bool forceNewVariable = false) {
+                           bool forceNewVariable = false, bool mapUniquely = true) {
     const std::string *outVariableName{};
 
     auto &variables = storage.variables;
@@ -223,8 +230,12 @@ WGSLBlock TranslationContext::assignVariable(const std::string &varName, bool gl
     if (forceNewVariable || it == variables.end()) {
       variables.insert_or_assign(varName, fieldType);
 
-      auto tmpName = getUniqueVariableName(varName);
-      outVariableName = &storage.mapUniqueVariableName(varName, tmpName);
+      if (mapUniquely) {
+        auto tmpName = getUniqueVariableName(varName);
+        outVariableName = &storage.mapUniqueVariableName(varName, tmpName);
+      } else {
+        outVariableName = &storage.mapUniqueVariableName(varName, varName);
+      }
     } else {
       if (allowUpdate) {
         if (it->second.type != value->getType()) {
@@ -243,17 +254,17 @@ WGSLBlock TranslationContext::assignVariable(const std::string &varName, bool gl
 
   if (global) {
     // Store global variable type info & check update
-    const std::string &uniqueVariableName = updateStorage(globals, varName, valueType);
+    const std::string &variableName = updateStorage(globals, varName, valueType, false, false);
 
     const NumType *numType = std::get_if<NumType>(&valueType);
     if (!numType)
       throw ShaderComposeError(fmt::format("Can not assign {} globally, unsupported type: {}", varName, valueType));
 
     // Generate a shader source block containing the assignment
-    addNew(blocks::makeBlock<blocks::WriteGlobal>(uniqueVariableName, *numType, value->toBlock()));
+    addNew(blocks::makeBlock<blocks::WriteGlobal>(variableName, *numType, value->toBlock()));
 
     // Push reference to assigned value
-    return WGSLBlock(valueType, blocks::makeBlock<blocks::ReadGlobal>(uniqueVariableName));
+    return WGSLBlock(valueType, blocks::makeBlock<blocks::ReadGlobal>(variableName));
   } else {
     TranslationBlockRef *parent{};
     bool isNewVariable = true;
@@ -360,6 +371,7 @@ WGSLBlock TranslationContext::reference(const std::string &varName) {
 
   auto foundVariable = findVariable(varName);
   if (!foundVariable) {
+    findVariable(varName);
     throw ShaderComposeError(fmt::format("Can not get/ref: Variable {} does not exist here", varName));
   }
 

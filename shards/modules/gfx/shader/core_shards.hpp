@@ -122,7 +122,7 @@ struct UpdateTranslator {
 
     std::unique_ptr<IWGSLGenerated> wgslValue = context.takeWGSLTop();
 
-    WGSLBlock reference = context.assignVariable(varName, shard->_global, true, true, std::move(wgslValue));
+    WGSLBlock reference = context.assignVariable(varName, shard->_isGlobal, true, true, std::move(wgslValue));
     context.setWGSLTop<WGSLBlock>(std::move(reference));
   }
 };

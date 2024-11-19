@@ -1,0 +1,75 @@
+@define(fbl/shader-0 {
+  Name: "initLighting"
+  Stage: ProgrammableGraphicsStage::Fragment
+  EntryPoint: {
+    @f3(1.0 1.0 1.0) | Set(lighting Global: true)
+    @f4(0.1) | Shader.WriteGlobal("color")
+    0.2 | Set(fbl/namespaced-var Global: true)
+  }
+})
+@define(shader-1 {
+  Name: "applyLighting"
+  After: ["initLighting"]
+  Before: ["writeColor"]
+  Stage: ProgrammableGraphicsStage::Fragment
+  EntryPoint: {
+    fbl/namespaced-var | Add(0.1) = f
+    Shader.ReadGlobal("lighting") | Mul(@f3(0.7 0.4 0.2)) = l2
+    lighting | Mul(@f3(0.1 0.1 0.7)) = l3
+    @f3(f) | Sub(l3) | Add(l2) | ToFloat4 | Add(color) > color
+  }
+})
+@define(shards/shader-2 {
+  Name: "writeColor"
+  Stage: ProgrammableGraphicsStage::Fragment
+  EntryPoint: {
+    color | Shader.WriteOutput("color")
+  }
+})
+
+@wire(update-cube-transform {
+  @f3(0.25) | Math.Scaling >= transform
+  time | Math.Cos | Math.Multiply(10.0) | Math.DegreesToRadians | Math.AxisAngleZ | Math.Rotation >= rmat-0
+  time | Math.Multiply(0.8) | Math.Cos | Math.Multiply(3.0) | Math.DegreesToRadians | Math.AxisAngleY | Math.Rotation >= rmat-1
+  rmat-1 | Math.MatMul(rmat-0) | Math.MatMul(transform)
+})
+
+@wire(gfx {
+  Animation.Timer = time
+  
+  Once({
+    {Position: @f3(0.0 1.0 0.0) Target: @f3(0.0)} | Math.LookAt >= view-transform
+    GFX.View(view-transform) >= view
+    
+    GFX.BuiltinMesh(Type: BuiltinMeshType::Cube) >= cube
+    
+    Do(update-cube-transform)
+  })
+  
+  GFX.BuiltinFeature(Id: BuiltinFeatureId::Transform) >> features
+  GFX.Feature(Shaders:
+    [
+      @fbl/shader-0
+      @shader-1
+      @shards/shader-2]
+    ViewGenerators: {
+      {time: time}
+    }
+  ) >> features
+  
+  GFX.DrawQueue >= queue
+  GFX.DrawablePass(Features: features Queue: queue) >> render-steps
+  
+  Do(update-cube-transform)
+  GFX.Drawable(Mesh: cube) | GFX.Draw(queue)
+  GFX.Render(Steps: render-steps View: view)
+} Looped: true)
+
+
+@wire(test-wire {
+  GFX.MainWindow(Title: "Shards Window" Width: 1280 Height: 720 Contents: {Step(gfx)})
+} Looped: true)
+
+@mesh(root)
+@schedule(root test-wire)
+@run(root FPS: 120 Iterations: 200) | Assert.Is(true)

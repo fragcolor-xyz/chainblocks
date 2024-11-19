@@ -1,5 +1,16 @@
+@include("../../lib/gfx/fbl-shared.shs")
 @include("../../lib/gfx/atmosphere.shs")
 @include("../../lib/gfx/pbr.shs")
+
+@template(texture-sky-fs [] {
+  Shader.ReadInput("texCoord0")
+  Shader.SampleTextureCoord("sky")
+  @fbl/float4-with-alpha(1.0)
+  Shader.WriteOutput("color")
+  
+  1.0 | Shader.WriteOutput("depth")
+})
+
 
 @template(sphere-map-pass [texture] {
   Once({
@@ -7,12 +18,12 @@
     GFX.Feature(
       Params: {sky: texture}
       Shaders: [
-        {Stage: ProgrammableGraphicsStage::Vertex EntryPoint: {@sky-sphere-vs()} After: ["initScreenPosition"] Before: ["writePosition"]}
-        {Stage: ProgrammableGraphicsStage::Fragment EntryPoint: {@sky-sphere-fs()}}]
+        {Stage: ProgrammableGraphicsStage::Vertex EntryPoint: {@gfx/sky-sphere-vs()} After: ["initScreenPosition"] Before: ["writePosition"]}
+        {Stage: ProgrammableGraphicsStage::Fragment EntryPoint: {@texture-sky-fs()}}]
       State: {FlipFrontFace: true DepthWrite: false DepthCompare: CompareFunction::LessEqual}
     ) >> sky-sphere-features
   })
-  @render-sky-sphere-queue({}) = queue
+  @gfx/render-sky-sphere-queue({}) = queue
   GFX.DrawablePass(Queue: queue Features: sky-sphere-features)
 })
 
@@ -21,7 +32,7 @@
     GFX.DrawQueue >= ui-draw-queue
     GFX.UIPass(ui-draw-queue) = ui-step
   })
-
+  
   UI({
     UI.Window(
       Title: "Settings"
@@ -30,12 +41,14 @@
         When({use-procedural-skybox} {
           UI.Horizontal({"Light Color" | UI.Label | UI.Variable(light-color)})
           UI.Horizontal({"Light Direction" | UI.Label | UI.Variable(light-direction)})
+          UI.Horizontal({"Exposure" | UI.Label | UI.Variable(exposure)})
         })
+        UI.Horizontal({"ibl-intensity" | UI.Label | UI.Variable(ibl-intensity)})
       }
     )
   }) | UI.Render(ui-draw-queue)
-
-
+  
+  
   ui-step >> steps
 })
 
@@ -43,54 +56,60 @@
   GFX.MainWindow(Title: "PBR Demo" Width: 800 Height: 600 Contents: {
     Animation.Timer(Rate: 0.2) = t
     GFX.DrawQueue = queue
-
+    
     Once({
       GFX.BuiltinFeature(BuiltinFeatureId::Transform) >> base-features
       GFX.BuiltinFeature(BuiltinFeatureId::BaseColor) >> base-features
       base-features >= capture-features
+      GFX.Feature(Shaders: [
+        @fbl/init-lighting-shader
+        @fbl/apply-lighting-shader ;
+      ]) >> base-features
     })
-
+    
     Once({
-      @f3(1.0 1.0 1.0) >= light-color
+      @color(255) >= light-color
       @f3(0.5 1.0 0.5) >= light-direction
-      false >= use-procedural-skybox
+      true >= use-procedural-skybox
+      1.0 >= exposure
+      1.0 >= ibl-intensity
     })
-
+    
     If({use-procedural-skybox} {
         @setup-skybox-pass()
       } {
-        Once({ LoadImage("data/footprint_court.hdr") | GFX.Texture = sphere-map-texture })
+        Once({LoadImage("data/footprint_court.hdr") | GFX.Texture = sphere-map-texture})
         @sphere-map-pass(sphere-map-texture)
       }
     ) = skybox-step
-
+    
     5.0 = r
     t | Math.Cos | Math.Multiply(r) >= x
     t | Math.Sin | Math.Multiply(r) >= z
     t | Math.Multiply(0.4) | Math.Sin | Math.Multiply(2.0) >= y
-
+    
     {Target: @f3(0.0 0.0 0.0) Position: @f3(x y z)}
     Math.LookAt >= view-transform
-
+    
     90.0 | Math.DegreesToRadians | Math.AxisAngleX | Math.Rotation = rot-z
     @f3(0 0 0) | Math.Translation = tsl
     tsl | Math.MatMul(rot-z)
     GFX.glTF(Path: "../../external/glTF-Sample-Assets/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb") | GFX.Draw(queue)
-
+    
     GFX.View(view-transform) = view
-
+    
     ; PBR Step
     base-features >= features
     skybox-step >> capture-steps
-
-    @render-pbr-base(capture-steps @f3(0.0) [use-procedural-skybox light-color light-direction] features)
-
+    
+    @render-pbr-base(capture-steps @f3(0.0) [use-procedural-skybox light-color light-direction exposure] features)
+    
     GFX.DrawablePass(Queue: queue Features: features) >> steps
     skybox-step >> steps
-
+    
     ; Render UI
     Do(ui)
-
+    
     GFX.Render(steps view)
   })
 } Looped: true)

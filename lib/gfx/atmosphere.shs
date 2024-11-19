@@ -1,14 +1,15 @@
 @include("cubemap-utils.shs" Once: true)
-
 @define(atmosphere-wgsl @read("atmosphere.wgsl"))
+
+
 @template(precompute-sky-fs [] {
-  Shader.Literal(Type: ShaderLiteralType::Header Source: @atmosphere-wgsl)
+  Shader.Literal(Type: ShaderLiteralType::Header Source: gfx-internal/atmosphere)
   Shader.ReadInput("worldNormal") | Math.Normalize >= ray-dir
   @f3(0.0) >= ray-start
   9999999999999.0 >= ray-length
   
-  lightDir >= light-dir
-  lightColor >= light-color
+  gfx-internal/lightDir >= light-dir
+  gfx-internal/lightColor >= light-color
   
   Shader.Literal(["
   let _DrawPlanet = 0;
@@ -31,47 +32,54 @@
   1.0 | Shader.WriteOutput("depth")
 })
 
-@template(setup-skybox-pass [] {
-  @wire(precompute-sky {
-    Once({
-      GFX.Texture(
-        Format: TextureFormat::RGBA8UnormSrgb
-        Resolution: @i2(1024)
-        Dimension: TextureDimension::Cube
-      ) = sky-cube-tex
-    })
-    
-    light-direction | Math.Normalize = ldn
-    [ldn light-color] | Memoize({
-      Log("Recomputing skybox")
-      GFX.Feature(ComposeWith: {
-          lightDir: ldn
-          lightColor: light-color
-        }
-        Shaders: [
-          {Stage: ProgrammableGraphicsStage::Fragment
-           EntryPoint: {@precompute-sky-fs()}}]
-      ) = filter-feature
-      @filter-cubemap(filter-feature sky-cube-tex 0 {})
-      sky-cube-tex | Log("the sky cube tex")
-      {sky: sky-cube-tex}
-    })
-  } Looped: true)
+@template(gfx-atmosphere/precompute-sky [] {
+  Once({
+    GFX.Texture(
+      Format: TextureFormat::RGBA8UnormSrgb
+      Resolution: @i2(1024)
+      Dimension: TextureDimension::Cube
+    ) = sky-cube-tex
+  })
   
-  GFX.BuiltinFeature(Id: BuiltinFeatureId::Transform) >> sky-features
+  light-direction | Math.Normalize = ldn
+  @fbl/color-to-float4(light-color) | Math.Multiply(exposure) | ToFloat3 = lc
+  [ldn lc] | Memoize({
+    Log("Recomputing skybox")
+    GFX.Feature(ComposeWith: {
+        "gfx-internal/atmosphere": @atmosphere-wgsl
+        "gfx-internal/lightDir": ldn
+        "gfx-internal/lightColor": lc
+      }
+      Shaders: [
+        {Stage: ProgrammableGraphicsStage::Fragment
+         EntryPoint: {@precompute-sky-fs()}}]
+    ) = filter-feature
+    @gfx/filter-cubemap(filter-feature sky-cube-tex 0 {})
+    sky-cube-tex | Log("the sky cube tex")
+    {sky: sky-cube-tex}
+  })
+} Looped: true)
+
+@template(setup-skybox-feature [] {
   GFX.Feature(Shaders: [
       {Stage: ProgrammableGraphicsStage::Vertex
-       EntryPoint: {@sky-sphere-vs()}
+       EntryPoint: {@gfx/sky-sphere-vs()}
        After: ["initScreenPosition"]
        Before: ["writePosition"]}
       {Stage: ProgrammableGraphicsStage::Fragment
-       EntryPoint: {@sky-fs()}}]
+       EntryPoint: {@sky-fs()}
+       After: ["writeColor"]}]
     State: {FlipFrontFace: true DepthWrite: false DepthCompare: CompareFunction::LessEqual}
-    ViewGenerators: precompute-sky
-  ) >> sky-features
+    ViewGenerators: {@gfx-atmosphere/precompute-sky()}
+  )
+})
+
+@template(setup-skybox-pass [] {
+  GFX.BuiltinFeature(Id: BuiltinFeatureId::Transform) >> sky-features
+  @setup-skybox-feature() >> sky-features
   
   GFX.DrawablePass(
     Features: sky-features
-    Queue: (@render-sky-sphere-queue({}))
+    Queue: (@gfx/render-sky-sphere-queue({}))
   )
 })

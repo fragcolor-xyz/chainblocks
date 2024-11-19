@@ -3,7 +3,7 @@
 @wire(fail {
   Maybe({
     Table(player-table)
-    player-table | Update(player-table uuid)
+    player-table | Set(player-table uuid)
     player-table | Log("Hello")
   })
 

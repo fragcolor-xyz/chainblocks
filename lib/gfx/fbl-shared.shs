@@ -1,0 +1,249 @@
+; === BEGIN SHARDS COMMON ===
+
+@define(pi 3.141592653589)
+@define(pi2 #(@pi | Math.Multiply(2.0)))
+@define(pid2 #(@pi | Math.Divide(2.0)))
+
+@define(axis-x @f3(1.0 0.0 0.0))
+@define(axis-y @f3(0.0 1.0 0.0))
+@define(axis-z @f3(0.0 0.0 1.0))
+@define(axis-left @f3(-1.0 0.0 0.0))
+@define(axis-right @f3(1.0 0.0 0.0))
+@define(axis-up @f3(0.0 1.0 0.0))
+@define(axis-down @f3(0.0 -1.0 0.0))
+@define(axis-forward @f3(0.0 0.0 1.0))
+@define(axis-backward @f3(0.0 0.0 -1.0))
+
+@template(fbl/clamp [min max] {
+  If(IsLess(min) {min} {
+    If(IsMore(max) {max} {Pass})
+  })
+})
+
+@define(fbl/texture-type #(TypeOf({GFX.Texture(Format: TextureFormat::RGBA8UnormSrgb)})))
+@define(fbl/drawable-type #(TypeOf({
+    GFX.BuiltinMesh = tmp-mesh
+    Math.MatIdentity | GFX.Drawable(tmp-mesh)
+  })
+))
+@define(fbl/draw-queue-type #(TypeOf({GFX.DrawQueue})))
+@define(fbl/render-steps-type #(TypeOf({
+    GFX.EffectPass >> seq
+    seq
+  })
+))
+
+; https://chilliant.blogspot.com/2012/08/srgb-approximations-for-hlsl.html
+@template(fbl/srgb-to-linear3 [in] {
+  in = c
+  c | Math.Multiply(c) = c-sqr
+  c-sqr | Math.Multiply(c) = c-cube
+  
+  c | Math.Multiply(0.012522878)
+  Math.Add((c-sqr | Math.Multiply(0.682171111)))
+  Math.Add((c-cube | Math.Multiply(0.305306011)))
+})
+
+; Convert sRGB color to linear Float4
+@template(fbl/color-to-float4 [color] {
+  color | ToFloat4 | Math.Divide(255.0)
+  {Take(3) = a
+    @f4(0.0 0.0 0.0 a) = f4-a
+  }
+  ToFloat3 = c
+  @fbl/srgb-to-linear3(c) | ToFloat4 | Math.Add(f4-a)
+})
+
+@template(fbl/float4-with-alpha [alpha] {
+  {@f4(0.0 0.0 0.0 alpha) = f4-a}
+  ToFloat3 | ToFloat4 | Math.Add(f4-a)
+})
+
+@template(fbl/linear3-to-color-with-alpha [color alpha] {
+  color | ToFloat3 | Math.Sqrt = s1
+  Math.Sqrt = s2
+  Math.Sqrt = s3
+  s1 | Math.Multiply(0.585122381)
+  Math.Add((s2 | Math.Multiply(0.783140355)))
+  Math.Subtract((s3 | Math.Multiply(0.368262736)))
+  {Take(0) = r} {Take(1) = g} {Take(2) = b}
+  
+  @f4(r g b alpha)
+})
+
+@define(fbl/init-lighting-shader {
+  Name: "initLighting"
+  Stage: ProgrammableGraphicsStage::Fragment
+  EntryPoint: {
+    @f3(0.0) | Set(lighting Global: true)
+  }
+})
+
+@define(fbl/apply-lighting-shader {
+  After: ["initLighting"]
+  Name: "applyLighting"
+  Stage: ProgrammableGraphicsStage::Fragment
+  EntryPoint: {
+    Shader.ReadGlobal("color") | Take(3) = a
+    
+    @f3(0.0) >= emissive
+    Shader.WithTexture("emissiveTexture" {
+      Shader.SampleTexture("emissiveTexture") | ToFloat3 > emissive
+    })
+    
+    lighting | Add(emissive) | @fbl/float4-with-alpha(a) | Shader.WriteGlobal("color")
+  }
+  After: ["readColor"]
+  Before: ["writeColor"]
+})
+
+@define(fbl/shader-ambient-light {
+  Name: "ambient-lighting"
+  After: ["initLighting"]
+  Before: ["applyLighting"]
+  Stage: ProgrammableGraphicsStage::Fragment
+  EntryPoint: {
+    Shader.ReadBuffer("ambientLightColor") | ToFloat3 = ambient-light-color
+    Shader.ReadGlobal("color") | ToFloat3 = base-color
+    base-color | Math.Multiply(ambient-light-color) = lighting-tmp
+    lighting | Math.Add(lighting-tmp) > lighting
+  }
+})
+
+@define(fbl/shader-dir-light {
+  Name: "directional-lighting"
+  After: ["initLighting"]
+  Before: ["applyLighting"]
+  Stage: ProgrammableGraphicsStage::Fragment
+  EntryPoint: {
+    Shader.ReadInput("worldNormal") = normal
+    Shader.ReadBuffer("lightDirection") = light-dir
+    light-dir | Math.Negate = inv-light-dir
+    normal | Math.Normalize | Math.Dot(inv-light-dir) | Max(0.0) = n-dot-l
+    Shader.ReadBuffer("lightColor") | Math.Multiply(n-dot-l) >= lighting-tmp
+    Shader.ReadGlobal("color") | ToFloat3 = base-color
+    Shader.WithTexture("shadowTexture" {
+      Shader.ReadInput("worldPosition") | @fbl/float4-with-alpha(1.0) = world-pos-4
+      Shader.ReadBuffer("shadowViewProj") | Math.MatMul(world-pos-4) >= tmp
+      Math.Divide((tmp:3)) | ToFloat3 = shadow-pos
+      shadow-pos | ToFloat2 | Math.Multiply(@f2(0.5 -0.5)) | Math.Add(0.5) = shadow-uv
+      
+      ; Sample shadow depth
+      shadow-uv | Shader.SampleTextureCoord("shadowTexture") | Take(0) = sampled-shadow-depth
+      
+      ; Compute expected-shadow-depth
+      shadow-pos:2 = expected-shadow-depth
+      
+      ; Scale out shadowing when sampling out of texture bounds
+      1.0 >= shadow-factor
+      When({shadow-uv:0 | IsLess(0.0) | Or shadow-uv:0 | IsMore(1.0)}
+      {0.0 > shadow-factor})
+      When({shadow-uv:1 | IsLess(0.0) | Or shadow-uv:1 | IsMore(1.0)}
+      {0.0 > shadow-factor})
+      
+      expected-shadow-depth | Math.Subtract(sampled-shadow-depth) = delta
+      Shader.ReadBuffer("shadowSampleThreshold") = sample-threshold
+      When({delta | IsMore(sample-threshold)} {
+        shadow-factor | Math.Lerp(lighting-tmp @f3(0 0 0)) > lighting-tmp
+      })
+    })
+    base-color | Math.Multiply(lighting-tmp) > lighting-tmp
+    lighting | Math.Add(lighting-tmp) > lighting
+  }
+})
+
+@template(fbl/render-shadow-map [queues light-data] {
+  light-data:direction | ExpectFloat3 | Math.Normalize = light-direction
+  Get(light-data "sample-threshold" Default: 0.00001) | ExpectFloat = sample-threshold
+  Get(light-data "projection-size" Default: 20.0) | ExpectFloat = projection-size
+  Get(light-data "position" Default: @f3(0.0)) | ExpectFloat3 = origin
+  Get(light-data "shadow-range" Default: 5000.0) | ExpectFloat = shadow-range
+  
+  Once({
+    @i2(2048) = shadow-map-size
+    GFX.Texture(Resolution: shadow-map-size Format: TextureFormat::Depth32Float) = shadow-map
+  })
+  
+  light-direction | Math.Negate | Math.Multiply((shadow-range | Math.Divide(2.0))) | Math.Add(origin) = shadow-pos
+  {Position: shadow-pos Target: origin} | Math.LookAt = view-mat
+  GFX.View(View: view-mat OrthographicSize: projection-size Near: 0.0 Far: shadow-range) = shadow-view
+  
+  GFX.RenderInto(Textures: {depth: shadow-map} Contents: {
+    Sequence(steps Type: @fbl/render-steps-type)
+    GFX.BuiltinFeature(BuiltinFeatureId::Transform) >> shadow-features
+    queues | ForEach({
+      Expect(@fbl/draw-queue-type) = queue
+      GFX.DrawablePass(Queue: queue Features: shadow-features Name: "Shadow pass") >> steps
+    })
+    
+    GFX.Render(Steps: steps View: shadow-view)
+  })
+  
+  shadow-view | GFX.ViewProjectionMatrix(ViewSize: (shadow-map-size | ToFloat2)) = shadow-vpm
+  {
+    shadowViewProj: shadow-vpm
+    shadowTexture: shadow-map
+    shadowSampleThreshold: sample-threshold
+  }
+})
+
+@template(fbl/default-ambient-light-feature [ambient-light-color] {
+  GFX.Feature(
+    Shaders: [@fbl/shader-ambient-light]
+    UniqueVariables: ["ambientLightColor"]
+    ViewGenerators: {
+      {ambientLightColor: ambient-light-color}
+    }
+  )
+})
+
+@template(fbl/default-lighting-feature [light-direction light-color] {
+  GFX.Feature(
+    Shaders: [@fbl/shader-dir-light]
+    UniqueVariables: ["lightDirection" "lightColor"]
+    ViewGenerators: {
+      {lightDirection: light-direction lightColor: light-color}
+    }
+  )
+})
+
+@template(fbl/default-light-shadow-feature [light-direction light-color shadow-params] {
+  GFX.Feature(
+    Shaders: [@fbl/shader-dir-light]
+    Params: {
+      shadowTexture: {Type: TextureDimension::D2 SampleType: TextureSampleType::UnfilterableFloat}
+    }
+    ; New magic feature that automatically gives this feature unique variables in the generated shader
+    UniqueVariables: ["shadowViewProj" "shadowTexture" "shadowSampleThreshold" "lightDirection" "lightColor"]
+    ViewGenerators: {
+      {
+        lightDirection: light-direction
+        lightColor: light-color
+        shadowViewProj: (shadow-params:shadowViewProj)
+        shadowTexture: (shadow-params:shadowTexture)
+        shadowSampleThreshold: (shadow-params:shadowSampleThreshold)
+      }
+    }
+  )
+})
+
+@template(fbl/placeholder-texture-2 [color] {
+  color = init-0
+  [init-0 init-0 init-0 init-0] | Flatten | FloatsToImage(2 2 4)
+  GFX.Texture
+})
+
+@template(fbl/default-light-framework-feature [] {
+  Once({
+    @fbl/placeholder-texture-2(@f4(0.0)) = zero-placeholder-texture
+  })
+  GFX.Feature(
+    Params: {
+      "emissiveTexture": zero-placeholder-texture
+    }
+    Shaders: [
+      @fbl/init-lighting-shader ;
+      @fbl/apply-lighting-shader ;
+    ]
+  )
+})

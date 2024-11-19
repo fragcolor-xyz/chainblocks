@@ -1,4 +1,4 @@
-@define(cube-rotations [
+@define(gfx-internal/cube-rotations [
   {idx: 0 rot: @f3(0 -90.0 0)} ; X+
   {idx: 1 rot: @f3(0 90.0 0)} ; X-
   {idx: 2 rot: @f3(90.0 180 0)} ; Y+
@@ -7,7 +7,7 @@
   {idx: 5 rot: @f3(0 0 0)} ; Z+
 ])
 
-@template(xyz-rot-to-mat [] {
+@template(gfx-internal/xyz-rot-to-mat [] {
   {Take(0) = x}
   {Take(1) = y}
   {Take(2) = z}
@@ -17,11 +17,11 @@
   rz | Math.MatMul(ry) | Math.MatMul(rx)
 })
 
-@template(render-cubemap [probe-inner-steps cube-tex probe-offset mip-level] {
+@template(gfx/render-cubemap [probe-inner-steps cube-tex probe-offset mip-level] {
   90.0 | Math.DegreesToRadians >= fov
-  @cube-rotations | DoMany({
+  @gfx-internal/cube-rotations | ForEach({
     {Take("idx") = face-idx}
-    {Take("rot") | @xyz-rot-to-mat() = tmp-rot}
+    {Take("rot") | @gfx-internal/xyz-rot-to-mat() = tmp-rot}
     probe-offset | Math.Translation = tmp-tsl
     @f3(-1 1 1) | Math.Scaling = tmp-flip
     tmp-tsl | Math.MatMul(tmp-rot) | Math.MatMul(tmp-flip) | Math.Inverse = view-transform
@@ -35,11 +35,11 @@
   })
 })
 
-@template(render-cubemap-0 [probe-inner-steps cube-tex probe-offset] {
-  @render-cubemap(probe-inner-steps cube-tex probe-offset 0)
+@template(gfx/render-cubemap-0 [probe-inner-steps cube-tex probe-offset] {
+  @gfx/render-cubemap(probe-inner-steps cube-tex probe-offset 0)
 })
 
-@template(sky-sphere-vs [] {
+@template(gfx/sky-sphere-vs [] {
   Shader.ReadGlobal("localPosition") | ToFloat3 | Math.Multiply(@f3(20.0)) >= local-pos
   Shader.ReadBuffer("view" BufferName: "view") >= view
   Shader.ReadBuffer("proj" BufferName: "view") >= proj
@@ -49,7 +49,7 @@
   screen-pos | Shader.WriteGlobal("screenPosition")
 })
 
-@template(sky-sphere-fs [] {
+@template(gfx/sky-sphere-fs [] {
   ; Just sample the cubemap
   Shader.ReadInput("texCoord0") >= uv
   uv | Shader.SampleTextureCoord("sky") >= color
@@ -59,7 +59,7 @@
   1.0 | Shader.WriteOutput("depth")
 })
 
-@template(render-sky-sphere-queue [params] {
+@template(gfx/render-sky-sphere-queue [params] {
   Once({GFX.BuiltinMesh(Type: BuiltinMeshType::Sphere) = mesh})
   GFX.DrawQueue(AutoClear: false)
   {
@@ -69,12 +69,12 @@
   }
 })
 
-@template(filter-cubemap [effect-feature out-texture mip-level shader-params] {
+@template(gfx/filter-cubemap [effect-feature out-texture mip-level shader-params] {
   GFX.BuiltinFeature(Id: BuiltinFeatureId::Transform) >> filter-cubemap-features
   GFX.Feature(State: {FlipFrontFace: true DepthWrite: false}
     Shaders: [
       {Stage: ProgrammableGraphicsStage::Vertex
-       EntryPoint: {@sky-sphere-vs()}
+       EntryPoint: {@gfx/sky-sphere-vs()}
        After: ["initScreenPosition"]
        Before: ["writePosition"]}]
   ) >> filter-cubemap-features
@@ -82,7 +82,7 @@
   
   GFX.DrawablePass(
     Features: filter-cubemap-features
-    Queue: (@render-sky-sphere-queue(shader-params))
+    Queue: (@gfx/render-sky-sphere-queue(shader-params))
   ) >> filter-cubemap-steps
-  @render-cubemap(filter-cubemap-steps out-texture @f3(0.0) mip-level)
+  @gfx/render-cubemap(filter-cubemap-steps out-texture @f3(0.0) mip-level)
 })

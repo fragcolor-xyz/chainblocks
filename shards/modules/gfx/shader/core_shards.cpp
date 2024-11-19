@@ -33,6 +33,10 @@ struct PushTranslator {
   }
 };
 
+struct PassTranslator {
+  static void translate(std::monostate *shard, TranslationContext &context) {}
+};
+
 void registerCoreShards() {
   // Literal copy-paste into shader code
   REGISTER_ENUM(ShaderLiteralTypeEnumInfo);
@@ -65,5 +69,8 @@ void registerCoreShards() {
   REGISTER_EXTERNAL_SHADER_SHARD(TakeTranslator, "Take", shards::Take);
 
   REGISTER_EXTERNAL_SHADER_SHARD(PushTranslator, "Push", shards::Push);
+
+  REGISTER_EXTERNAL_SHADER_SHARD(PassTranslator, "Pass", std::monostate);
+  REGISTER_EXTERNAL_SHADER_SHARD(PassTranslator, "Debug.Noop", std::monostate);
 }
 } // namespace gfx::shader
