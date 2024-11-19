@@ -1319,6 +1319,13 @@ struct Erase : SeqUser {
   }
 
   SHVar activate(SHContext *context, const SHVar &input) {
+    if (unlikely(_isTable)) {
+      checkIfTableChanged();
+      if (unlikely(_cell == nullptr)) {
+        fillVariableCell();
+      }
+    }
+
     const auto &indices = _indices.get();
     if (_cell->valueType == SHType::Table) {
       if (indices.valueType != SHType::Seq) {
