@@ -1,4 +1,4 @@
-@include("../../lib/gfx/shared.shs")
+@include("../../lib/gfx/fbl-shared.shs")
 @include("../../lib/gfx/atmosphere.shs")
 @include("../../lib/gfx/pbr.shs")
 
