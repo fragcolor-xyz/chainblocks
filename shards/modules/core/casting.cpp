@@ -2,6 +2,7 @@
 /* Copyright © 2019 Fragcolor Pte. Ltd. */
 
 #include "casting.hpp"
+#include "shards/inlined.hpp"
 #include <shards/core/foundation.hpp>
 #include <shards/core/params.hpp>
 #include <shards/core/runtime.hpp>
@@ -180,8 +181,7 @@ template <SHType SHTYPE> struct ToString1 {
 
   static SHTypesInfo inputTypes() { return _inputType; }
   static SHOptionalString inputHelp() {
-    return SHCCSTR(
-        "Accepts a byte array as input. Each byte in the sequence is interpreted as a character.");
+    return SHCCSTR("Accepts a byte array as input. Each byte in the sequence is interpreted as a character.");
   }
 
   static SHTypesInfo outputTypes() { return CoreInfo::StringType; }
@@ -217,9 +217,7 @@ template <SHType FROMTYPE> struct ToImage {
   }
 
   static SHTypesInfo outputTypes() { return CoreInfo::ImageType; }
-  static SHOptionalString outputHelp() {
-    return SHCCSTR("This shard outputs and image.");
-  }
+  static SHOptionalString outputHelp() { return SHCCSTR("This shard outputs and image."); }
 
   static SHOptionalString help() {
     return SHCCSTR("Converts a sequence of floats into an image. The image dimensions (width and height) and the "
@@ -335,6 +333,24 @@ struct ToHex {
     stream.tryWriteHex(input);
     return Var(stream.str());
   }
+};
+
+struct ToAny {
+  static SHTypesInfo inputTypes() { return CoreInfo::AnyType; }
+  static SHOptionalString inputHelp() { return SHCCSTR("Converts the input to any type"); }
+
+  static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
+  static SHOptionalString outputHelp() { return SHCCSTR("The same value as the input but typed as Any."); }
+
+  static SHOptionalString help() {
+    return SHCCSTR("Converts an integer, bytes, or string value into its hexadecimal string representation.");
+  }
+
+  SHTypeInfo compose(const SHInstanceData &data) {
+    data.shard->inlineShardId = InlineShard::NoopShard;
+    return CoreInfo::AnyType;
+  }
+  SHVar activate(SHContext *context, const SHVar &input) { return input; }
 };
 
 struct VarAddr {
@@ -568,7 +584,8 @@ template <SHType ET> struct ExpectX {
       return SHCCSTR("Checks the input value if it is none. The shard outputs the input value unchanged if it is of the "
                      "appropriate type; otherwise, the shard will trigger an error, preventing further execution.");
     } else {
-      return SHCCSTR("Checks the input value if it is of the type specified. The shard outputs the input value unchanged if it is of the appropriate type; otherwise, the shard will trigger an error, preventing further execution.");
+      return SHCCSTR("Checks the input value if it is of the type specified. The shard outputs the input value unchanged if it "
+                     "is of the appropriate type; otherwise, the shard will trigger an error, preventing further execution.");
     }
   }
   SHVar activate(SHContext *context, const SHVar &input) {
@@ -1190,6 +1207,7 @@ SHARDS_REGISTER_FN(casting) {
 
   REGISTER_SHARD("ToString", ToString);
   REGISTER_SHARD("ToHex", ToHex);
+  REGISTER_SHARD("ToAny", ToAny);
   REGISTER_SHARD("VarAddr", VarAddr);
   REGISTER_SHARD("BitSwap32", BitSwap32);
   REGISTER_SHARD("BitSwap64", BitSwap64);
