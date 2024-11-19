@@ -150,6 +150,7 @@ public:
         SHLOG_TRACE("Branch: referencing required variable: {}", name);
         auto vp = referenceVariable(context, name);
         mesh->addRef(toSWL(name), vp);
+        refs.push_back(vp);
       }
     }
   }
@@ -162,8 +163,11 @@ public:
   }
 
   void cleanup(SHContext *context = nullptr) {
-    mesh->releaseAllRefs();
     mesh->terminate();
+    for (auto ref : refs) {
+      shards::releaseVariable(ref);
+    }
+    refs.clear();
     mesh->parent = nullptr;
   }
 
@@ -211,6 +215,8 @@ private:
 
     wire->composeResult = composeWire(wire.get(), dataCopy);
   }
+
+  std::vector<SHVar *> refs;
 };
 } // namespace shards
 

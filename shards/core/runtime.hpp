@@ -701,6 +701,11 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
       shards::stop((*it).get());
       ++it;
     }
+    auto it2 = _pendingSchedule.begin();
+    while (it2 != _pendingSchedule.end()) {
+      shards::stop((*it2).get());
+      ++it2;
+    }
 
     // release all wires
     _scheduled.clear();
@@ -813,13 +818,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     } else {
       return nullptr;
     }
-  }
-
-  void releaseAllRefs() {
-    for (auto ref : refs) {
-      shards::releaseVariable(ref.second);
-    }
-    refs.clear();
   }
 
   bool hasRef(const SHStringWithLen name) {
