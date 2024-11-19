@@ -246,6 +246,128 @@ struct DefaultHelpText {
   static inline const SHOptionalString OutputHelpPass = SHCCSTR("Outputs the input value, passed through unchanged.");
 };
 
+#include <vector>
+#include <unordered_map>
+#include <optional>
+#include <iterator>
+
+template <typename K, typename V> class LayeredMap {
+  std::vector<std::unordered_map<K, V>> layers;
+
+public:
+  // Nested iterator class
+  class iterator {
+    using OuterIt = typename std::vector<std::unordered_map<K, V>>::const_reverse_iterator;
+    using InnerIt = typename std::unordered_map<K, V>::const_iterator;
+
+    OuterIt outer_it;
+    OuterIt outer_end;
+    InnerIt inner_it;
+
+    // Advance to the next valid element across layers
+    void advanceToNextValid() {
+      while (outer_it != outer_end && inner_it == outer_it->end()) {
+        ++outer_it;
+        if (outer_it != outer_end) {
+          inner_it = outer_it->begin();
+        }
+      }
+    }
+
+  public:
+    // Constructor for normal iteration
+    iterator(OuterIt outer_it, OuterIt outer_end)
+        : outer_it(outer_it), outer_end(outer_end),
+          inner_it(outer_it != outer_end ? outer_it->begin() : typename std::unordered_map<K, V>::const_iterator()) {
+      advanceToNextValid();
+    }
+
+    // Constructor for find (points directly to the found element)
+    iterator(OuterIt outer_it, OuterIt outer_end, InnerIt inner_it)
+        : outer_it(outer_it), outer_end(outer_end), inner_it(inner_it) {}
+
+    const std::pair<const K, V> &operator*() const { return *inner_it; }
+
+    const std::pair<const K, V> *operator->() const { return &(*inner_it); }
+
+    iterator &operator++() {
+      ++inner_it;
+      advanceToNextValid();
+      return *this;
+    }
+
+    bool operator==(const iterator &other) const {
+      return outer_it == other.outer_it && (outer_it == outer_end || inner_it == other.inner_it);
+    }
+
+    bool operator!=(const iterator &other) const { return !(*this == other); }
+  };
+
+  // Basic operations for layers
+  void pushLayer() { layers.emplace_back(); }
+
+  void popLayer() {
+    if (!layers.empty()) {
+      layers.pop_back();
+    } else {
+      throw std::runtime_error("No layers to pop!");
+    }
+  }
+
+  // Insert only if the key does not exist in any layer
+  void insert(const K &key, const V &value) {
+    if (find(key) == end()) {
+      if (!layers.empty()) {
+        layers.back()[key] = value;
+      } else {
+        throw std::runtime_error("No layers to insert into!");
+      }
+    }
+  }
+
+  // Erase the key from the topmost layer where it exists
+  void erase(const K &key) {
+    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
+      if (it->erase(key)) {
+        break;
+      }
+    }
+  }
+
+  // Find the key and return an iterator to it
+  iterator find(const K &key) const {
+    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
+      auto found = it->find(key);
+      if (found != it->end()) {
+        // Create an iterator pointing directly to the found element
+        return iterator(it, layers.rend(), found);
+      }
+    }
+    return end();
+  }
+
+  // Calculate the size considering unique keys
+  size_t size() const {
+    std::unordered_map<K, bool> seen;
+    size_t total = 0;
+    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
+      for (const auto &pair : *it) {
+        if (seen.find(pair.first) == seen.end()) {
+          seen[pair.first] = true;
+          ++total;
+        }
+      }
+    }
+    return total;
+  }
+
+  // Begin iterator
+  iterator begin() const { return iterator(layers.rbegin(), layers.rend()); }
+
+  // End iterator
+  iterator end() const { return iterator(layers.rend(), layers.rend()); }
+};
+
 template <typename T> struct AnyStorage {
 private:
   std::shared_ptr<entt::any> _anyStorage;
@@ -503,7 +625,9 @@ struct CompositionContext {
   shards::pmr::unordered_map<SHWire *, SHTypeInfo> visitedWires;
   std::vector<std::string> errorStack;
 
-  CompositionContext();
+  shards::LayeredMap<std::string_view, SHExposedTypeInfo> inherited;
+
+  CompositionContext() : visitedWires(tempAllocator.getAllocator()) {}
 };
 }; // namespace shards
 
