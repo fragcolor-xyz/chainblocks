@@ -815,13 +815,6 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
     }
   }
 
-  void releaseAllRefs() {
-    for (auto ref : refs) {
-      shards::releaseVariable(ref.second);
-    }
-    refs.clear();
-  }
-
   bool hasRef(const SHStringWithLen name) {
     auto key = shards::OwnedVar::Foreign(name);
     return refs.count(key) > 0;

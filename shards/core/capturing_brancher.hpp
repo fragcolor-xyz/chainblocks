@@ -81,10 +81,11 @@ public:
 
   auto requiredVariables() { return brancher.requiredVariables(); }
 
-  void compose(const SHInstanceData &data, const ExposedInfo &shared = ExposedInfo{}, const IgnoredVariables &ignored = {}, bool shareObjectVariables = false) {
+  void compose(const SHInstanceData &data, const ExposedInfo &shared = ExposedInfo{}, const IgnoredVariables &ignored = {},
+               bool shareObjectVariables = false) {
     _variablesApplied = false;
     ExposedInfo sharedNonMutable{data.shared};
-    for(auto& data : sharedNonMutable._innerInfo) {
+    for (auto &data : sharedNonMutable._innerInfo) {
       // Make all captured variables non-mutable as it doesn't make sense to mutate them
       // they would get overwritten every time the capturing brancher updates it's variables
       data.isMutable = false;
@@ -106,7 +107,7 @@ public:
     }
   }
 
-  void applyCapturedVariablesSwap(CapturedVariables& _variables) {
+  void applyCapturedVariablesSwap(CapturedVariables &_variables) {
     std::swap(variableState, _variables);
 
     if (!_variablesApplied) {
@@ -134,8 +135,12 @@ public:
   }
 
   void cleanup() {
-    brancher.mesh->releaseAllRefs();
     brancher.mesh->terminate();
+    for (auto &storage : variableStorage) {
+      if (storage.second.refcount > 1) {
+        SHLOG_ERROR("Variable {} still has a refcount of {}", storage.first, storage.second.refcount);
+      }
+    }
     variableStorage.clear();
     variableState.clear();
   }
