@@ -543,7 +543,7 @@ inline SHVar *findVariable(SHContext *ctx, std::string_view name) {
       }
       // if this wire is pure we break here and do not look further
       if (wire->pure) {
-        return nullptr;
+        break; // exit early, continue with mesh lookup
       }
     }
   }
@@ -856,7 +856,7 @@ void validateConnection(InternalCompositionContext &ctx) {
       ZoneScopedN("PrepareCompose");
 #endif
       pmr::vector<SHExposedTypeInfo> sharedStorage{ctx.sharedContext->tempAllocator.getAllocator()};
-      sharedStorage.reserve(ctx.exposed.size() + ctx.sharedContext->inherited.size());
+      sharedStorage.reserve(ctx.exposed.size() + ctx.sharedContext->inherited.size() + ctx.sharedContext->globals.size());
 
       data.shard = ctx.bottom;
       data.wire = ctx.wire;
@@ -878,6 +878,13 @@ void validateConnection(InternalCompositionContext &ctx) {
       for (auto &pair : ctx.sharedContext->inherited) {
         if (ctx.exposed.find(pair.first) != ctx.exposed.end())
           continue; // Let exposed override inherited
+        sharedStorage.push_back(pair.second);
+      }
+
+      // and globals
+      for (auto &pair : ctx.sharedContext->globals) {
+        if (ctx.exposed.find(pair.first) != ctx.exposed.end())
+          continue; // Let exposed override globals
         sharedStorage.push_back(pair.second);
       }
 
@@ -1002,15 +1009,20 @@ void validateConnection(InternalCompositionContext &ctx) {
 
     std::optional<SHExposedTypeInfo> found;
     const auto findIt = ctx.exposed.find(name);
-    if (findIt == ctx.exposed.end()) {
+    if (findIt != ctx.exposed.end()) {
+      found = findIt->second;
+    } else {
       const auto foundInherited = ctx.sharedContext->inherited.find(name);
       if (foundInherited != ctx.sharedContext->inherited.end()) {
         found = foundInherited->second;
       } else {
-        found = std::nullopt;
+        const auto foundGlobal = ctx.sharedContext->globals.find(name);
+        if (foundGlobal != ctx.sharedContext->globals.end()) {
+          found = foundGlobal->second;
+        } else {
+          found = std::nullopt;
+        }
       }
-    } else {
-      found = findIt->second;
     }
     if (!found) {
       auto err = fmt::format("Required variable not found: {}", name);
@@ -1036,12 +1048,18 @@ void validateConnection(InternalCompositionContext &ctx) {
       auto &type = required.second;
       ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
 
-      ss << "exposed types: ";
+      ss << "exposed types (directly): ";
       for (const auto &info : ctx.exposed) {
         auto &type = info.second;
         ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
       }
+      ss << "exposed types (inherited): ";
       for (const auto &info : ctx.sharedContext->inherited) {
+        auto &type = info.second;
+        ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
+      }
+      ss << "exposed types (globals): ";
+      for (const auto &info : ctx.sharedContext->globals) {
         auto &type = info.second;
         ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
       }
@@ -1133,7 +1151,7 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
         auto metadata = mesh->getMetadata(&v.second);
         if (metadata) {
           std::string_view sName(v.first.payload.stringValue, v.first.payload.stringLen);
-          ctx.sharedContext->inherited.insert(sName, *metadata);
+          ctx.sharedContext->globals.emplace(sName, *metadata); // might be already there
         }
       }
     }
@@ -1145,7 +1163,11 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
 #endif
     for (uint32_t i = 0; i < data.shared.len; i++) {
       auto &info = data.shared.elements[i];
-      ctx.sharedContext->inherited.insert(info.name, info);
+      if (info.global) {
+        ctx.sharedContext->globals.emplace(info.name, info); // might be already there
+      } else {
+        ctx.sharedContext->inherited.insert(info.name, info);
+      }
     }
   }
 

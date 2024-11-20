@@ -2156,14 +2156,14 @@ struct Push : public SeqBase {
             throw ComposeError(fmt::format("Push: error, variable {} is not a sequence.", _name));
           // found, can we mutate it?
           if (!cv.isMutable) {
-            throw ComposeError("Cannot mutate a non-mutable variable");
+            throw ComposeError(fmt::format("Cannot mutate a non-mutable variable: {}", _name));
           } else if (cv.isProtected) {
-            throw ComposeError("Cannot mutate a protected variable");
+            throw ComposeError(fmt::format("Cannot mutate a protected variable: {}", _name));
           }
 
           if (cv.tracked) {
             // cannot push into exposed variables
-            throw ComposeError("Cannot push into exposed variables");
+            throw ComposeError(fmt::format("Cannot push into exposed variables: {}", _name));
           }
 
           // ok now update into
