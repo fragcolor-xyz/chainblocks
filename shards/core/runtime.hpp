@@ -250,7 +250,6 @@ struct DefaultHelpText {
 template <typename K, typename V> class LayeredMap {
   std::vector<std::unordered_map<K, V>> layers;
   std::vector<bool> blocker_tags;
-  size_t first_blocker_index = std::numeric_limits<size_t>::max(); // Index of the first blocker
 
 public:
   // Nested iterator class
@@ -262,7 +261,7 @@ public:
     OuterIt end_layer;
     InnerIt current_it;
 
-    // Advance to the next valid element
+    // Helper to advance to the next valid element
     void advance_to_next() {
       while (current_layer != end_layer) {
         if (current_it == current_layer->end()) {
@@ -321,41 +320,16 @@ public:
     bool operator!=(const iterator &other) const { return !(*this == other); }
   };
 
-  // Constructor with optional pre-reserved layers
-  LayeredMap(size_t max_layers = 0) {
-    if (max_layers > 0) {
-      layers.reserve(max_layers);
-      blocker_tags.reserve(max_layers);
-    }
-  }
-
   // Push a new layer
   // If blocked is true, the previous layer will be blocked from being accessed
   void pushLayer(bool blocked = false) {
-    layers.emplace_back();              // May throw
-    blocker_tags.emplace_back(blocked); // May throw
-
-    if (blocked) {
-      if (first_blocker_index == std::numeric_limits<size_t>::max()) {
-        first_blocker_index = layers.size() - 1;
-      }
-    }
+    layers.emplace_back();
+    blocker_tags.push_back(blocked);
   }
 
   // Pop the topmost layer
   void popLayer() {
     if (!layers.empty()) {
-      size_t index = layers.size() - 1;
-      if (blocker_tags[index] && first_blocker_index == index) {
-        // Find the next blocker below
-        first_blocker_index = std::numeric_limits<size_t>::max();
-        for (size_t i = index; i-- > 0;) {
-          if (blocker_tags[i]) {
-            first_blocker_index = i;
-            break;
-          }
-        }
-      }
       layers.pop_back();
       blocker_tags.pop_back();
     } else {
@@ -364,21 +338,10 @@ public:
   }
 
   // Insert only if the key does not exist in any accessible layer
-  void insert(const K &key, const V &value, bool forceLastLayer = false) {
-    if (forceLastLayer || find(key) == end()) {
+  void insert(const K &key, const V &value) {
+    if (find(key) == end()) {
       if (!layers.empty()) {
-        layers.back().emplace(key, value);
-      } else {
-        throw std::runtime_error("No layers to insert into!");
-      }
-    }
-  }
-
-  // Insert with move semantics
-  void insert(const K &key, V &&value, bool forceLastLayer = false) {
-    if (forceLastLayer || find(key) == end()) {
-      if (!layers.empty()) {
-        layers.back().emplace(key, std::move(value));
+        layers.back()[key] = value;
       } else {
         throw std::runtime_error("No layers to insert into!");
       }
@@ -387,17 +350,13 @@ public:
 
   // Erase the key from the topmost accessible layer where it exists
   void erase(const K &key) {
-    size_t num_layers = layers.size();
-    size_t start_index = first_blocker_index != std::numeric_limits<size_t>::max() ? first_blocker_index : 0;
-
-    for (size_t i = num_layers; i > start_index; --i) {
-      size_t index = i - 1;
-      if (blocker_tags[index] && index != first_blocker_index) {
-        // If a blocker is found and it's not the first blocker, stop searching
+    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
+      size_t index = std::distance(it, layers.rend()) - 1;
+      if (blocker_tags[index]) {
+        // If the current layer is blocked, do not go further down
         break;
       }
-      auto &layer = layers[index];
-      if (layer.erase(key)) {
+      if (it->erase(key)) {
         break;
       }
     }
@@ -405,23 +364,19 @@ public:
 
   // Find the key and return an iterator to it
   iterator find(const K &key) const {
-    if (layers.empty())
-      return end();
-
     size_t num_layers = layers.size();
-    size_t start_index = first_blocker_index != std::numeric_limits<size_t>::max() ? first_blocker_index : 0;
-
-    for (size_t i = num_layers; i > start_index; --i) {
+    for (size_t i = num_layers; i > 0; --i) {
       size_t index = i - 1;
+      if (blocker_tags[index] && i != num_layers) {
+        // If a blocker is found and it's not the topmost layer, stop searching
+        break;
+      }
       const auto &layer = layers[index];
       auto found = layer.find(key);
       if (found != layer.end()) {
         // Calculate the iterator to the found layer
         auto layer_it = layers.begin() + index;
         return iterator(layer_it, layers.end(), found);
-      }
-      if (blocker_tags[index] && index != first_blocker_index) {
-        break;
       }
     }
     return end();
@@ -430,10 +385,7 @@ public:
   // Calculate the size considering blocker_tags
   size_t size() const {
     size_t total = 0;
-    size_t num_layers = layers.size();
-    size_t start_index = first_blocker_index != std::numeric_limits<size_t>::max() ? first_blocker_index : 0;
-
-    for (size_t i = num_layers; i > start_index; --i) {
+    for (size_t i = layers.size(); i > 0; --i) {
       size_t index = i - 1;
       total += layers[index].size();
       if (blocker_tags[index]) {
@@ -445,13 +397,22 @@ public:
 
   // Begin iterator
   iterator begin() const {
+    // Determine the range of layers to iterate over, respecting blockers
     auto start = layers.end();
     auto end_it = layers.end();
 
-    if (first_blocker_index != std::numeric_limits<size_t>::max()) {
-      start = layers.begin() + first_blocker_index;
-      end_it = layers.end();
-    } else {
+    // Iterate from top to bottom to find the first blocker
+    for (size_t i = layers.size(); i > 0; --i) {
+      size_t index = i - 1;
+      if (blocker_tags[index]) {
+        start = layers.begin() + index;
+        end_it = layers.end();
+        break;
+      }
+    }
+
+    // If no blocker is found, start from the first layer
+    if (start == layers.end()) {
       start = layers.begin();
     }
 

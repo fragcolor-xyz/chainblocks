@@ -106,7 +106,7 @@ if(WIN32)
   endif()
 endif()
 
-if(USE_TSAN)
+if(USE_RUST_TSAN)
   list(APPEND RUST_FLAGS -Zsanitizer=thread)
 endif()
 
