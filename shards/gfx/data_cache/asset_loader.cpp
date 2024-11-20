@@ -3,8 +3,12 @@
 #include "data_format/drawable.hpp"
 #include "data_format/texture.hpp"
 #include "data_format/mesh.hpp"
+#include "log.hpp"
+#include "fmt.hpp"
 
 namespace gfx::data {
+
+static auto logger = getLogger();
 
 template <AssetCategory Cat> void insertLoadedAssetData(LoadedAssetData &outData, boost::span<uint8_t> source) {
   throw std::logic_error("Not implemented");
@@ -38,7 +42,7 @@ static void loadDrawable(LoadedAssetData &outData, boost::span<uint8_t> source) 
   outData = std::move(drawable);
 }
 
-static void loadImage(LoadedAssetData &outData, boost::span<uint8_t> source) {
+static void loadImage(LoadedAssetData &outData, boost::span<uint8_t> source, AssetInfo& debugKey) {
   SerializedTexture serialized = shards::fromByteArray<SerializedTexture>(source);
   auto &hdr = serialized.header;
   TextureDescCPUCopy desc;
@@ -49,6 +53,8 @@ static void loadImage(LoadedAssetData &outData, boost::span<uint8_t> source) {
     desc.sourceRowStride = hdr.sourceRowStride;
   } else {
     desc.format = hdr.format;
+    if (!serialized.rawImageData)
+      SPDLOG_LOGGER_TRACE(logger, "Decoding image data for {}", debugKey);
     serialized.decodeImageData();
   }
 
@@ -66,7 +72,7 @@ void finializeAssetLoadRequest(AssetLoadRequest &request, boost::span<uint8_t> s
     loadDrawable(outData, source);
     break;
   case gfx::data::AssetCategory::Image:
-    loadImage(outData, source);
+    loadImage(outData, source, request.key);
     break;
   case gfx::data::AssetCategory::Mesh:
     loadMesh(outData, source);
@@ -87,6 +93,8 @@ void processAssetStoreRequest(AssetStoreRequest &request, shards::pmr::vector<ui
   switch (request.key.category) {
   case AssetCategory::Image: {
     SerializedTexture &tex = std::get<SerializedTexture>(*request.data.get());
+    if (!tex.diskImageData)
+      SPDLOG_LOGGER_TRACE(logger, "Encoding image data for {}", request.key);
     tex.encodeImageData();
     shards::BufferRefWriterA writer(outData);
     shards::serde(writer, tex);

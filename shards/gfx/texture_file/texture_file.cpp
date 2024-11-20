@@ -56,6 +56,8 @@ TexturePtr textureFromFile(const char *path) {
     format.resolution = size;
     texture->init(TextureDescCPUCopy{
         .format = format,
+        .sourceChannels = uint8_t(numComponents),
+        .sourceRowStride = uint32_t(size.x * pixelSize),
         .sourceData = ImmutableSharedBuffer(data, dataSize, [](void *data, void *_) { stbi_image_free(data); }),
     });
   }

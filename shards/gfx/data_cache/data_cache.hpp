@@ -73,11 +73,13 @@ struct IDataCacheIO {
   virtual bool hasAsset(const AssetInfo &key) = 0;
 };
 
+struct DerivedDataGeneratorRegistry;
 struct TrackedFileCache;
 struct DataCache {
 private:
   std::shared_ptr<IDataCacheIO> io;
   std::shared_ptr<TrackedFileCache> trackedFiles;
+  std::shared_ptr<DerivedDataGeneratorRegistry> ddRegistry;
 
 public:
   DataCache(std::shared_ptr<IDataCacheIO> io);
@@ -88,6 +90,8 @@ public:
 
   // Generate a new key for a binary blob, key is based on the contents of the blob
   AssetInfo generateSourceKey(boost::span<uint8_t> data, AssetCategory category);
+  
+  AssetInfo generateDerivedKey(AssetInfo sourceKey, uint64_t generatorID);
 
   bool hasAsset(const AssetInfo &info);
 
@@ -99,6 +103,22 @@ public:
 
   // Fetch an asset immediately, this should only be used for small metadata
   void loadImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data);
+
+  // Fetch a derived asset
+  std::shared_ptr<AssetLoadRequest> loadDerived(AssetInfo key, uint64_t generatorID);
+
+  // Clears all in-memory assets
+  void flushAssets();
+
+  // Flushes all pending requests (wait till completion)
+  void flushRequests();
+
+  void flush() {
+    flushRequests();
+    flushAssets();
+  }
+
+  const std::shared_ptr<DerivedDataGeneratorRegistry> &getDerivedDataGeneratorRegistry() const { return ddRegistry; }
 };
 
 std::shared_ptr<DataCache> getInstance();

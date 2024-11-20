@@ -4,11 +4,23 @@
 #include "types.hpp"
 #include <magic_enum.hpp>
 #include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+#include <boost/uuid/uuid_io.hpp>
 
 template <> struct fmt::formatter<gfx::data::AssetInfo> {
   constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
   template <typename FormatContext> auto format(const gfx::data::AssetInfo &info, FormatContext &ctx) {
-    return format_to(ctx.out(), "AssetInfo(cat: {}/{}, key: {}, flags: {})", magic_enum::enum_name(info.category), magic_enum::enum_name(info.categoryFlags), info.key, magic_enum::enum_name(info.flags));
+    auto it = ctx.out();
+    it = format_to(it, "AssetInfo({}", magic_enum::enum_name(info.category));
+    if (info.categoryFlags != gfx::data::AssetCategoryFlags::None) {
+      it = format_to(it, "/{}", magic_enum::enum_name(info.categoryFlags));
+    }
+    it = format_to(it, ", key: {}", info.key);
+    if (info.flags != gfx::data::AssetFlags::None) {
+      it = format_to(it, ", flags: {}", magic_enum::enum_name(info.flags));
+    }
+    it = format_to(it, ")");
+    return it;
   }
 };
 

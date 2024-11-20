@@ -22,6 +22,12 @@ add_executable(test-gfx
   test_assets.cpp
 )
 
+set(PROJECT_FOLDER_SDK_LIBS "unused")
+set(PROJECT_SOURCE_DIR "../../../deps/compressonator")
+add_subdirectory(${PROJECT_SOURCE_DIR}/cmp_compressonatorlib cmp_compressonatorlib)
+add_subdirectory(${PROJECT_SOURCE_DIR}/cmp_core cmp_core)
+target_link_libraries(test-gfx CMP_Compressonator)
+
 if(EMSCRIPTEN)
   target_link_options(test-gfx PRIVATE --emrun)
 endif()

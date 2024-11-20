@@ -103,7 +103,26 @@ std::shared_ptr<AssetLoadRequest> DataCache::load(AssetInfo key) {
   io->enqueueLoadRequest(req);
   return req;
 }
+
 void DataCache::loadImmediate(AssetInfo key, shards::pmr::vector<uint8_t> &data) { io->loadImmediate(key, data); }
+
+AssetInfo DataCache::generateDerivedKey(AssetInfo sourceKey, uint64_t generatorID) {
+  AssetInfo info;
+  info.key = sourceKey.key;
+  info.category = sourceKey.category;
+  info.flags = sourceKey.flags;
+  info.rootAsset = sourceKey.key;
+  return info;
+}
+
+std::shared_ptr<AssetLoadRequest> DataCache::loadDerived(AssetInfo key, uint64_t generatorID) {
+  key.
+  // auto req = std::make_shared<AssetLoadRequest>();
+  // req->key = key;
+  // req->generatorID = generatorID;
+  // io->enqueueLoadRequest(req);
+  // return req;
+}
 
 // TODO: Mayhaps replace this with a per-context cache, athough fully shared might be better
 static std::shared_ptr<DataCache> instance;
