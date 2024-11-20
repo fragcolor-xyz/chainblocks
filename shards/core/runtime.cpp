@@ -787,8 +787,9 @@ SHWireState activateShards2(SHSeq shards, SHContext *context, const SHVar &wireI
 
 bool matchTypes(const SHTypeInfo &inputType, const SHTypeInfo &receiverType, bool isParameter, bool strict,
                 bool relaxEmptySeqCheck, bool ignoreFixedSeq) {
-  return TypeMatcher{.isParameter = isParameter, .strict = strict, .relaxEmptySeqCheck = relaxEmptySeqCheck, .ignoreFixedSeq = ignoreFixedSeq}.match(inputType,
-                                                                                                                   receiverType);
+  return TypeMatcher{
+      .isParameter = isParameter, .strict = strict, .relaxEmptySeqCheck = relaxEmptySeqCheck, .ignoreFixedSeq = ignoreFixedSeq}
+      .match(inputType, receiverType);
 }
 
 struct InternalCompositionContext {
@@ -1001,14 +1002,15 @@ void validateConnection(InternalCompositionContext &ctx) {
 
     auto end = ctx.exposed.end();
     auto findIt = ctx.exposed.find(name);
+    bool isInherited = false;
     if (findIt == end) {
       end = ctx.inherited.end();
       findIt = ctx.inherited.find(name);
+      isInherited = true;
     }
     if (findIt == end) {
-      auto err = fmt::format("Required variable not found: {}", name);
       // Warning only, delegate compose to decide if it's an error
-      SHLOG_WARNING("{}", err);
+      SHLOG_TRACE("Required variable not found: {}", name);
     } else {
       auto exposedType = findIt->second.exposedType;
       auto requiredType = required_param.exposedType;
@@ -1023,23 +1025,17 @@ void validateConnection(InternalCompositionContext &ctx) {
     }
 
     if (!matching) {
-      std::stringstream ss;
-      ss << "Required types do not match currently exposed ones for variable '" << required.first
-         << "' required possible types: ";
-      auto &type = required.second;
-      ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-
-      ss << "exposed types: ";
-      for (const auto &info : ctx.exposed) {
-        auto &type = info.second;
-        ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
+      std::string error;
+      if (findIt == end) {
+        error = fmt::format("Required variable \"{}\" not found, expected type: {}", name, required_param.exposedType);
+      } else if (isInherited) {
+        error = fmt::format("Required variable \"{}\" does not have the expected type: {}, inherited type {}", name,
+                            required_param.exposedType, findIt->second.exposedType);
+      } else { // Exposed
+        error = fmt::format("Required variable \"{}\" does not have the expected type: {}, exposed type {}", name,
+                            required_param.exposedType, findIt->second.exposedType);
       }
-      for (const auto &info : ctx.inherited) {
-        auto &type = info.second;
-        ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-      }
-      auto sss = ss.str();
-      throw ComposeError(sss);
+      throw ComposeError(error);
     } else {
       // Add required stuff that we do not expose ourself
       if (ctx.exposed.find(match.name) == ctx.exposed.end())
