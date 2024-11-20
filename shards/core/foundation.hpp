@@ -503,6 +503,188 @@ private:
 };
 
 namespace shards {
+// LayeredMap Class Definition
+template <typename K, typename V> class LayeredMap {
+  std::vector<std::unordered_map<K, V>> layers;
+  std::vector<bool> blocker_tags;
+
+public:
+  // Nested iterator class
+  class iterator {
+    using OuterIt = typename std::vector<std::unordered_map<K, V>>::const_iterator;
+    using InnerIt = typename std::unordered_map<K, V>::const_iterator;
+
+    OuterIt current_layer;
+    OuterIt end_layer;
+    InnerIt current_it;
+
+    // Helper to advance to the next valid element
+    void advance_to_next() {
+      while (current_layer != end_layer) {
+        if (current_it == current_layer->end()) {
+          ++current_layer;
+          if (current_layer != end_layer) {
+            current_it = current_layer->begin();
+          }
+          continue;
+        }
+        break;
+      }
+    }
+
+  public:
+    // Iterator traits
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = std::pair<const K, V>;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const value_type *;
+    using reference = const value_type &;
+
+    // Constructor for begin iterator
+    iterator(OuterIt start, OuterIt end) : current_layer(start), end_layer(end) {
+      if (current_layer != end_layer) {
+        current_it = current_layer->begin();
+        advance_to_next();
+      }
+    }
+
+    // Constructor for specific element (used in find)
+    iterator(OuterIt layer, OuterIt end, InnerIt it) : current_layer(layer), end_layer(end), current_it(it) {}
+
+    // Dereference operators
+    reference operator*() const { return *current_it; }
+    pointer operator->() const { return &(*current_it); }
+
+    // Pre-increment
+    iterator &operator++() {
+      if (current_layer == end_layer)
+        return *this;
+      ++current_it;
+      advance_to_next();
+      return *this;
+    }
+
+    // Equality operators
+    bool operator==(const iterator &other) const {
+      if (current_layer == other.current_layer) {
+        if (current_layer == end_layer)
+          return true;
+        return current_it == other.current_it;
+      }
+      return false;
+    }
+
+    bool operator!=(const iterator &other) const { return !(*this == other); }
+  };
+
+  // Push a new layer
+  // If blocked is true, the previous layer will be blocked from being accessed
+  void pushLayer(bool blocked = false) {
+    if (!layers.empty()) {
+      // Mark the current layer as blocked
+      blocker_tags.back() = blocked;
+    }
+    // Push a new layer and set its blocked status
+    layers.emplace_back();
+    blocker_tags.push_back(false);
+  }
+
+  // Pop the topmost layer
+  void popLayer() {
+    if (!layers.empty()) {
+      layers.pop_back();
+      blocker_tags.pop_back();
+    } else {
+      throw std::runtime_error("No layers to pop!");
+    }
+  }
+
+  // Insert only if the key does not exist in any accessible layer
+  void insert(const K &key, const V &value) {
+    if (find(key) == end()) {
+      if (!layers.empty()) {
+        layers.back()[key] = value;
+      } else {
+        throw std::runtime_error("No layers to insert into!");
+      }
+    }
+  }
+
+  // Erase the key from the topmost accessible layer where it exists
+  void erase(const K &key) {
+    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
+      size_t index = std::distance(it, layers.rend()) - 1;
+      if (blocker_tags[index]) {
+        // If the current layer is blocked, do not go further down
+        break;
+      }
+      if (it->erase(key)) {
+        break;
+      }
+    }
+  }
+
+  // Find the key and return an iterator to it
+  iterator find(const K &key) const {
+    size_t num_layers = layers.size();
+    for (size_t i = num_layers; i > 0; --i) {
+      size_t index = i - 1;
+      if (blocker_tags[index]) {
+        // If a blocker is found and it's not the topmost layer, stop searching
+        break;
+      }
+      const auto &layer = layers[index];
+      auto found = layer.find(key);
+      if (found != layer.end()) {
+        // Calculate the iterator to the found layer
+        auto layer_it = layers.begin() + index;
+        return iterator(layer_it, layers.end(), found);
+      }
+    }
+    return end();
+  }
+
+  // Calculate the size considering blocker_tags
+  size_t size() const {
+    size_t total = 0;
+    for (size_t i = layers.size(); i > 0; --i) {
+      size_t index = i - 1;
+      total += layers[index].size();
+      if (blocker_tags[index]) {
+        break;
+      }
+    }
+    return total;
+  }
+
+  // Begin iterator
+  iterator begin() const {
+    // Determine the range of layers to iterate over, respecting blockers
+    auto start = layers.end();
+    auto end_it = layers.end();
+
+    // Iterate from top to bottom to find the first blocker
+    for (size_t i = layers.size(); i > 0; --i) {
+      size_t index = i - 1;
+      if (blocker_tags[index]) {
+        start = layers.begin() + index;
+        end_it = layers.end();
+        break;
+      }
+    }
+
+    // If no blocker is found, start from the first layer
+    if (start == layers.end()) {
+      start = layers.begin();
+    }
+
+    return iterator(start, end_it);
+  }
+
+  // End iterator
+  iterator end() const { return iterator(layers.end(), layers.end()); }
+};
+
 using SHHashSet = SHSetImpl;
 using SHHashSetIt = SHHashSet::iterator;
 
@@ -1471,6 +1653,15 @@ inline const SHExposedTypeInfo *findExposedVariablePtr(const SHExposedTypesInfo 
     if (variableName == entry.name) {
       return &entry;
     }
+  }
+  return nullptr;
+}
+
+inline const SHExposedTypeInfo *findExposedVariablePtr(const shards::LayeredMap<std::string_view, SHExposedTypeInfo> &exposed,
+                                                       std::string_view variableName) {
+  auto it = exposed.find(variableName);
+  if (it != exposed.end()) {
+    return &it->second;
   }
   return nullptr;
 }

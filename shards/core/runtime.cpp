@@ -850,7 +850,6 @@ void validateConnection(InternalCompositionContext &ctx) {
   // If we don't we assume our output will be of the same type of the previous!
   if (ctx.bottom->compose) {
     SHInstanceData data{};
-
     {
 #if SH_EXTENDED_COMPOSE_PROFILING
       ZoneScopedN("PrepareCompose");
@@ -893,6 +892,32 @@ void validateConnection(InternalCompositionContext &ctx) {
     // this ensures e.g. SetVariable exposedVars have right type from the actual
     // input type (previousOutput)!
     auto composeResult = ctx.bottom->compose(ctx.bottom, &data);
+    if (composeResult.error.code != SH_ERROR_NONE) {
+      std::string_view msg(composeResult.error.message.string, size_t(composeResult.error.message.len));
+      SHLOG_ERROR("Error composing shard: {}, wire: {}", msg, ctx.wire ? ctx.wire->name : "(unwired)");
+      throw ComposeError(msg);
+    }
+    ctx.previousOutputType = composeResult.result;
+  } else if (ctx.bottom->composeV2) {
+    SHInstanceData data{};
+    data.shard = ctx.bottom;
+    data.wire = ctx.wire;
+    data.inputType = previousOutput;
+    data.requiredVariables = ctx.fullRequired;
+    data.privateContext = ctx.sharedContext;
+    if (ctx.next) {
+      data.outputTypes = ctx.next->inputTypes(ctx.next);
+    }
+    data.onWorkerThread = ctx.onWorkerThread;
+
+// Uncomment for more detailed profiling
+#if SH_EXTENDED_COMPOSE_PROFILING
+    ZoneScopedN("Compose");
+#endif
+
+    // this ensures e.g. SetVariable exposedVars have right type from the actual
+    // input type (previousOutput)!
+    auto composeResult = ctx.bottom->composeV2(ctx.bottom, &data);
     if (composeResult.error.code != SH_ERROR_NONE) {
       std::string_view msg(composeResult.error.message.string, size_t(composeResult.error.message.len));
       SHLOG_ERROR("Error composing shard: {}, wire: {}", msg, ctx.wire ? ctx.wire->name : "(unwired)");
@@ -979,6 +1004,7 @@ void validateConnection(InternalCompositionContext &ctx) {
     }
 
     ctx.exposed[name] = exposed_param;
+    ctx.sharedContext->inherited.insert(name, exposed_param);
   }
 
   // Finally do checks on what we consume
@@ -1001,16 +1027,11 @@ void validateConnection(InternalCompositionContext &ctx) {
     std::string_view name(required_param.name);
 
     std::optional<SHExposedTypeInfo> found;
-    const auto findIt = ctx.exposed.find(name);
-    if (findIt != ctx.exposed.end()) {
-      found = findIt->second;
+    const auto foundInherited = ctx.sharedContext->inherited.find(name);
+    if (foundInherited != ctx.sharedContext->inherited.end()) {
+      found = foundInherited->second;
     } else {
-      const auto foundInherited = ctx.sharedContext->inherited.find(name);
-      if (foundInherited != ctx.sharedContext->inherited.end()) {
-        found = foundInherited->second;
-      } else {
-        found = std::nullopt;
-      }
+      found = std::nullopt;
     }
     if (!found) {
       auto err = fmt::format("Required variable not found: {}", name);
@@ -1081,7 +1102,7 @@ struct ComposeMemory {
 };
 thread_local std::optional<ComposeMemory> ComposeMemory::allocator;
 
-SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstanceData data) {
+SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstanceData data, bool fromWire = false) {
   ZoneScoped;
   if (data.wire) {
     ZoneText(data.wire->name.data(), data.wire->name.size());
@@ -1095,7 +1116,7 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
   }
 
   CompositionContext *context{reinterpret_cast<CompositionContext *>(data.privateContext)};
-  context->inherited.pushLayer(data.wire->pure); // if pure, prevent inherited vars from being visible
+  context->inherited.pushLayer(fromWire && data.wire->pure); // if pure, prevent inherited vars from being visible
   DEFER(context->inherited.popLayer());
   InternalCompositionContext ctx{context->tempAllocator};
   ctx.sharedContext = context;
@@ -1281,7 +1302,7 @@ SHComposeResult internalComposeWire(const SHWire *wire_, SHInstanceData data) {
 
   shassert(wire == data.wire); // caller must pass the same wire as data.wire
 
-  auto res = internalComposeWire(wire->shards, data);
+  auto res = internalComposeWire(wire->shards, data, true);
   DEFER({
     shards::arrayFree(res.exposedInfo);
     shards::arrayFree(res.requiredInfo);

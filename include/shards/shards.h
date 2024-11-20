@@ -761,6 +761,7 @@ typedef struct SHError(__cdecl *SHSetParamProc)(struct Shard *, int, const struc
 typedef struct SHVar(__cdecl *SHGetParamProc)(struct Shard *, int);
 
 typedef struct SHShardComposeResult(__cdecl *SHComposeProc)(struct Shard *, struct SHInstanceData *data);
+typedef struct SHShardComposeResult(__cdecl *SHComposeV2Proc)(struct Shard *, struct SHInstanceData *data);
 
 // The core of the shard processing, avoid syscalls here
 typedef const struct SHVar *(__cdecl *SHActivateProc)(struct Shard *, struct SHContext *, const struct SHVar *);
@@ -827,6 +828,7 @@ struct Shard {
   // Optional call used during validation to fixup "Any" input
   // type and provide valid output and exposed variable types
   SHComposeProc compose;
+  SHComposeV2Proc composeV2;
 
   SHParametersProc parameters;
   SHSetParamProc setParam; // Set a parameter, the shard will copy the value, so
