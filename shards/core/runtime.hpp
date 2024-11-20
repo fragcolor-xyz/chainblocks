@@ -246,89 +246,158 @@ struct DefaultHelpText {
   static inline const SHOptionalString OutputHelpPass = SHCCSTR("Outputs the input value, passed through unchanged.");
 };
 
-#include <vector>
-#include <unordered_map>
-#include <optional>
-#include <iterator>
-
+// LayeredMap Class Definition
 template <typename K, typename V> class LayeredMap {
   std::vector<std::unordered_map<K, V>> layers;
+  std::vector<bool> blocker_tags;
+  size_t first_blocker_index = std::numeric_limits<size_t>::max(); // Index of the first blocker
 
 public:
   // Nested iterator class
   class iterator {
-    using OuterIt = typename std::vector<std::unordered_map<K, V>>::const_reverse_iterator;
+    using OuterIt = typename std::vector<std::unordered_map<K, V>>::const_iterator;
     using InnerIt = typename std::unordered_map<K, V>::const_iterator;
 
-    OuterIt outer_it;
-    OuterIt outer_end;
-    InnerIt inner_it;
+    OuterIt current_layer;
+    OuterIt end_layer;
+    InnerIt current_it;
 
-    // Advance to the next valid element across layers
-    void advanceToNextValid() {
-      while (outer_it != outer_end && inner_it == outer_it->end()) {
-        ++outer_it;
-        if (outer_it != outer_end) {
-          inner_it = outer_it->begin();
+    // Advance to the next valid element
+    void advance_to_next() {
+      while (current_layer != end_layer) {
+        if (current_it == current_layer->end()) {
+          ++current_layer;
+          if (current_layer != end_layer) {
+            current_it = current_layer->begin();
+          }
+          continue;
         }
+        break;
       }
     }
 
   public:
-    // Constructor for normal iteration
-    iterator(OuterIt outer_it, OuterIt outer_end)
-        : outer_it(outer_it), outer_end(outer_end),
-          inner_it(outer_it != outer_end ? outer_it->begin() : typename std::unordered_map<K, V>::const_iterator()) {
-      advanceToNextValid();
+    // Iterator traits
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = std::pair<const K, V>;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const value_type *;
+    using reference = const value_type &;
+
+    // Constructor for begin iterator
+    iterator(OuterIt start, OuterIt end) : current_layer(start), end_layer(end) {
+      if (current_layer != end_layer) {
+        current_it = current_layer->begin();
+        advance_to_next();
+      }
     }
 
-    // Constructor for find (points directly to the found element)
-    iterator(OuterIt outer_it, OuterIt outer_end, InnerIt inner_it)
-        : outer_it(outer_it), outer_end(outer_end), inner_it(inner_it) {}
+    // Constructor for specific element (used in find)
+    iterator(OuterIt layer, OuterIt end, InnerIt it) : current_layer(layer), end_layer(end), current_it(it) {}
 
-    const std::pair<const K, V> &operator*() const { return *inner_it; }
+    // Dereference operators
+    reference operator*() const { return *current_it; }
+    pointer operator->() const { return &(*current_it); }
 
-    const std::pair<const K, V> *operator->() const { return &(*inner_it); }
-
+    // Pre-increment
     iterator &operator++() {
-      ++inner_it;
-      advanceToNextValid();
+      if (current_layer == end_layer)
+        return *this;
+      ++current_it;
+      advance_to_next();
       return *this;
     }
 
+    // Equality operators
     bool operator==(const iterator &other) const {
-      return outer_it == other.outer_it && (outer_it == outer_end || inner_it == other.inner_it);
+      if (current_layer == other.current_layer) {
+        if (current_layer == end_layer)
+          return true;
+        return current_it == other.current_it;
+      }
+      return false;
     }
 
     bool operator!=(const iterator &other) const { return !(*this == other); }
   };
 
-  // Basic operations for layers
-  void pushLayer() { layers.emplace_back(); }
+  // Constructor with optional pre-reserved layers
+  LayeredMap(size_t max_layers = 0) {
+    if (max_layers > 0) {
+      layers.reserve(max_layers);
+      blocker_tags.reserve(max_layers);
+    }
+  }
 
+  // Push a new layer
+  // If blocked is true, the previous layer will be blocked from being accessed
+  void pushLayer(bool blocked = false) {
+    layers.emplace_back();              // May throw
+    blocker_tags.emplace_back(blocked); // May throw
+
+    if (blocked) {
+      if (first_blocker_index == std::numeric_limits<size_t>::max()) {
+        first_blocker_index = layers.size() - 1;
+      }
+    }
+  }
+
+  // Pop the topmost layer
   void popLayer() {
     if (!layers.empty()) {
+      size_t index = layers.size() - 1;
+      if (blocker_tags[index] && first_blocker_index == index) {
+        // Find the next blocker below
+        first_blocker_index = std::numeric_limits<size_t>::max();
+        for (size_t i = index; i-- > 0;) {
+          if (blocker_tags[i]) {
+            first_blocker_index = i;
+            break;
+          }
+        }
+      }
       layers.pop_back();
+      blocker_tags.pop_back();
     } else {
       throw std::runtime_error("No layers to pop!");
     }
   }
 
-  // Insert only if the key does not exist in any layer
+  // Insert only if the key does not exist in any accessible layer
   void insert(const K &key, const V &value) {
     if (find(key) == end()) {
       if (!layers.empty()) {
-        layers.back()[key] = value;
+        layers.back().emplace(key, value);
       } else {
         throw std::runtime_error("No layers to insert into!");
       }
     }
   }
 
-  // Erase the key from the topmost layer where it exists
+  // Insert with move semantics
+  void insert(const K &key, V &&value) {
+    if (find(key) == end()) {
+      if (!layers.empty()) {
+        layers.back().emplace(key, std::move(value));
+      } else {
+        throw std::runtime_error("No layers to insert into!");
+      }
+    }
+  }
+
+  // Erase the key from the topmost accessible layer where it exists
   void erase(const K &key) {
-    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-      if (it->erase(key)) {
+    size_t num_layers = layers.size();
+    size_t start_index = first_blocker_index != std::numeric_limits<size_t>::max() ? first_blocker_index : 0;
+
+    for (size_t i = num_layers; i > start_index; --i) {
+      size_t index = i - 1;
+      if (blocker_tags[index] && index != first_blocker_index) {
+        // If a blocker is found and it's not the first blocker, stop searching
+        break;
+      }
+      auto &layer = layers[index];
+      if (layer.erase(key)) {
         break;
       }
     }
@@ -336,36 +405,61 @@ public:
 
   // Find the key and return an iterator to it
   iterator find(const K &key) const {
-    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-      auto found = it->find(key);
-      if (found != it->end()) {
-        // Create an iterator pointing directly to the found element
-        return iterator(it, layers.rend(), found);
+    if (layers.empty())
+      return end();
+
+    size_t num_layers = layers.size();
+    size_t start_index = first_blocker_index != std::numeric_limits<size_t>::max() ? first_blocker_index : 0;
+
+    for (size_t i = num_layers; i > start_index; --i) {
+      size_t index = i - 1;
+      const auto &layer = layers[index];
+      auto found = layer.find(key);
+      if (found != layer.end()) {
+        // Calculate the iterator to the found layer
+        auto layer_it = layers.begin() + index;
+        return iterator(layer_it, layers.end(), found);
+      }
+      if (blocker_tags[index] && index != first_blocker_index) {
+        break;
       }
     }
     return end();
   }
 
-  // Calculate the size considering unique keys
+  // Calculate the size considering blocker_tags
   size_t size() const {
-    std::unordered_map<K, bool> seen;
     size_t total = 0;
-    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-      for (const auto &pair : *it) {
-        if (seen.find(pair.first) == seen.end()) {
-          seen[pair.first] = true;
-          ++total;
-        }
+    size_t num_layers = layers.size();
+    size_t start_index = first_blocker_index != std::numeric_limits<size_t>::max() ? first_blocker_index : 0;
+
+    for (size_t i = num_layers; i > start_index; --i) {
+      size_t index = i - 1;
+      total += layers[index].size();
+      if (blocker_tags[index]) {
+        break;
       }
     }
     return total;
   }
 
   // Begin iterator
-  iterator begin() const { return iterator(layers.rbegin(), layers.rend()); }
+  iterator begin() const {
+    auto start = layers.end();
+    auto end_it = layers.end();
+
+    if (first_blocker_index != std::numeric_limits<size_t>::max()) {
+      start = layers.begin() + first_blocker_index;
+      end_it = layers.end();
+    } else {
+      start = layers.begin();
+    }
+
+    return iterator(start, end_it);
+  }
 
   // End iterator
-  iterator end() const { return iterator(layers.rend(), layers.rend()); }
+  iterator end() const { return iterator(layers.end(), layers.end()); }
 };
 
 template <typename T> struct AnyStorage {
@@ -626,6 +720,7 @@ struct CompositionContext {
   std::vector<std::string> errorStack;
 
   shards::LayeredMap<std::string_view, SHExposedTypeInfo> inherited;
+  std::unordered_map<std::string_view, SHExposedTypeInfo> globals;
 
   CompositionContext() : visitedWires(tempAllocator.getAllocator()) {}
 };

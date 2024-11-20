@@ -1094,7 +1094,7 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
   }
 
   CompositionContext *context{reinterpret_cast<CompositionContext *>(data.privateContext)};
-  context->inherited.pushLayer();
+  context->inherited.pushLayer(data.wire->pure);
   DEFER(context->inherited.popLayer());
   InternalCompositionContext ctx{context->tempAllocator};
   ctx.sharedContext = context;
