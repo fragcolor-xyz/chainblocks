@@ -856,7 +856,7 @@ void validateConnection(InternalCompositionContext &ctx) {
       ZoneScopedN("PrepareCompose");
 #endif
       pmr::vector<SHExposedTypeInfo> sharedStorage{ctx.sharedContext->tempAllocator.getAllocator()};
-      sharedStorage.reserve(ctx.exposed.size() + ctx.sharedContext->inherited.size() + ctx.sharedContext->globals.size());
+      sharedStorage.reserve(ctx.exposed.size() + ctx.sharedContext->inherited.size());
 
       data.shard = ctx.bottom;
       data.wire = ctx.wire;
@@ -878,13 +878,6 @@ void validateConnection(InternalCompositionContext &ctx) {
       for (auto &pair : ctx.sharedContext->inherited) {
         if (ctx.exposed.find(pair.first) != ctx.exposed.end())
           continue; // Let exposed override inherited
-        sharedStorage.push_back(pair.second);
-      }
-
-      // and globals
-      for (auto &pair : ctx.sharedContext->globals) {
-        if (ctx.exposed.find(pair.first) != ctx.exposed.end())
-          continue; // Let exposed override globals
         sharedStorage.push_back(pair.second);
       }
 
@@ -1016,12 +1009,7 @@ void validateConnection(InternalCompositionContext &ctx) {
       if (foundInherited != ctx.sharedContext->inherited.end()) {
         found = foundInherited->second;
       } else {
-        const auto foundGlobal = ctx.sharedContext->globals.find(name);
-        if (foundGlobal != ctx.sharedContext->globals.end()) {
-          found = foundGlobal->second;
-        } else {
-          found = std::nullopt;
-        }
+        found = std::nullopt;
       }
     }
     if (!found) {
@@ -1055,11 +1043,6 @@ void validateConnection(InternalCompositionContext &ctx) {
       }
       ss << "exposed types (inherited): ";
       for (const auto &info : ctx.sharedContext->inherited) {
-        auto &type = info.second;
-        ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-      }
-      ss << "exposed types (globals): ";
-      for (const auto &info : ctx.sharedContext->globals) {
         auto &type = info.second;
         ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
       }
@@ -1112,7 +1095,7 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
   }
 
   CompositionContext *context{reinterpret_cast<CompositionContext *>(data.privateContext)};
-  context->inherited.pushLayer(data.wire->pure || data.isolating);
+  context->inherited.pushLayer(data.wire->pure);
   DEFER(context->inherited.popLayer());
   InternalCompositionContext ctx{context->tempAllocator};
   ctx.sharedContext = context;
@@ -1151,7 +1134,7 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
         auto metadata = mesh->getMetadata(&v.second);
         if (metadata) {
           std::string_view sName(v.first.payload.stringValue, v.first.payload.stringLen);
-          ctx.sharedContext->globals.emplace(sName, *metadata); // might be already there
+          ctx.sharedContext->inherited.insert(sName, *metadata);
         }
       }
     }
@@ -1163,17 +1146,7 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
 #endif
     for (uint32_t i = 0; i < data.shared.len; i++) {
       auto &info = data.shared.elements[i];
-      if (info.global) {
-        ctx.sharedContext->globals.emplace(info.name, info); // might be already there
-      } else {
-        if (data.isolating) {
-          // force last layer, since we are isolating we want to make sure
-          // we are not shadowing any inherited vars
-          ctx.sharedContext->inherited.insert(info.name, info, true);
-        } else {
-          ctx.sharedContext->inherited.insert(info.name, info);
-        }
-      }
+      ctx.sharedContext->inherited.insert(info.name, info);
     }
   }
 

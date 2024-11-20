@@ -720,7 +720,6 @@ struct CompositionContext {
   std::vector<std::string> errorStack;
 
   shards::LayeredMap<std::string_view, SHExposedTypeInfo> inherited;
-  std::unordered_map<std::string_view, SHExposedTypeInfo> globals;
 
   CompositionContext() : visitedWires(tempAllocator.getAllocator()) {}
 };
