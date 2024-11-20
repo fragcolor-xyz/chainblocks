@@ -1112,7 +1112,7 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
   }
 
   CompositionContext *context{reinterpret_cast<CompositionContext *>(data.privateContext)};
-  context->inherited.pushLayer(data.wire->pure);
+  context->inherited.pushLayer(data.wire->pure || data.isolating);
   DEFER(context->inherited.popLayer());
   InternalCompositionContext ctx{context->tempAllocator};
   ctx.sharedContext = context;
@@ -1166,7 +1166,13 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
       if (info.global) {
         ctx.sharedContext->globals.emplace(info.name, info); // might be already there
       } else {
-        ctx.sharedContext->inherited.insert(info.name, info);
+        if (data.isolating) {
+          // force last layer, since we are isolating we want to make sure
+          // we are not shadowing any inherited vars
+          ctx.sharedContext->inherited.insert(info.name, info, true);
+        } else {
+          ctx.sharedContext->inherited.insert(info.name, info);
+        }
       }
     }
   }

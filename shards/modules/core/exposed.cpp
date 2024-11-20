@@ -54,6 +54,7 @@ struct Isolate {
     }
 
     SHInstanceData tmpData = data;
+    tmpData.isolating = true; // need this flag to tell to compose to just consider our data here
     tmpData.shared = SHExposedTypesInfo(innerShared);
     auto cr = _contents.compose(tmpData);
 

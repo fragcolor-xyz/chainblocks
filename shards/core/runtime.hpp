@@ -364,8 +364,8 @@ public:
   }
 
   // Insert only if the key does not exist in any accessible layer
-  void insert(const K &key, const V &value) {
-    if (find(key) == end()) {
+  void insert(const K &key, const V &value, bool forceLastLayer = false) {
+    if (forceLastLayer || find(key) == end()) {
       if (!layers.empty()) {
         layers.back().emplace(key, value);
       } else {
@@ -375,8 +375,8 @@ public:
   }
 
   // Insert with move semantics
-  void insert(const K &key, V &&value) {
-    if (find(key) == end()) {
+  void insert(const K &key, V &&value, bool forceLastLayer = false) {
+    if (forceLastLayer || find(key) == end()) {
       if (!layers.empty()) {
         layers.back().emplace(key, std::move(value));
       } else {
