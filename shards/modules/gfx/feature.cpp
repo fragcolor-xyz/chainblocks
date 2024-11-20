@@ -56,12 +56,20 @@ ENUM_HELP(gfx::BuiltinFeatureId, gfx::BuiltinFeatureId::Velocity,
 ENUM_HELP(gfx::BuiltinFeatureId, gfx::BuiltinFeatureId::AlphaBlend, SHCCSTR("Simple feature that enables alpha blending"));
 
 namespace gfx {
-DECL_ENUM_INFO(RequiredAttributes_, RequiredAttributes, "Attributes required for a graphics feature. Specifies the necessary properties or capabilities for a feature to function.", 'fatt');
+DECL_ENUM_INFO(
+    RequiredAttributes_, RequiredAttributes,
+    "Attributes required for a graphics feature. Specifies the necessary properties or capabilities for a feature to function.",
+    'fatt');
 
 struct BuiltinFeatureShard {
-  DECL_ENUM_INFO(BuiltinFeatureId, BuiltinFeatureId, "Identifier for built-in graphics features. Used to reference pre-defined functionality in the graphics system.", 'feid');
+  DECL_ENUM_INFO(BuiltinFeatureId, BuiltinFeatureId,
+                 "Identifier for built-in graphics features. Used to reference pre-defined functionality in the graphics system.",
+                 'feid');
 
-  static SHOptionalString help() { return SHCCSTR("This shard creates the ready-made feature object of the feature specified in the ID parameter, for use in a rendering pass."); }
+  static SHOptionalString help() {
+    return SHCCSTR("This shard creates the ready-made feature object of the feature specified in the ID parameter, for use in a "
+                   "rendering pass.");
+  }
 
   static SHOptionalString inputHelp() { return DefaultHelpText::InputHelpIgnored; }
   static SHOptionalString outputHelp() { return SHCCSTR("The feature object for use in a rendering pass."); }
@@ -151,7 +159,9 @@ struct FeatureShard {
   static SHTypesInfo inputTypes() { return CoreInfo::NoneType; }
   static SHTypesInfo outputTypes() { return ShardsTypes::Feature; }
 
-  static SHOptionalString help() { return SHCCSTR("This shard creates a feature object based on what was provided in the different parameters."); }
+  static SHOptionalString help() {
+    return SHCCSTR("This shard creates a feature object based on what was provided in the different parameters.");
+  }
 
   static SHOptionalString inputHelp() { return DefaultHelpText::InputHelpIgnored; }
   static SHOptionalString outputHelp() { return SHCCSTR("The feature object for use in a rendering pass."); }
@@ -174,7 +184,8 @@ struct FeatureShard {
   // Any variables used in the callback will be copied during this shard's activation
   // The output should be a single parameter table
   PARAM_VAR(_viewGenerators, "ViewGenerators",
-            "A collection of callbacks that will be run to generate per-view shader parameters during rendering. These parameters are added to the view buffer.",
+            "A collection of callbacks that will be run to generate per-view shader parameters during rendering. These "
+            "parameters are added to the view buffer.",
             {IntoWires::RunnableTypes, {CoreInfo::NoneType}});
   // [(-> ...)]/(-> ...)/[<wire>]/<wire>
   // Any variables used in the callback will be copied during this shard's activation
@@ -186,10 +197,10 @@ struct FeatureShard {
   //   :<name> {:Type <ShaderFieldBaseType> :Dimension <number>}
   //   :<name> {:Default <default>}   (type will be derived from value)
   //   :<name> <default-value>        (type will be derived from value)
-  PARAM_PARAMVAR(
-      _params, "Params",
-      "The parameters to add to the object buffer and expose to shaders, these default values can later be modified by the Params parameter in GFX.Material or GFX.Drawable.",
-      {CoreInfo::NoneType, ParameterSpecType, Type::VariableOf(ParameterSpecType)});
+  PARAM_PARAMVAR(_params, "Params",
+                 "The parameters to add to the object buffer and expose to shaders, these default values can later be modified "
+                 "by the Params parameter in GFX.Material or GFX.Drawable.",
+                 {CoreInfo::NoneType, ParameterSpecType, Type::VariableOf(ParameterSpecType)});
 
   // Table of block shader parameters, can be defined using any of the formats below:
   //   :<name> {:Type <ShaderFieldBaseType> :Dimension <number>}
@@ -263,7 +274,7 @@ private:
 public:
   void cleanup(SHContext *context) {
     // This makes sure all branchers are cleaned up on the correct thread
-    if(_sharedData)
+    if (_sharedData)
       _sharedData->cleanup();
     _sharedData.reset();
     _drawableGeneratorRefs.clear();
@@ -373,6 +384,7 @@ public:
 
   void composeGeneratorWires(const SHInstanceData &data) {
     SHInstanceData generatorInstanceData = data;
+    generatorInstanceData.privateContext = nullptr; // force a new context
 
     bool hasGeneratorWires = !_drawableGenerators->isNone() || !_viewGenerators->isNone();
     if (hasGeneratorWires) {

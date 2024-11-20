@@ -137,21 +137,24 @@ struct BaseRunner : public WireBase {
     // build the list of variables to capture and inject into spawned chain
     _vars.clear();
     arrayResize(_mergedReqs, 0);
-    for (auto &avail : data.shared) {
-      auto it = wire->requirements.find(avail.name);
-      if (it != wire->requirements.end()) {
-        if (!avail.global) {
-          // Capture if not global as we need to copy it!
-          SHLOG_TRACE("BaseRunner: adding variable to requirements: {}, wire {}", avail.name, wire->name);
-          SHVar ctxVar{};
-          ctxVar.valueType = SHType::ContextVar;
-          ctxVar.payload.stringValue = avail.name;
-          ctxVar.payload.stringLen = strlen(avail.name);
-          auto &p = _vars.emplace_back();
-          p = ctxVar;
-        }
+    // pure wires do not need to capture variables
+    if (!wire->pure && wire->requirements.size() > 0) {
+      for (auto &avail : data.shared) {
+        auto it = wire->requirements.find(avail.name);
+        if (it != wire->requirements.end()) {
+          if (!avail.global) {
+            // Capture if not global as we need to copy it!
+            SHLOG_TRACE("BaseRunner: adding variable to requirements: {}, wire {}", avail.name, wire->name);
+            SHVar ctxVar{};
+            ctxVar.valueType = SHType::ContextVar;
+            ctxVar.payload.stringValue = avail.name;
+            ctxVar.payload.stringLen = strlen(avail.name);
+            auto &p = _vars.emplace_back();
+            p = ctxVar;
+          }
 
-        arrayPush(_mergedReqs, it->second);
+          arrayPush(_mergedReqs, it->second);
+        }
       }
     }
 

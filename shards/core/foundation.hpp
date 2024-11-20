@@ -594,6 +594,9 @@ public:
     if (!layers.empty()) {
       layers.pop_back();
       blocker_tags.pop_back();
+      if (!blocker_tags.empty()) {
+        blocker_tags.back() = false;
+      }
     } else {
       throw std::runtime_error("No layers to pop!");
     }
@@ -649,10 +652,10 @@ public:
     size_t total = 0;
     for (size_t i = layers.size(); i > 0; --i) {
       size_t index = i - 1;
-      total += layers[index].size();
       if (blocker_tags[index]) {
         break;
       }
+      total += layers[index].size();
     }
     return total;
   }
