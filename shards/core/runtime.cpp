@@ -517,7 +517,7 @@ SHVar *referenceGlobalVariable(SHContext *ctx, std::string_view name) {
   return &v;
 }
 
-inline SHVar *findVariable(SHContext *ctx, std::string_view name) {
+SHVar *findVariable(SHContext *ctx, std::string_view name) {
   // try find a wire variable
   // from top to bottom of wire stack
   {

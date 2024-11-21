@@ -214,6 +214,8 @@ namespace shards {
 [[nodiscard]] SHComposeResult composeWire(const SHSeq wire, SHInstanceData data);
 [[nodiscard]] SHComposeResult composeWire(const SHWire *wire, SHInstanceData data);
 
+SHVar *findVariable(SHContext *ctx, std::string_view name);
+
 bool validateSetParam(Shard *shard, int index, const SHVar &value);
 bool matchTypes(const SHTypeInfo &inputType, const SHTypeInfo &receiverType, bool isParameter, bool strict,
                 bool relaxEmptySeqCheck, bool ignoreFixedSeq = false);
