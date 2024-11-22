@@ -21,6 +21,7 @@ SH_HAS_MEMBER_TEST(outputTypes);
 SH_HAS_MEMBER_TEST(exposedVariables);
 SH_HAS_MEMBER_TEST(requiredVariables);
 SH_HAS_MEMBER_TEST(compose);
+SH_HAS_MEMBER_TEST(composeV2);
 SH_HAS_MEMBER_TEST(parameters);
 SH_HAS_MEMBER_TEST(setParam);
 SH_HAS_MEMBER_TEST(getParam);
@@ -190,6 +191,23 @@ template <class T> struct ShardWrapper {
     } else {
       // compose is optional!
       result->compose = nullptr;
+    }
+
+    // composeV2
+    if constexpr (has_composeV2<T>::value) {
+      result->composeV2 = static_cast<SHComposeV2Proc>([](Shard *b, SHInstanceData *data) {
+        try {
+          return SHShardComposeResult{SHError::Success, reinterpret_cast<ShardWrapper<T> *>(b)->shard.composeV2(*data)};
+        } catch (std::exception &e) {
+          reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
+          return SHShardComposeResult{SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
+                                                                 reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}},
+                                      SHTypeInfo{}};
+        }
+      });
+    } else {
+      // composeV2 is optional!
+      result->composeV2 = nullptr;
     }
 
     // warmup

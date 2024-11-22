@@ -1264,23 +1264,16 @@ struct Erase : SeqUser {
     }
   }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    SeqUser::compose(data);
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    SeqUser::composeV2(data);
+
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    // info is valid because we run base compose first
 
     bool valid = false;
-
-    std::optional<SHExposedTypeInfo> info;
-    for (uint32_t i = 0; i < data.shared.len; i++) {
-      auto &reference = data.shared.elements[i];
-      if (strcmp(reference.name, _name.c_str()) == 0) {
-        info = reference;
-        break;
-      }
-    }
-
-    if (!info) {
-      throw ComposeError("Erase: Could not find reference to sequence or table.");
-    }
 
     if (info->exposedType.basicType != SHType::Seq && info->exposedType.basicType != SHType::Table) {
       throw ComposeError(
@@ -1299,7 +1292,7 @@ struct Erase : SeqUser {
     } else if (_indices->valueType == SHType::Int) {
       valid = true;
     } else { // SHType::ContextVar && !isTable
-      auto info = findExposedVariable(data.shared, SHSTRVIEW((*_indices)));
+      auto info = findExposedVariable(inherited->inherited, SHSTRVIEW((*_indices)));
       if (info) {
         if (info->exposedType.basicType == SHType::Seq && info->exposedType.seqTypes.len == 1 &&
             info->exposedType.seqTypes.elements[0].basicType == SHType::Int) {
@@ -1313,8 +1306,10 @@ struct Erase : SeqUser {
       }
     }
 
-    if (!valid)
+    if (!valid) {
       throw SHException("Erase, invalid indices or malformed input.");
+    }
+
     return data.inputType;
   }
 
@@ -2264,7 +2259,7 @@ RUNTIME_SHARD_inputHelp(Set);
 RUNTIME_SHARD_outputTypes(Set);
 RUNTIME_SHARD_outputHelp(Set);
 RUNTIME_SHARD_parameters(Set);
-RUNTIME_SHARD_compose(Set);
+RUNTIME_SHARD_composeV2(Set);
 RUNTIME_SHARD_exposedVariables(Set);
 RUNTIME_SHARD_setParam(Set);
 RUNTIME_SHARD_getParam(Set);
@@ -2281,7 +2276,7 @@ RUNTIME_SHARD_inputHelp(Ref);
 RUNTIME_SHARD_outputTypes(Ref);
 RUNTIME_SHARD_outputHelp(Ref);
 RUNTIME_SHARD_parameters(Ref);
-RUNTIME_SHARD_compose(Ref);
+RUNTIME_SHARD_composeV2(Ref);
 RUNTIME_SHARD_exposedVariables(Ref);
 RUNTIME_SHARD_setParam(Ref);
 RUNTIME_SHARD_getParam(Ref);
@@ -2298,7 +2293,7 @@ RUNTIME_SHARD_inputHelp(Update);
 RUNTIME_SHARD_outputTypes(Update);
 RUNTIME_SHARD_outputHelp(Update);
 RUNTIME_SHARD_parameters(Update);
-RUNTIME_SHARD_compose(Update);
+RUNTIME_SHARD_composeV2(Update);
 RUNTIME_SHARD_requiredVariables(Update);
 RUNTIME_SHARD_setParam(Update);
 RUNTIME_SHARD_getParam(Update);
@@ -2352,7 +2347,7 @@ RUNTIME_SHARD_inputHelp(Pop);
 RUNTIME_SHARD_outputTypes(Pop);
 RUNTIME_SHARD_outputHelp(Pop);
 RUNTIME_SHARD_parameters(Pop);
-RUNTIME_SHARD_compose(Pop);
+RUNTIME_SHARD_composeV2(Pop);
 RUNTIME_SHARD_requiredVariables(Pop);
 RUNTIME_SHARD_setParam(Pop);
 RUNTIME_SHARD_getParam(Pop);
@@ -2370,7 +2365,7 @@ RUNTIME_SHARD_inputHelp(PopFront);
 RUNTIME_SHARD_outputTypes(PopFront);
 RUNTIME_SHARD_outputHelp(PopFront);
 RUNTIME_SHARD_parameters(PopFront);
-RUNTIME_SHARD_compose(PopFront);
+RUNTIME_SHARD_composeV2(PopFront);
 RUNTIME_SHARD_requiredVariables(PopFront);
 RUNTIME_SHARD_setParam(PopFront);
 RUNTIME_SHARD_getParam(PopFront);
@@ -2406,7 +2401,7 @@ RUNTIME_SHARD_parameters(Clear);
 RUNTIME_SHARD_setParam(Clear);
 RUNTIME_SHARD_getParam(Clear);
 RUNTIME_SHARD_activate(Clear);
-RUNTIME_SHARD_compose(Clear);
+RUNTIME_SHARD_composeV2(Clear);
 RUNTIME_SHARD_END(Clear);
 
 // Register Drop
@@ -2422,7 +2417,7 @@ RUNTIME_SHARD_parameters(Drop);
 RUNTIME_SHARD_setParam(Drop);
 RUNTIME_SHARD_getParam(Drop);
 RUNTIME_SHARD_activate(Drop);
-RUNTIME_SHARD_compose(Drop);
+RUNTIME_SHARD_composeV2(Drop);
 RUNTIME_SHARD_END(Drop);
 
 // Register DropFront
@@ -2438,7 +2433,7 @@ RUNTIME_SHARD_parameters(DropFront);
 RUNTIME_SHARD_setParam(DropFront);
 RUNTIME_SHARD_getParam(DropFront);
 RUNTIME_SHARD_activate(DropFront);
-RUNTIME_SHARD_compose(DropFront);
+RUNTIME_SHARD_composeV2(DropFront);
 RUNTIME_SHARD_END(DropFront);
 
 // Register Get
@@ -2452,7 +2447,7 @@ RUNTIME_SHARD_inputHelp(Get);
 RUNTIME_SHARD_outputTypes(Get);
 RUNTIME_SHARD_outputHelp(Get);
 RUNTIME_SHARD_parameters(Get);
-RUNTIME_SHARD_compose(Get);
+RUNTIME_SHARD_composeV2(Get);
 RUNTIME_SHARD_requiredVariables(Get);
 RUNTIME_SHARD_setParam(Get);
 RUNTIME_SHARD_getParam(Get);
@@ -2953,7 +2948,7 @@ struct Once {
     self = data.shard;
     _validation = _blks.compose(data);
 
-    collectRequiredVariables(data.shared, _requiredInfo, _repeat);
+    collectRequiredVariables(data, _requiredInfo, _repeat);
 
     return data.inputType;
   }

@@ -27,7 +27,7 @@
 //       PARAM_CLEANUP(ctx);
 //     }
 //   };
-// CAUTION: 
+// CAUTION:
 //  - If you use PARAM_PARAMVAR, you must also add the compose(), warmup() and cleanup() functions
 
 namespace shards {
@@ -52,8 +52,7 @@ struct IterableParam {
 
   void (*setParam)(void *varPtr, SHVar var){};
   SHVar (*getParam)(void *varPtr){};
-  void (*collectRequirements)(const shards::IterableParam &param, const SHExposedTypesInfo &exposed, ExposedInfo &out,
-                              void *varPtr){};
+  void (*collectRequirements)(const shards::IterableParam &param, const SHInstanceData &data, ExposedInfo &out, void *varPtr){};
   void (*warmup)(void *varPtr, SHContext *ctx){};
   void (*cleanup)(void *varPtr, SHContext *ctx){};
 
@@ -65,16 +64,15 @@ struct IterableParam {
 
   template <typename T>
   static IterableParam createWithVarInterface(void *(*resolveParamInShard)(void *), const ParameterInfo *paramInfo) {
-    IterableParam result{
-        .resolveParamInShard = resolveParamInShard,
-        .paramInfo = paramInfo,
-        .setParam = [](void *varPtr, SHVar var) { *((T *)varPtr) = var; },
-        .getParam = [](void *varPtr) -> SHVar { return *((T *)varPtr); },
-        .collectRequirements =
-            [](const shards::IterableParam &param, const SHExposedTypesInfo &exposed, ExposedInfo &out, void *varPtr) {
-              collectRequiredVariables(exposed, out, *((T *)varPtr), SHTypesInfo(param.paramInfo->_types),
-                                       param.paramInfo->_name);
-            }};
+    IterableParam result{.resolveParamInShard = resolveParamInShard,
+                         .paramInfo = paramInfo,
+                         .setParam = [](void *varPtr, SHVar var) { *((T *)varPtr) = var; },
+                         .getParam = [](void *varPtr) -> SHVar { return *((T *)varPtr); },
+                         .collectRequirements =
+                             [](const shards::IterableParam &param, const SHInstanceData &data, ExposedInfo &out, void *varPtr) {
+                               collectRequiredVariables(data, out, *((T *)varPtr), SHTypesInfo(param.paramInfo->_types),
+                                                        param.paramInfo->_name);
+                             }};
 
     bool canPossiblyHaveContextVariables = false;
     for (auto &type : paramInfo->_types._types) {
@@ -185,16 +183,16 @@ struct IterableParam {
 //    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
 //    return outputTypes().elements[0];
 //  }
-#define PARAM_COMPOSE_REQUIRED_VARIABLES(__data)                                                                          \
-  {                                                                                                                       \
-    size_t numParams;                                                                                                     \
-    const shards::IterableParam *params = getIterableParams(numParams);                                                   \
-    _requiredVariables.clear();                                                                                           \
-    for (size_t i = 0; i < numParams; i++) {                                                                              \
-      if (params[i].collectRequirements) {                                                                                \
-        params[i].collectRequirements(params[i], __data.shared, _requiredVariables, params[i].resolveParamInShard(this)); \
-      }                                                                                                                   \
-    }                                                                                                                     \
+#define PARAM_COMPOSE_REQUIRED_VARIABLES(__data)                                                                   \
+  {                                                                                                                \
+    size_t numParams;                                                                                              \
+    const shards::IterableParam *params = getIterableParams(numParams);                                            \
+    _requiredVariables.clear();                                                                                    \
+    for (size_t i = 0; i < numParams; i++) {                                                                       \
+      if (params[i].collectRequirements) {                                                                         \
+        params[i].collectRequirements(params[i], __data, _requiredVariables, params[i].resolveParamInShard(this)); \
+      }                                                                                                            \
+    }                                                                                                              \
   }
 
 // Implements setParam()/getParam()

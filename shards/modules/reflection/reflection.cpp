@@ -47,7 +47,7 @@ struct Get {
   static SHTypesInfo inputTypes() { return CoreInfo::NoneType; }
   static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
 
-  PARAM_PARAMVAR(_variableName, "Variable Name", "The name of the variable to get", {CoreInfo::StringVarType});
+  PARAM_PARAMVAR(_variableName, "Name", "The name of the variable to get", {CoreInfo::StringType, CoreInfo::StringVarType});
   PARAM_IMPL(PARAM_IMPL_FOR(_variableName))
 
   std::string _currentVarName;

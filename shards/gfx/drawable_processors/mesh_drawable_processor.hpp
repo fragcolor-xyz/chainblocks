@@ -847,8 +847,8 @@ struct MeshDrawableProcessor final : public IDrawableProcessor {
           try {
             meshCacheEntry.mesh = generateLocalBasisAttribute(meshCacheEntry.mesh);
             meshCacheEntry.hasLocalBasisVector = true;
-          } catch (...) {
-            SPDLOG_LOGGER_WARN(getLogger(), "Failed to generate tangents for mesh {}", mesh->getId().value);
+          } catch (std::exception &e) {
+            SPDLOG_LOGGER_WARN(getLogger(), "Failed to generate tangents for mesh {}, {}", mesh->getId().value, e.what());
           }
         }
       }

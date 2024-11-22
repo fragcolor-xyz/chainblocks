@@ -86,6 +86,7 @@ public:
     _copyBySerialize.clear();
 
     SHInstanceData tmpData = data;
+    tmpData.privateContext = nullptr; // null this, in order to create a new context!
     ExposedInfo shared{shared_};
     for (auto &type : data.shared) {
       if (ignored.find(type.name) != ignored.end())

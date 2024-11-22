@@ -88,8 +88,8 @@ struct NetworkBase {
   ExposedInfo _required;
   SHTypeInfo compose(const SHInstanceData &data) {
     _required.clear();
-    collectRequiredVariables(data.shared, _required, (SHVar &)_addr);
-    collectRequiredVariables(data.shared, _required, (SHVar &)_port);
+    collectRequiredVariables(data, _required, (SHVar &)_addr);
+    collectRequiredVariables(data, _required, (SHVar &)_port);
     return data.inputType;
   }
 

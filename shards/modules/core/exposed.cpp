@@ -54,6 +54,7 @@ struct Isolate {
     }
 
     SHInstanceData tmpData = data;
+    tmpData.privateContext = nullptr; // null this, in order to create a new context!
     tmpData.shared = SHExposedTypesInfo(innerShared);
     auto cr = _contents.compose(tmpData);
 

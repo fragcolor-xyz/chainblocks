@@ -61,7 +61,7 @@ struct Const {
 
   SHVar getParam(int index) { return _value; }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
+  SHTypeInfo composeV2(const SHInstanceData &data) {
     freeDerivedInfo(_innerInfo);
     _dependencies.clear();
     _innerInfo = deriveTypeInfo(_value, data, &_dependencies);
@@ -461,7 +461,7 @@ struct Pause {
 
   SHTypeInfo compose(const SHInstanceData &data) {
     reqs.clear();
-    collectAllRequiredVariables(data.shared, reqs, time);
+    collectAllRequiredVariables(data, reqs, time);
 
     return data.inputType;
   }
@@ -1071,7 +1071,9 @@ struct SetBase : public VariableBase {
 
   // Runs sanity checks on the target variable, returns the existing exposed type if any
   const SHExposedTypeInfo *setBaseCompose(const SHInstanceData &data, bool warnIfExists, bool failIfExists, bool overwrite) {
-    const SHExposedTypeInfo *existingExposedType = findExposedVariablePtr(data.shared, _name);
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    const SHExposedTypeInfo *existingExposedType = findExposedVariablePtr(inherited->inherited, _name);
     if (existingExposedType) {
       auto &reference = *existingExposedType;
       if (_isTable) {
@@ -1213,7 +1215,7 @@ struct Set : public SetUpdateBase {
     throw SHException("Param index out of range.");
   }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
+  SHTypeInfo composeV2(const SHInstanceData &data) {
     _self = data.shard;
 
     const SHExposedTypeInfo *existingExposedType = setBaseCompose(data, true, false, false);
@@ -1387,7 +1389,7 @@ struct Ref : public SetBase {
     throw SHException("Param index out of range.");
   }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
+  SHTypeInfo composeV2(const SHInstanceData &data) {
     setBaseCompose(data, false, true, _overwrite);
 
     // bake exposed types
@@ -1500,7 +1502,9 @@ struct Update : public SetUpdateBase {
     return nullptr;
   }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
     _self = data.shard;
 
     setBaseCompose(data, false, false, false);
@@ -1512,30 +1516,28 @@ struct Update : public SetUpdateBase {
     if (_isTable) {
       // we are a table!
       _tableContentInfo = data.inputType;
-      for (uint32_t i = 0; data.shared.len > i; i++) {
-        auto &name = data.shared.elements[i].name;
-        if (name == _name && data.shared.elements[i].exposedType.basicType == SHType::Table) {
-          originalTableType = &data.shared.elements[i].exposedType;
+      auto type = findExposedVariablePtr(inherited->inherited, _name);
+      if (type && type->exposedType.basicType == SHType::Table) {
+        originalTableType = const_cast<SHTypeInfo *>(&type->exposedType);
 
-          auto &tableKeys = data.shared.elements[i].exposedType.table.keys;
-          auto &tableTypes = data.shared.elements[i].exposedType.table.types;
-          if (_key.isVariable()) {
-            tableInnerValueType = findTableNoneEntry(originalTableType);
-          } else {
-            for (uint32_t y = 0; y < tableKeys.len; y++) {
-              // if keys are populated they are not variables
-              auto &key = tableKeys.elements[y];
-              if (key == *_key) {
-                tableInnerValueType = &tableTypes.elements[y];
-              }
-            }
-            // Fallback to none type
-            if (!tableInnerValueType) {
-              tableInnerValueType = findTableNoneEntry(originalTableType);
+        auto &tableKeys = type->exposedType.table.keys;
+        auto &tableTypes = type->exposedType.table.types;
+        if (_key.isVariable()) {
+          tableInnerValueType = findTableNoneEntry(originalTableType);
+        } else {
+          for (uint32_t y = 0; y < tableKeys.len; y++) {
+            // if keys are populated they are not variables
+            auto &key = tableKeys.elements[y];
+            if (key == *_key) {
+              tableInnerValueType = &tableTypes.elements[y];
             }
           }
-          _isGlobal = data.shared.elements[i].global;
+          // Fallback to none type
+          if (!tableInnerValueType) {
+            tableInnerValueType = findTableNoneEntry(originalTableType);
+          }
         }
+        _isGlobal = type->global;
       }
 
       if (!originalTableType) {
@@ -1544,31 +1546,31 @@ struct Update : public SetUpdateBase {
 
       if (!tableInnerValueType) {
         if (_key.isVariable()) {
-          throw SHException(fmt::format(
+          throw ComposeError(fmt::format(
               "Update: can not update table with variable key \"{}\" because it has no \"none\" type field information ({}).",
               *_key, *originalTableType));
         } else {
-          throw SHException(fmt::format(
+          throw ComposeError(fmt::format(
               "Update: can not update table with variable key \"{}\" because it is not present in the table type({}).", *_key,
               *originalTableType));
         }
       }
 
       if (!matchTypes(data.inputType, *tableInnerValueType, true, true, true, true)) {
-        throw SHException(fmt::format("Update: error, update is changing table field for key {} from {} => {}", *_key,
-                                      *tableInnerValueType, data.inputType));
+        throw ComposeError(fmt::format("Update: error, update is changing table field for key {} from {} => {}", *_key,
+                                       *tableInnerValueType, data.inputType));
       }
 
       const_cast<Shard *>(data.shard)->inlineShardId = InlineShard::CoreSetUpdateTable;
     } else {
-      for (uint32_t i = 0; i < data.shared.len; i++) {
-        auto &cv = data.shared.elements[i];
-        if (_name == cv.name) {
-          if (cv.exposedType.basicType != SHType::Table && data.inputType != cv.exposedType) {
-            throw SHException("Update: error, update is changing the variable type.");
-          }
-          _isGlobal = cv.global;
+      auto type = findExposedVariablePtr(inherited->inherited, _name);
+      if (type) {
+        if (type->exposedType.basicType != SHType::Table && data.inputType != type->exposedType) {
+          throw ComposeError("Update: error, update is changing the variable type.");
         }
+        _isGlobal = type->global;
+      } else {
+        throw ComposeError(fmt::format("Update: error, variable {} is not exposed.", _name));
       }
 
       const_cast<Shard *>(data.shard)->inlineShardId = InlineShard::CoreSetUpdateRegular;
@@ -1681,7 +1683,10 @@ struct Get : public VariableBase {
   static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
   static SHOptionalString outputHelp() { return SHCCSTR("The output is the value read from the specified variable."); }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+
     _shard = const_cast<Shard *>(data.shard);
 
     if (_defaultValue.valueType != SHType::None) {
@@ -1689,62 +1694,61 @@ struct Get : public VariableBase {
       _defaultType = deriveTypeInfo(_defaultValue, data);
     }
 
+    auto type = findExposedVariablePtr(inherited->inherited, _name);
+
     if (_isTable) {
-      for (uint32_t i = 0; data.shared.len > i; i++) {
-        auto &name = data.shared.elements[i].name;
-        if (strcmp(name, _name.c_str()) == 0) {
-          if (data.shared.elements[i].exposedType.basicType != SHType::Table)
-            throw ComposeError(fmt::format("Get: error, variable {} was not a table", _name));
+      if (type) {
+        if (type->exposedType.basicType != SHType::Table)
+          throw ComposeError(fmt::format("Get: error, variable {} was not a table", _name));
 
-          auto &tableKeys = data.shared.elements[i].exposedType.table.keys;
-          auto &tableTypes = data.shared.elements[i].exposedType.table.types;
-          if (tableKeys.len == tableTypes.len) {
-            // if we have a name use it
-            bool hasMagicNone = false; // we use none for any key such as @type({none: Type::String})
-            std::optional<SHTypeInfo> magicNoneType;
-            for (uint32_t y = 0; y < tableKeys.len; y++) {
-              // if keys are populated they are not variables;
-              auto &key = tableKeys.elements[y];
-              if (key == _key) {
-                return tableTypes.elements[y];
-              } else if (key.valueType == SHType::None) {
-                hasMagicNone = true;
-                // only add once, if we got more types reset to Any
-                if (!magicNoneType) {
-                  magicNoneType = tableTypes.elements[y];
-                } else {
-                  if (*magicNoneType != tableTypes.elements[y])
-                    magicNoneType = CoreInfo::AnyType;
-                }
-              }
-            }
-
-            if (hasMagicNone && _key.isVariable()) {
-              // we got a variable key and we got a magic none
-              // we can return the magic none type
-              if (_defaultValue.valueType != SHType::None) {
-                return _defaultType;
+        auto &tableKeys = type->exposedType.table.keys;
+        auto &tableTypes = type->exposedType.table.types;
+        if (tableKeys.len == tableTypes.len) {
+          // if we have a name use it
+          bool hasMagicNone = false; // we use none for any key such as @type({none: Type::String})
+          std::optional<SHTypeInfo> magicNoneType;
+          for (uint32_t y = 0; y < tableKeys.len; y++) {
+            // if keys are populated they are not variables;
+            auto &key = tableKeys.elements[y];
+            if (key == _key) {
+              return tableTypes.elements[y];
+            } else if (key.valueType == SHType::None) {
+              hasMagicNone = true;
+              // only add once, if we got more types reset to Any
+              if (!magicNoneType) {
+                magicNoneType = tableTypes.elements[y];
               } else {
-                return *magicNoneType;
+                if (*magicNoneType != tableTypes.elements[y])
+                  magicNoneType = CoreInfo::AnyType;
               }
             }
-          } else {
-            // we got no key names
+          }
+
+          if (hasMagicNone && _key.isVariable()) {
+            // we got a variable key and we got a magic none
+            // we can return the magic none type
             if (_defaultValue.valueType != SHType::None) {
               return _defaultType;
-            } else if (tableTypes.len == 1) {
-              // 1 type only so we assume we return that type
-              return tableTypes.elements[0];
             } else {
-              // multiple types...
-              // return any, can still be used with ExpectX
-              return CoreInfo::AnyType;
+              return *magicNoneType;
             }
           }
-
-          if (data.shared.elements[i].isProtected) {
-            throw ComposeError("Get (" + _name + "): Cannot Get, variable is protected.");
+        } else {
+          // we got no key names
+          if (_defaultValue.valueType != SHType::None) {
+            return _defaultType;
+          } else if (tableTypes.len == 1) {
+            // 1 type only so we assume we return that type
+            return tableTypes.elements[0];
+          } else {
+            // multiple types...
+            // return any, can still be used with ExpectX
+            return CoreInfo::AnyType;
           }
+        }
+
+        if (type->isProtected) {
+          throw ComposeError("Get (" + _name + "): Cannot Get, variable is protected.");
         }
       }
 
@@ -1765,15 +1769,12 @@ struct Get : public VariableBase {
     } else {
       _tableTypes.clear();
       _tableKeys.clear();
-      for (uint32_t i = 0; i < data.shared.len; i++) {
-        auto &cv = data.shared.elements[i];
-        if (strcmp(_name.c_str(), cv.name) == 0) {
-          if (cv.isProtected) {
-            throw ComposeError("Get (" + _name + "): Cannot Get, variable is protected.");
-          }
 
-          return cv.exposedType;
+      if (type) {
+        if (type->isProtected) {
+          throw ComposeError("Get (" + _name + "): Cannot Get, variable is protected.");
         }
+        return type->exposedType;
       }
 
       // check if we can compose a table type
@@ -2156,14 +2157,14 @@ struct Push : public SeqBase {
             throw ComposeError(fmt::format("Push: error, variable {} is not a sequence.", _name));
           // found, can we mutate it?
           if (!cv.isMutable) {
-            throw ComposeError("Cannot mutate a non-mutable variable");
+            throw ComposeError(fmt::format("Cannot mutate a non-mutable variable: {}", _name));
           } else if (cv.isProtected) {
-            throw ComposeError("Cannot mutate a protected variable");
+            throw ComposeError(fmt::format("Cannot mutate a protected variable: {}", _name));
           }
 
           if (cv.tracked) {
             // cannot push into exposed variables
-            throw ComposeError("Cannot push into exposed variables");
+            throw ComposeError(fmt::format("Cannot push into exposed variables: {}", _name));
           }
 
           // ok now update into
@@ -2549,13 +2550,17 @@ struct SeqUser : VariableBase {
     _cell = _target->payload.tableValue.api->tableAt(_target->payload.tableValue, kv);
   }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    for (auto &shared : data.shared) {
-      std::string_view vName(shared.name);
-      if (vName == _name && shared.tracked) {
-        SHLOG_ERROR("Exposed variable {} can only be updated using Update.", _name);
-        throw ComposeError("Exposed variables can only be updated using Update.");
-      }
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    if (!info) {
+      throw ComposeError(fmt::format("Variable {} not found.", _name));
+    }
+
+    if (info->tracked) {
+      throw ComposeError(fmt::format("Variable {} is tracked and can only be updated using Update.", _name));
     }
 
     return data.inputType;
@@ -2641,15 +2646,17 @@ struct Clear : SeqUser {
   static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
   static SHOptionalString outputHelp() { return SHCCSTR("The input is passed through as the output."); }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    SeqUser::compose(data);
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    SeqUser::composeV2(data);
 
-    for (auto &shared : data.shared) {
-      std::string_view vName(shared.name);
-      if (vName == _name && !shared.isMutable) {
-        SHLOG_ERROR("Clear: Variable {} is not mutable.", _name);
-        throw ComposeError("Clear: Variable is not mutable.");
-      }
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    // info is valid because we run base compose first
+
+    if (!info->isMutable) {
+      throw ComposeError(fmt::format("Variable {} is not mutable.", _name));
     }
 
     return data.inputType;
@@ -2796,40 +2803,39 @@ struct Pop : SeqUser {
 
   void destroy() { destroyVar(_output); }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    SeqUser::compose(data);
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    SeqUser::composeV2(data);
+
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    // info is valid because we run base compose first
 
     if (_isTable) {
-      for (uint32_t i = 0; data.shared.len > i; i++) {
-        if (data.shared.elements[i].name == _name && data.shared.elements[i].exposedType.table.types.elements) {
-          auto &tableKeys = data.shared.elements[i].exposedType.table.keys;
-          auto &tableTypes = data.shared.elements[i].exposedType.table.types;
-          for (uint32_t y = 0; y < tableKeys.len; y++) {
-            // if here _key is not variable
-            if (*_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
-              // if we have 1 type we can predict the output
-              // with more just make us a any seq, will need ExpectX shards
-              // likely
-              if (tableTypes.elements[y].seqTypes.len == 1)
-                return tableTypes.elements[y].seqTypes.elements[0];
-              else
-                return CoreInfo::AnySeqType;
-            }
-          }
+      auto &tableKeys = info->exposedType.table.keys;
+      auto &tableTypes = info->exposedType.table.types;
+      for (uint32_t y = 0; y < tableKeys.len; y++) {
+        // if here _key is not variable
+        if (*_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
+          // if we have 1 type we can predict the output
+          // with more just make us a any seq, will need ExpectX shards
+          // likely
+          if (tableTypes.elements[y].seqTypes.len == 1)
+            return tableTypes.elements[y].seqTypes.elements[0];
+          else
+            return CoreInfo::AnySeqType;
         }
       }
       throw SHException("Pop: key not found or key value is not a sequence!.");
     } else {
-      for (uint32_t i = 0; i < data.shared.len; i++) {
-        auto &cv = data.shared.elements[i];
-        if (_name == cv.name && cv.exposedType.basicType == SHType::Seq) {
-          // if we have 1 type we can predict the output
-          // with more just make us a any seq, will need ExpectX shards likely
-          if (cv.exposedType.seqTypes.len == 1)
-            return cv.exposedType.seqTypes.elements[0];
-          else
-            return CoreInfo::AnySeqType;
-        }
+      if (info->exposedType.basicType == SHType::Seq) {
+        // if we have 1 type we can predict the output
+        // with more just make us a any seq, will need ExpectX shards likely
+        if (info->exposedType.seqTypes.len == 1)
+          return info->exposedType.seqTypes.elements[0];
+        else
+          return CoreInfo::AnySeqType;
       }
     }
     throw SHException("Variable is not a sequence.");
@@ -2874,40 +2880,39 @@ struct PopFront : SeqUser {
 
   void destroy() { destroyVar(_output); }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    SeqUser::compose(data);
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    SeqUser::composeV2(data);
+
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    // info is valid because we run base compose first
 
     if (_isTable) {
-      for (uint32_t i = 0; data.shared.len > i; i++) {
-        if (data.shared.elements[i].name == _name && data.shared.elements[i].exposedType.table.types.elements) {
-          auto &tableKeys = data.shared.elements[i].exposedType.table.keys;
-          auto &tableTypes = data.shared.elements[i].exposedType.table.types;
-          for (uint32_t y = 0; y < tableKeys.len; y++) {
-            // if here _key is not variable
-            if (*_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
-              // if we have 1 type we can predict the output
-              // with more just make us a any seq, will need ExpectX shards
-              // likely
-              if (tableTypes.elements[y].seqTypes.len == 1)
-                return tableTypes.elements[y].seqTypes.elements[0];
-              else
-                return CoreInfo::AnySeqType;
-            }
-          }
+      auto &tableKeys = info->exposedType.table.keys;
+      auto &tableTypes = info->exposedType.table.types;
+      for (uint32_t y = 0; y < tableKeys.len; y++) {
+        // if here _key is not variable
+        if (*_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
+          // if we have 1 type we can predict the output
+          // with more just make us a any seq, will need ExpectX shards
+          // likely
+          if (tableTypes.elements[y].seqTypes.len == 1)
+            return tableTypes.elements[y].seqTypes.elements[0];
+          else
+            return CoreInfo::AnySeqType;
         }
       }
       throw SHException("Pop: key not found or key value is not a sequence!.");
     } else {
-      for (uint32_t i = 0; i < data.shared.len; i++) {
-        auto &cv = data.shared.elements[i];
-        if (_name == cv.name && cv.exposedType.basicType == SHType::Seq) {
-          // if we have 1 type we can predict the output
-          // with more just make us a any seq, will need ExpectX shards likely
-          if (cv.exposedType.seqTypes.len == 1)
-            return cv.exposedType.seqTypes.elements[0];
-          else
-            return CoreInfo::AnySeqType;
-        }
+      if (info->exposedType.basicType == SHType::Seq) {
+        // if we have 1 type we can predict the output
+        // with more just make us a any seq, will need ExpectX shards likely
+        if (info->exposedType.seqTypes.len == 1)
+          return info->exposedType.seqTypes.elements[0];
+        else
+          return CoreInfo::AnySeqType;
       }
     }
     throw SHException("Variable is not a sequence.");

@@ -129,6 +129,7 @@ struct Convolve {
     // advance the scan
     _xindex += _step;
 
+    _output.version = input.version + 1;
     return _output;
   }
 
@@ -251,6 +252,7 @@ struct PremultiplyAlpha {
       process<float>(input, _output, w, h, imageGetRowStride(input.payload.imageValue));
     }
 
+    _output.version = input.version + 1;
     return _output;
   }
 

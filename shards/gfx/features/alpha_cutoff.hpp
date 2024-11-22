@@ -28,8 +28,12 @@ struct AlphaCutoff {
       context.readBuffer("alphaCutoff", Types::Float, "object");
       context.write(";");
       context.write("let alpha = ");
-      context.readGlobal("color");
-      context.write(".a;");
+      if(context.getDefinitions().globals.find("color") != context.getDefinitions().globals.end()) {
+        context.readGlobal("color");
+        context.write(".a;");
+      } else {
+        context.write("1.0;");
+      }
       context.write(R"(
         if(alpha < cutoff) {
           discard;

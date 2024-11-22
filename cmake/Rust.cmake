@@ -106,17 +106,18 @@ if(WIN32)
   endif()
 endif()
 
-if(USE_TSAN)
+if(USE_RUST_TSAN)
   list(APPEND RUST_FLAGS -Zsanitizer=thread)
 endif()
 
 option(CARGO_OFFLINE_MODE "Use offline mode for cargo" OFF)
+
 if(CARGO_OFFLINE_MODE)
   list(APPEND RUSTC_FLAGS --offline)
 endif()
 
 # if(USE_ASAN)
-#   list(APPEND RUST_FLAGS -Zsanitizer=address)
+# list(APPEND RUST_FLAGS -Zsanitizer=address)
 # endif()
 
 # Currently required for --crate-type argument
@@ -274,14 +275,19 @@ function(add_rust_library)
   endif()
 
   set(_RUST_ENVIRONMENT ${RUST_ENVIRONMENT})
+
   if(RUST_TARGET_PATH)
     list(APPEND _RUST_ENVIRONMENT "CARGO_TARGET_DIR=${RUST_TARGET_PATH}")
   endif()
 
   if(ANDROID_TOOLCHAIN_ROOT)
     list(APPEND _RUST_ENVIRONMENT
-        "AR=${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-ar"
-        "TARGET_CC=${CMAKE_CXX_COMPILER}")
+      "AR=${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-ar"
+      "TARGET_CC=${CMAKE_C_COMPILER}")
+  endif()
+
+  if(ANDROID)
+    list(APPEND RUST_FLAGS -Ctarget-feature=+fp16)
   endif()
 
   list(APPEND _RUST_ENVIRONMENT RUSTFLAGS="${RUST_FLAGS}")

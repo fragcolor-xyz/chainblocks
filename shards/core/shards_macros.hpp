@@ -205,6 +205,18 @@
     }                                                                                                                        \
   });
 
+#define RUNTIME_SHARD_composeV2(_name_)                                                                                      \
+  result->composeV2 = static_cast<SHComposeV2Proc>([](Shard *shard, SHInstanceData *data) {                                  \
+    try {                                                                                                                    \
+      return SHShardComposeResult{SHError::Success, reinterpret_cast<_name_##Runtime *>(shard)->core.composeV2(*data)};      \
+    } catch (std::exception & e) {                                                                                           \
+      reinterpret_cast<_name_##Runtime *>(shard)->lastError.assign(e.what());                                                \
+      return SHShardComposeResult{SHError{1, SHStringWithLen{reinterpret_cast<_name_##Runtime *>(shard)->lastError.data(),   \
+                                                             reinterpret_cast<_name_##Runtime *>(shard)->lastError.size()}}, \
+                                  SHTypeInfo{}};                                                                             \
+    }                                                                                                                        \
+  });
+
 #define RUNTIME_SHARD_warmup(_name_)                                                                    \
   result->warmup = static_cast<SHWarmupProc>([](Shard *shard, SHContext *ctx) {                         \
     try {                                                                                               \

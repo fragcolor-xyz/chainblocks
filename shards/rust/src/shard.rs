@@ -531,6 +531,7 @@ pub fn create<T: Default + LegacyShard>() -> LegacyShardWrapper<T> {
       } else {
         None
       },
+      composeV2: None,
       parameters: Some(legacy_shard_parameters::<T>),
       setParam: Some(legacy_shard_setParam::<T>),
       getParam: Some(legacy_shard_getParam::<T>),
@@ -872,6 +873,7 @@ pub fn create2<T: Default + Shard + ShardGenerated + ShardGeneratedOverloads>() 
       } else {
         None
       },
+      composeV2: None,
       parameters: Some(shard_parameters::<T>),
       setParam: Some(shard_setParam::<T>),
       getParam: Some(shard_getParam::<T>),

@@ -517,7 +517,7 @@ SHVar *referenceGlobalVariable(SHContext *ctx, std::string_view name) {
   return &v;
 }
 
-inline SHVar *findVariable(SHContext *ctx, std::string_view name) {
+SHVar *findVariable(SHContext *ctx, std::string_view name) {
   // try find a wire variable
   // from top to bottom of wire stack
   {
@@ -543,7 +543,7 @@ inline SHVar *findVariable(SHContext *ctx, std::string_view name) {
       }
       // if this wire is pure we break here and do not look further
       if (wire->pure) {
-        return nullptr;
+        break; // exit early, continue with mesh lookup
       }
     }
   }
@@ -787,12 +787,12 @@ SHWireState activateShards2(SHSeq shards, SHContext *context, const SHVar &wireI
 
 bool matchTypes(const SHTypeInfo &inputType, const SHTypeInfo &receiverType, bool isParameter, bool strict,
                 bool relaxEmptySeqCheck, bool ignoreFixedSeq) {
-  return TypeMatcher{.isParameter = isParameter, .strict = strict, .relaxEmptySeqCheck = relaxEmptySeqCheck, .ignoreFixedSeq = ignoreFixedSeq}.match(inputType,
-                                                                                                                   receiverType);
+  return TypeMatcher{
+      .isParameter = isParameter, .strict = strict, .relaxEmptySeqCheck = relaxEmptySeqCheck, .ignoreFixedSeq = ignoreFixedSeq}
+      .match(inputType, receiverType);
 }
 
 struct InternalCompositionContext {
-  pmr::unordered_map<std::string_view, SHExposedTypeInfo> inherited;
   pmr::unordered_map<std::string_view, SHExposedTypeInfo> exposed;
   pmr::unordered_set<SHExposedTypeInfo> required;
   CompositionContext *sharedContext{};
@@ -809,17 +809,38 @@ struct InternalCompositionContext {
   std::unordered_map<std::string_view, SHExposedTypeInfo> *fullRequired{nullptr};
 
   InternalCompositionContext() = default;
-  InternalCompositionContext(pmr::memory_resource *allocator) : inherited(allocator), exposed(allocator), required(allocator) {}
+  InternalCompositionContext(pmr::memory_resource *allocator) : exposed(allocator), required(allocator) {}
 };
 
-// Uncomment for more detailed profiling
-#define SH_EXTENDED_COMPOSE_PROFILING 1
+void collectRequiredVariables(const SHInstanceData &data, ExposedInfo &out, const SHVar &var) {
+  using namespace std::literals;
+
+  switch (var.valueType) {
+  case SHType::ContextVar: {
+    auto sv = SHSTRVIEW(var);
+    // use context inherited
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariable(inherited->inherited, sv);
+    if (info) {
+      out.push_back(*info);
+      break;
+    }
+  } break;
+  case SHType::Seq:
+    shards::ForEach(var.payload.seqValue, [&](const SHVar &v) { collectRequiredVariables(data, out, v); });
+    break;
+  case SHType::Table:
+    shards::ForEach(var.payload.tableValue, [&](const SHVar &key, const SHVar &v) { collectRequiredVariables(data, out, v); });
+    break;
+  default:
+    break;
+  }
+}
 
 void validateConnection(InternalCompositionContext &ctx) {
-#if SH_EXTENDED_COMPOSE_PROFILING
   ZoneScopedN("validateConnection");
   ZoneName(ctx.bottom->name(ctx.bottom), ctx.bottom->nameLength);
-#endif
 
   auto previousOutput = ctx.previousOutputType;
 
@@ -850,13 +871,9 @@ void validateConnection(InternalCompositionContext &ctx) {
   // If we don't we assume our output will be of the same type of the previous!
   if (ctx.bottom->compose) {
     SHInstanceData data{};
-
     {
-#if SH_EXTENDED_COMPOSE_PROFILING
-      ZoneScopedN("PrepareCompose");
-#endif
       pmr::vector<SHExposedTypeInfo> sharedStorage{ctx.sharedContext->tempAllocator.getAllocator()};
-      sharedStorage.reserve(ctx.exposed.size() + ctx.inherited.size());
+      sharedStorage.reserve(ctx.exposed.size() + ctx.sharedContext->inherited.size());
 
       data.shard = ctx.bottom;
       data.wire = ctx.wire;
@@ -873,8 +890,9 @@ void validateConnection(InternalCompositionContext &ctx) {
       for (auto &pair : ctx.exposed) {
         sharedStorage.push_back(pair.second);
       }
+
       // and inherited
-      for (auto &pair : ctx.inherited) {
+      for (auto &pair : ctx.sharedContext->inherited) {
         if (ctx.exposed.find(pair.first) != ctx.exposed.end())
           continue; // Let exposed override inherited
         sharedStorage.push_back(pair.second);
@@ -884,14 +902,30 @@ void validateConnection(InternalCompositionContext &ctx) {
       data.shared.len = sharedStorage.size();
     }
 
-// Uncomment for more detailed profiling
-#if SH_EXTENDED_COMPOSE_PROFILING
-    ZoneScopedN("Compose");
-#endif
-
     // this ensures e.g. SetVariable exposedVars have right type from the actual
     // input type (previousOutput)!
     auto composeResult = ctx.bottom->compose(ctx.bottom, &data);
+    if (composeResult.error.code != SH_ERROR_NONE) {
+      std::string_view msg(composeResult.error.message.string, size_t(composeResult.error.message.len));
+      SHLOG_ERROR("Error composing shard: {}, wire: {}", msg, ctx.wire ? ctx.wire->name : "(unwired)");
+      throw ComposeError(msg);
+    }
+    ctx.previousOutputType = composeResult.result;
+  } else if (ctx.bottom->composeV2) {
+    SHInstanceData data{};
+    data.shard = ctx.bottom;
+    data.wire = ctx.wire;
+    data.inputType = previousOutput;
+    data.requiredVariables = ctx.fullRequired;
+    data.privateContext = ctx.sharedContext;
+    if (ctx.next) {
+      data.outputTypes = ctx.next->inputTypes(ctx.next);
+    }
+    data.onWorkerThread = ctx.onWorkerThread;
+
+    // this ensures e.g. SetVariable exposedVars have right type from the actual
+    // input type (previousOutput)!
+    auto composeResult = ctx.bottom->composeV2(ctx.bottom, &data);
     if (composeResult.error.code != SH_ERROR_NONE) {
       std::string_view msg(composeResult.error.message.string, size_t(composeResult.error.message.len));
       SHLOG_ERROR("Error composing shard: {}, wire: {}", msg, ctx.wire ? ctx.wire->name : "(unwired)");
@@ -978,6 +1012,7 @@ void validateConnection(InternalCompositionContext &ctx) {
     }
 
     ctx.exposed[name] = exposed_param;
+    ctx.sharedContext->inherited.insert(name, exposed_param);
   }
 
   // Finally do checks on what we consume
@@ -999,18 +1034,19 @@ void validateConnection(InternalCompositionContext &ctx) {
 
     std::string_view name(required_param.name);
 
-    auto end = ctx.exposed.end();
-    auto findIt = ctx.exposed.find(name);
-    if (findIt == end) {
-      end = ctx.inherited.end();
-      findIt = ctx.inherited.find(name);
+    std::optional<SHExposedTypeInfo> found;
+    const auto foundInherited = ctx.sharedContext->inherited.find(name);
+    if (foundInherited != ctx.sharedContext->inherited.end()) {
+      found = foundInherited->second;
+    } else {
+      found = std::nullopt;
     }
-    if (findIt == end) {
+    if (!found) {
       auto err = fmt::format("Required variable not found: {}", name);
       // Warning only, delegate compose to decide if it's an error
-      SHLOG_WARNING("{}", err);
+      SHLOG_TRACE("Required variable not found: {}", name);
     } else {
-      auto exposedType = findIt->second.exposedType;
+      auto exposedType = found->exposedType;
       auto requiredType = required_param.exposedType;
       // Finally deep compare types
       if (matchTypes(exposedType, requiredType, false, true, false)) {
@@ -1023,23 +1059,9 @@ void validateConnection(InternalCompositionContext &ctx) {
     }
 
     if (!matching) {
-      std::stringstream ss;
-      ss << "Required types do not match currently exposed ones for variable '" << required.first
-         << "' required possible types: ";
-      auto &type = required.second;
-      ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-
-      ss << "exposed types: ";
-      for (const auto &info : ctx.exposed) {
-        auto &type = info.second;
-        ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-      }
-      for (const auto &info : ctx.inherited) {
-        auto &type = info.second;
-        ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-      }
-      auto sss = ss.str();
-      throw ComposeError(sss);
+      throw ComposeError(
+          fmt::format("Required types do not match currently exposed ones for variable '{}' required type: (\"{}\", {})",
+                      required.first, required.second.name, required.second.exposedType));
     } else {
       // Add required stuff that we do not expose ourself
       if (ctx.exposed.find(match.name) == ctx.exposed.end())
@@ -1073,9 +1095,7 @@ struct ComposeMemory {
 };
 thread_local std::optional<ComposeMemory> ComposeMemory::allocator;
 
-CompositionContext::CompositionContext() : visitedWires(tempAllocator.getAllocator()) {}
-
-SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstanceData data) {
+SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstanceData data, bool fromWire = false) {
   ZoneScoped;
   if (data.wire) {
     ZoneText(data.wire->name.data(), data.wire->name.size());
@@ -1089,6 +1109,8 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
   }
 
   CompositionContext *context{reinterpret_cast<CompositionContext *>(data.privateContext)};
+  context->inherited.pushLayer(fromWire && data.wire->pure); // if pure, prevent inherited vars from being visible
+  DEFER(context->inherited.popLayer());
   InternalCompositionContext ctx{context->tempAllocator};
   ctx.sharedContext = context;
   ctx.originalInputType = data.inputType;
@@ -1115,7 +1137,7 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
       SHExposedTypeInfo expInfo{key.payload.stringValue, {}, *type, true /* mutable */};
       expInfo.tracked = var.flags & SHVAR_FLAGS_TRACKED;
       std::string_view sName(key.payload.stringValue, key.payload.stringLen);
-      ctx.inherited[sName] = expInfo;
+      ctx.sharedContext->inherited.insert(sName, expInfo);
     }
 
     // add present mesh variables as well if we have a mesh
@@ -1126,19 +1148,16 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
         auto metadata = mesh->getMetadata(&v.second);
         if (metadata) {
           std::string_view sName(v.first.payload.stringValue, v.first.payload.stringLen);
-          ctx.inherited[sName] = *metadata;
+          ctx.sharedContext->inherited.insert(sName, *metadata);
         }
       }
     }
   }
 
   if (data.shared.elements) {
-#if SH_EXTENDED_COMPOSE_PROFILING
-    ZoneScopedN("Setup Inherited");
-#endif
     for (uint32_t i = 0; i < data.shared.len; i++) {
       auto &info = data.shared.elements[i];
-      ctx.inherited[info.name] = info;
+      ctx.sharedContext->inherited.insert(info.name, info);
     }
   }
 
@@ -1273,7 +1292,7 @@ SHComposeResult internalComposeWire(const SHWire *wire_, SHInstanceData data) {
 
   shassert(wire == data.wire); // caller must pass the same wire as data.wire
 
-  auto res = internalComposeWire(wire->shards, data);
+  auto res = internalComposeWire(wire->shards, data, true);
   DEFER({
     shards::arrayFree(res.exposedInfo);
     shards::arrayFree(res.requiredInfo);

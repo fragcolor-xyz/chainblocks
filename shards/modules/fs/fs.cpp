@@ -338,6 +338,10 @@ struct Read {
 
   SHTypeInfo compose(const SHInstanceData &data) { return _binary ? CoreInfo::BytesType : CoreInfo::StringType; }
 
+  void cleanup(SHContext *context) {
+    _buffer = {};
+  }
+
   SHVar activate(SHContext *context, const SHVar &input) {
     _buffer.clear();
     fs::path p(SHSTRING_PREFER_SHSTRVIEW(input));
@@ -625,7 +629,8 @@ struct Absolute {
   static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
   static SHTypesInfo outputTypes() { return CoreInfo::StringType; }
 
-  PARAM_PARAMVAR(_canonical, "Canonical", "Whether to canonicalize the path, the file should exist for this to work", {CoreInfo::BoolType, CoreInfo::BoolVarType});
+  PARAM_PARAMVAR(_canonical, "Canonical", "Whether to canonicalize the path, the file should exist for this to work",
+                 {CoreInfo::BoolType, CoreInfo::BoolVarType});
   PARAM_IMPL(PARAM_IMPL_FOR(_canonical));
 
   Absolute() { _canonical = Var(false); }
