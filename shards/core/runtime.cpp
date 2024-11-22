@@ -812,6 +812,32 @@ struct InternalCompositionContext {
   InternalCompositionContext(pmr::memory_resource *allocator) : exposed(allocator), required(allocator) {}
 };
 
+void collectRequiredVariables(const SHInstanceData &data, ExposedInfo &out, const SHVar &var) {
+  using namespace std::literals;
+
+  switch (var.valueType) {
+  case SHType::ContextVar: {
+    auto sv = SHSTRVIEW(var);
+    // use context inherited
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariable(inherited->inherited, sv);
+    if (info) {
+      out.push_back(*info);
+      break;
+    }
+  } break;
+  case SHType::Seq:
+    shards::ForEach(var.payload.seqValue, [&](const SHVar &v) { collectRequiredVariables(data, out, v); });
+    break;
+  case SHType::Table:
+    shards::ForEach(var.payload.tableValue, [&](const SHVar &key, const SHVar &v) { collectRequiredVariables(data, out, v); });
+    break;
+  default:
+    break;
+  }
+}
+
 void validateConnection(InternalCompositionContext &ctx) {
   ZoneScopedN("validateConnection");
   ZoneName(ctx.bottom->name(ctx.bottom), ctx.bottom->nameLength);

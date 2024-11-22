@@ -1696,37 +1696,10 @@ inline std::optional<SHExposedTypeInfo> findExposedVariable(const SHExposedTypes
 }
 
 // Collects all ContextVar references
-inline void collectRequiredVariables(const SHExposedTypesInfo &exposed, ExposedInfo &out, const SHVar &var) {
-  using namespace std::literals;
+void collectRequiredVariables(const SHInstanceData &data, ExposedInfo &out, const SHVar &var);
 
-  switch (var.valueType) {
-  case SHType::ContextVar: {
-    auto sv = SHSTRVIEW(var);
-    for (const auto &entry : exposed) {
-      shassert(var.payload.stringValue && entry.name && "Invalid exposed variable name (nullptr)");
-      if (sv == entry.name) {
-        out.push_back(SHExposedTypeInfo{
-            .name = var.payload.stringValue,
-            .exposedType = entry.exposedType,
-        });
-        break;
-      }
-    }
-  } break;
-  case SHType::Seq:
-    shards::ForEach(var.payload.seqValue, [&](const SHVar &v) { collectRequiredVariables(exposed, out, v); });
-    break;
-  case SHType::Table:
-    shards::ForEach(var.payload.tableValue, [&](const SHVar &key, const SHVar &v) { collectRequiredVariables(exposed, out, v); });
-    break;
-  default:
-    break;
-  }
-}
-
-inline bool collectRequiredVariables(const SHExposedTypesInfo &exposed, ExposedInfo &out, const SHVar &var,
-                                     SHTypesInfo validTypes, const char *debugTag) {
-  SHInstanceData data{.shared = exposed};
+inline bool collectRequiredVariables(const SHInstanceData &data, ExposedInfo &out, const SHVar &var, SHTypesInfo validTypes,
+                                     const char *debugTag) {
   std::vector<SHExposedTypeInfo> expInfo;
   TypeInfo ti(var, data, &expInfo, false);
   for (auto &type : validTypes) {
@@ -1746,8 +1719,8 @@ inline bool collectRequiredVariables(const SHExposedTypesInfo &exposed, ExposedI
 }
 
 template <typename... TArgs>
-inline void collectAllRequiredVariables(const SHExposedTypesInfo &exposed, ExposedInfo &out, TArgs &&...args) {
-  (collectRequiredVariables(exposed, out, std::forward<TArgs>(args)), ...);
+inline void collectAllRequiredVariables(const SHInstanceData &data, ExposedInfo &out, TArgs &&...args) {
+  (collectRequiredVariables(data, out, std::forward<TArgs>(args)), ...);
 }
 
 inline SHStringWithLen swlDuplicate(SHStringWithLen in) {

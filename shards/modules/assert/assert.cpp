@@ -213,7 +213,7 @@ struct IsAlmost {
 
   SHTypeInfo compose(const SHInstanceData &data) {
     _requiredVariables.clear();
-    collectRequiredVariables(data.shared, _requiredVariables, _value);
+    collectRequiredVariables(data, _requiredVariables, _value);
 
     if (_value.isVariable()) {
       auto exposed = findExposedVariable(data.shared, _value);

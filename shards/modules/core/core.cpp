@@ -2948,7 +2948,7 @@ struct Once {
     self = data.shard;
     _validation = _blks.compose(data);
 
-    collectRequiredVariables(data.shared, _requiredInfo, _repeat);
+    collectRequiredVariables(data, _requiredInfo, _repeat);
 
     return data.inputType;
   }

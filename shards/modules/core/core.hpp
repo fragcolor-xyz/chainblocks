@@ -461,7 +461,7 @@ struct Pause {
 
   SHTypeInfo compose(const SHInstanceData &data) {
     reqs.clear();
-    collectAllRequiredVariables(data.shared, reqs, time);
+    collectAllRequiredVariables(data, reqs, time);
 
     return data.inputType;
   }
