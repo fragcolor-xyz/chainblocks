@@ -604,12 +604,16 @@ public:
 
   // Insert only if the key does not exist in any accessible layer
   void insert(const K &key, const V &value) {
-    if (find(key) == end()) {
+    auto it = find(key);
+    if (it == end()) {
       if (!layers.empty()) {
         layers.back()[key] = value;
       } else {
         throw std::runtime_error("No layers to insert into!");
       }
+    } else {
+      // update existing value
+      const_cast<V &>(it->second) = value;
     }
   }
 

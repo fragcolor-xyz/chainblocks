@@ -896,7 +896,6 @@ void validateConnection(InternalCompositionContext &ctx) {
       data.outputTypes = ctx.next->inputTypes(ctx.next);
     }
     data.onWorkerThread = ctx.onWorkerThread;
-    data.composeVersion = 2;
 
     // this ensures e.g. SetVariable exposedVars have right type from the actual
     // input type (previousOutput)!
