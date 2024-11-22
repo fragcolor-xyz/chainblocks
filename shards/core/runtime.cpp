@@ -1019,7 +1019,7 @@ void validateConnection(InternalCompositionContext &ctx) {
     if (!found) {
       auto err = fmt::format("Required variable not found: {}", name);
       // Warning only, delegate compose to decide if it's an error
-      SHLOG_WARNING("{}", err);
+      SHLOG_TRACE("Required variable not found: {}", name);
     } else {
       auto exposedType = found->exposedType;
       auto requiredType = required_param.exposedType;
@@ -1039,13 +1039,7 @@ void validateConnection(InternalCompositionContext &ctx) {
          << "' required possible types: ";
       auto &type = required.second;
       ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-
-      ss << "exposed types (directly): ";
-      for (const auto &info : ctx.exposed) {
-        auto &type = info.second;
-        ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-      }
-      ss << "exposed types (inherited): ";
+      ss << "exposed types: ";
       for (const auto &info : ctx.sharedContext->inherited) {
         auto &type = info.second;
         ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
