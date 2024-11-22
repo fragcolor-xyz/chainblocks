@@ -736,6 +736,7 @@ struct SHInstanceData {
   // Internally used
   void *requiredVariables;
   void *privateContext;
+  int composeVersion;
 };
 
 typedef struct Shard *(__cdecl *SHShardConstructor)();

@@ -1274,7 +1274,7 @@ struct Erase : SeqUser {
     // info is valid because we run base compose first
 
     bool valid = false;
-    
+
     if (info->exposedType.basicType != SHType::Seq && info->exposedType.basicType != SHType::Table) {
       throw ComposeError(
           fmt::format("Erase: Expected a SHType::Seq or SHType::Table, got {}, variable: {}", info->exposedType, _name));
@@ -1292,7 +1292,7 @@ struct Erase : SeqUser {
     } else if (_indices->valueType == SHType::Int) {
       valid = true;
     } else { // SHType::ContextVar && !isTable
-      auto info = findExposedVariable(data.shared, SHSTRVIEW((*_indices)));
+      auto info = findExposedVariable(inherited->inherited, SHSTRVIEW((*_indices)));
       if (info) {
         if (info->exposedType.basicType == SHType::Seq && info->exposedType.seqTypes.len == 1 &&
             info->exposedType.seqTypes.elements[0].basicType == SHType::Int) {
@@ -1306,8 +1306,10 @@ struct Erase : SeqUser {
       }
     }
 
-    if (!valid)
+    if (!valid) {
       throw SHException("Erase, invalid indices or malformed input.");
+    }
+
     return data.inputType;
   }
 

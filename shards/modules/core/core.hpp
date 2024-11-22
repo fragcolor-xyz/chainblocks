@@ -61,7 +61,7 @@ struct Const {
 
   SHVar getParam(int index) { return _value; }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
+  SHTypeInfo composeV2(const SHInstanceData &data) {
     freeDerivedInfo(_innerInfo);
     _dependencies.clear();
     _innerInfo = deriveTypeInfo(_value, data, &_dependencies);

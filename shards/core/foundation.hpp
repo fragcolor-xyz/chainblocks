@@ -1677,6 +1677,15 @@ inline std::optional<SHExposedTypeInfo> findExposedVariable(const SHExposedTypes
   return std::nullopt;
 }
 
+inline std::optional<SHExposedTypeInfo>
+findExposedVariable(const shards::LayeredMap<std::string_view, SHExposedTypeInfo> &exposed, std::string_view variableName) {
+  auto it = exposed.find(variableName);
+  if (it != exposed.end()) {
+    return it->second;
+  }
+  return std::nullopt;
+}
+
 inline std::optional<SHExposedTypeInfo> findExposedVariable(const SHExposedTypesInfo &exposed, const SHVar &var) {
   shassert(var.valueType == SHType::ContextVar);
   return findExposedVariable(exposed, SHSTRVIEW(var));

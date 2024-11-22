@@ -84,6 +84,8 @@ SHTypeInfo cloneTypeInfo(const SHTypeInfo &other) {
 
 SHTypeInfo deriveTypeInfo(const SHVar &value, const SHInstanceData &data, std::vector<SHExposedTypeInfo> *expInfo,
                           bool resolveContextVariables) {
+  ZoneScopedN("deriveTypeInfo");
+  
   SHTypeInfo varType{};
   varType.basicType = value.valueType;
   varType.innerType = value.innerType;
@@ -131,20 +133,38 @@ SHTypeInfo deriveTypeInfo(const SHVar &value, const SHInstanceData &data, std::v
     if (expInfo) {
       auto sv = SHSTRVIEW(value);
       const auto varName = sv;
-      for (auto info : data.shared) {
-        std::string_view name(info.name);
-        if (name == sv) {
-          expInfo->push_back(SHExposedTypeInfo{.name = info.name, .exposedType = info.exposedType});
+      if (data.composeVersion == 2) {
+        shassert(data.privateContext && "Private context should be valid");
+        auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+        auto info = findExposedVariable(inherited->inherited, varName);
+        if (info) {
+          expInfo->push_back(*info);
           if (resolveContextVariables) {
-            return cloneTypeInfo(info.exposedType);
+            return cloneTypeInfo(info->exposedType);
           } else {
-            shards::arrayPush(varType.contextVarTypes, cloneTypeInfo(info.exposedType));
+            shards::arrayPush(varType.contextVarTypes, cloneTypeInfo(info->exposedType));
             return varType;
           }
+        } else {
+          SHLOG_ERROR("Could not find variable {} when deriving type info", varName);
+          throw std::runtime_error(fmt::format("Could not find variable {} when deriving type info", varName));
         }
+      } else {
+        for (auto info : data.shared) {
+          std::string_view name(info.name);
+          if (name == sv) {
+            expInfo->push_back(SHExposedTypeInfo{.name = info.name, .exposedType = info.exposedType});
+            if (resolveContextVariables) {
+              return cloneTypeInfo(info.exposedType);
+            } else {
+              shards::arrayPush(varType.contextVarTypes, cloneTypeInfo(info.exposedType));
+              return varType;
+            }
+          }
+        }
+        SHLOG_ERROR("Could not find variable {} when deriving type info", varName);
+        throw std::runtime_error(fmt::format("Could not find variable {} when deriving type info", varName));
       }
-      SHLOG_ERROR("Could not find variable {} when deriving type info", varName);
-      throw std::runtime_error(fmt::format("Could not find variable {} when deriving type info", varName));
     }
   } break;
   default:

@@ -812,14 +812,9 @@ struct InternalCompositionContext {
   InternalCompositionContext(pmr::memory_resource *allocator) : exposed(allocator), required(allocator) {}
 };
 
-// Uncomment for more detailed profiling
-#define SH_EXTENDED_COMPOSE_PROFILING 1
-
 void validateConnection(InternalCompositionContext &ctx) {
-#if SH_EXTENDED_COMPOSE_PROFILING
   ZoneScopedN("validateConnection");
   ZoneName(ctx.bottom->name(ctx.bottom), ctx.bottom->nameLength);
-#endif
 
   auto previousOutput = ctx.previousOutputType;
 
@@ -851,9 +846,6 @@ void validateConnection(InternalCompositionContext &ctx) {
   if (ctx.bottom->compose) {
     SHInstanceData data{};
     {
-#if SH_EXTENDED_COMPOSE_PROFILING
-      ZoneScopedN("PrepareCompose");
-#endif
       pmr::vector<SHExposedTypeInfo> sharedStorage{ctx.sharedContext->tempAllocator.getAllocator()};
       sharedStorage.reserve(ctx.exposed.size() + ctx.sharedContext->inherited.size());
 
@@ -884,11 +876,6 @@ void validateConnection(InternalCompositionContext &ctx) {
       data.shared.len = sharedStorage.size();
     }
 
-// Uncomment for more detailed profiling
-#if SH_EXTENDED_COMPOSE_PROFILING
-    ZoneScopedN("Compose");
-#endif
-
     // this ensures e.g. SetVariable exposedVars have right type from the actual
     // input type (previousOutput)!
     auto composeResult = ctx.bottom->compose(ctx.bottom, &data);
@@ -909,11 +896,7 @@ void validateConnection(InternalCompositionContext &ctx) {
       data.outputTypes = ctx.next->inputTypes(ctx.next);
     }
     data.onWorkerThread = ctx.onWorkerThread;
-
-// Uncomment for more detailed profiling
-#if SH_EXTENDED_COMPOSE_PROFILING
-    ZoneScopedN("Compose");
-#endif
+    data.composeVersion = 2;
 
     // this ensures e.g. SetVariable exposedVars have right type from the actual
     // input type (previousOutput)!
@@ -1162,9 +1145,6 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
   }
 
   if (data.shared.elements) {
-#if SH_EXTENDED_COMPOSE_PROFILING
-    ZoneScopedN("Setup Inherited");
-#endif
     for (uint32_t i = 0; i < data.shared.len; i++) {
       auto &info = data.shared.elements[i];
       ctx.sharedContext->inherited.insert(info.name, info);
