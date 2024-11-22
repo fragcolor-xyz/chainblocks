@@ -1034,18 +1034,9 @@ void validateConnection(InternalCompositionContext &ctx) {
     }
 
     if (!matching) {
-      std::stringstream ss;
-      ss << "Required types do not match currently exposed ones for variable '" << required.first
-         << "' required possible types: ";
-      auto &type = required.second;
-      ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-      ss << "exposed types: ";
-      for (const auto &info : ctx.sharedContext->inherited) {
-        auto &type = info.second;
-        ss << "{\"" << type.name << "\" (" << type.exposedType << ")} ";
-      }
-      auto sss = ss.str();
-      throw ComposeError(sss);
+      throw ComposeError(
+          fmt::format("Required types do not match currently exposed ones for variable '{}' required type: (\"{}\", {})",
+                      required.first, required.second.name, required.second.exposedType));
     } else {
       // Add required stuff that we do not expose ourself
       if (ctx.exposed.find(match.name) == ctx.exposed.end())
