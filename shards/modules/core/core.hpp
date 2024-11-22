@@ -2550,13 +2550,17 @@ struct SeqUser : VariableBase {
     _cell = _target->payload.tableValue.api->tableAt(_target->payload.tableValue, kv);
   }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    for (auto &shared : data.shared) {
-      std::string_view vName(shared.name);
-      if (vName == _name && shared.tracked) {
-        SHLOG_ERROR("Exposed variable {} can only be updated using Update.", _name);
-        throw ComposeError("Exposed variables can only be updated using Update.");
-      }
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    if (!info) {
+      throw ComposeError(fmt::format("Variable {} not found.", _name));
+    }
+
+    if (info->tracked) {
+      throw ComposeError(fmt::format("Variable {} is tracked and can only be updated using Update.", _name));
     }
 
     return data.inputType;
@@ -2642,15 +2646,17 @@ struct Clear : SeqUser {
   static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
   static SHOptionalString outputHelp() { return SHCCSTR("The input is passed through as the output."); }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    SeqUser::compose(data);
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    SeqUser::composeV2(data);
 
-    for (auto &shared : data.shared) {
-      std::string_view vName(shared.name);
-      if (vName == _name && !shared.isMutable) {
-        SHLOG_ERROR("Clear: Variable {} is not mutable.", _name);
-        throw ComposeError("Clear: Variable is not mutable.");
-      }
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    // info is valid because we run base compose first
+
+    if (!info->isMutable) {
+      throw ComposeError(fmt::format("Variable {} is not mutable.", _name));
     }
 
     return data.inputType;
@@ -2797,40 +2803,39 @@ struct Pop : SeqUser {
 
   void destroy() { destroyVar(_output); }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    SeqUser::compose(data);
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    SeqUser::composeV2(data);
+
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    // info is valid because we run base compose first
 
     if (_isTable) {
-      for (uint32_t i = 0; data.shared.len > i; i++) {
-        if (data.shared.elements[i].name == _name && data.shared.elements[i].exposedType.table.types.elements) {
-          auto &tableKeys = data.shared.elements[i].exposedType.table.keys;
-          auto &tableTypes = data.shared.elements[i].exposedType.table.types;
-          for (uint32_t y = 0; y < tableKeys.len; y++) {
-            // if here _key is not variable
-            if (*_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
-              // if we have 1 type we can predict the output
-              // with more just make us a any seq, will need ExpectX shards
-              // likely
-              if (tableTypes.elements[y].seqTypes.len == 1)
-                return tableTypes.elements[y].seqTypes.elements[0];
-              else
-                return CoreInfo::AnySeqType;
-            }
-          }
+      auto &tableKeys = info->exposedType.table.keys;
+      auto &tableTypes = info->exposedType.table.types;
+      for (uint32_t y = 0; y < tableKeys.len; y++) {
+        // if here _key is not variable
+        if (*_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
+          // if we have 1 type we can predict the output
+          // with more just make us a any seq, will need ExpectX shards
+          // likely
+          if (tableTypes.elements[y].seqTypes.len == 1)
+            return tableTypes.elements[y].seqTypes.elements[0];
+          else
+            return CoreInfo::AnySeqType;
         }
       }
       throw SHException("Pop: key not found or key value is not a sequence!.");
     } else {
-      for (uint32_t i = 0; i < data.shared.len; i++) {
-        auto &cv = data.shared.elements[i];
-        if (_name == cv.name && cv.exposedType.basicType == SHType::Seq) {
-          // if we have 1 type we can predict the output
-          // with more just make us a any seq, will need ExpectX shards likely
-          if (cv.exposedType.seqTypes.len == 1)
-            return cv.exposedType.seqTypes.elements[0];
-          else
-            return CoreInfo::AnySeqType;
-        }
+      if (info->exposedType.basicType == SHType::Seq) {
+        // if we have 1 type we can predict the output
+        // with more just make us a any seq, will need ExpectX shards likely
+        if (info->exposedType.seqTypes.len == 1)
+          return info->exposedType.seqTypes.elements[0];
+        else
+          return CoreInfo::AnySeqType;
       }
     }
     throw SHException("Variable is not a sequence.");
@@ -2875,40 +2880,39 @@ struct PopFront : SeqUser {
 
   void destroy() { destroyVar(_output); }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    SeqUser::compose(data);
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    SeqUser::composeV2(data);
+
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    // info is valid because we run base compose first
 
     if (_isTable) {
-      for (uint32_t i = 0; data.shared.len > i; i++) {
-        if (data.shared.elements[i].name == _name && data.shared.elements[i].exposedType.table.types.elements) {
-          auto &tableKeys = data.shared.elements[i].exposedType.table.keys;
-          auto &tableTypes = data.shared.elements[i].exposedType.table.types;
-          for (uint32_t y = 0; y < tableKeys.len; y++) {
-            // if here _key is not variable
-            if (*_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
-              // if we have 1 type we can predict the output
-              // with more just make us a any seq, will need ExpectX shards
-              // likely
-              if (tableTypes.elements[y].seqTypes.len == 1)
-                return tableTypes.elements[y].seqTypes.elements[0];
-              else
-                return CoreInfo::AnySeqType;
-            }
-          }
+      auto &tableKeys = info->exposedType.table.keys;
+      auto &tableTypes = info->exposedType.table.types;
+      for (uint32_t y = 0; y < tableKeys.len; y++) {
+        // if here _key is not variable
+        if (*_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
+          // if we have 1 type we can predict the output
+          // with more just make us a any seq, will need ExpectX shards
+          // likely
+          if (tableTypes.elements[y].seqTypes.len == 1)
+            return tableTypes.elements[y].seqTypes.elements[0];
+          else
+            return CoreInfo::AnySeqType;
         }
       }
       throw SHException("Pop: key not found or key value is not a sequence!.");
     } else {
-      for (uint32_t i = 0; i < data.shared.len; i++) {
-        auto &cv = data.shared.elements[i];
-        if (_name == cv.name && cv.exposedType.basicType == SHType::Seq) {
-          // if we have 1 type we can predict the output
-          // with more just make us a any seq, will need ExpectX shards likely
-          if (cv.exposedType.seqTypes.len == 1)
-            return cv.exposedType.seqTypes.elements[0];
-          else
-            return CoreInfo::AnySeqType;
-        }
+      if (info->exposedType.basicType == SHType::Seq) {
+        // if we have 1 type we can predict the output
+        // with more just make us a any seq, will need ExpectX shards likely
+        if (info->exposedType.seqTypes.len == 1)
+          return info->exposedType.seqTypes.elements[0];
+        else
+          return CoreInfo::AnySeqType;
       }
     }
     throw SHException("Variable is not a sequence.");

@@ -1264,24 +1264,17 @@ struct Erase : SeqUser {
     }
   }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
-    SeqUser::compose(data);
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    SeqUser::composeV2(data);
+
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+    auto info = findExposedVariablePtr(inherited->inherited, _name);
+
+    // info is valid because we run base compose first
 
     bool valid = false;
-
-    std::optional<SHExposedTypeInfo> info;
-    for (uint32_t i = 0; i < data.shared.len; i++) {
-      auto &reference = data.shared.elements[i];
-      if (strcmp(reference.name, _name.c_str()) == 0) {
-        info = reference;
-        break;
-      }
-    }
-
-    if (!info) {
-      throw ComposeError("Erase: Could not find reference to sequence or table.");
-    }
-
+    
     if (info->exposedType.basicType != SHType::Seq && info->exposedType.basicType != SHType::Table) {
       throw ComposeError(
           fmt::format("Erase: Expected a SHType::Seq or SHType::Table, got {}, variable: {}", info->exposedType, _name));
@@ -2352,7 +2345,7 @@ RUNTIME_SHARD_inputHelp(Pop);
 RUNTIME_SHARD_outputTypes(Pop);
 RUNTIME_SHARD_outputHelp(Pop);
 RUNTIME_SHARD_parameters(Pop);
-RUNTIME_SHARD_compose(Pop);
+RUNTIME_SHARD_composeV2(Pop);
 RUNTIME_SHARD_requiredVariables(Pop);
 RUNTIME_SHARD_setParam(Pop);
 RUNTIME_SHARD_getParam(Pop);
@@ -2370,7 +2363,7 @@ RUNTIME_SHARD_inputHelp(PopFront);
 RUNTIME_SHARD_outputTypes(PopFront);
 RUNTIME_SHARD_outputHelp(PopFront);
 RUNTIME_SHARD_parameters(PopFront);
-RUNTIME_SHARD_compose(PopFront);
+RUNTIME_SHARD_composeV2(PopFront);
 RUNTIME_SHARD_requiredVariables(PopFront);
 RUNTIME_SHARD_setParam(PopFront);
 RUNTIME_SHARD_getParam(PopFront);
@@ -2406,7 +2399,7 @@ RUNTIME_SHARD_parameters(Clear);
 RUNTIME_SHARD_setParam(Clear);
 RUNTIME_SHARD_getParam(Clear);
 RUNTIME_SHARD_activate(Clear);
-RUNTIME_SHARD_compose(Clear);
+RUNTIME_SHARD_composeV2(Clear);
 RUNTIME_SHARD_END(Clear);
 
 // Register Drop
@@ -2422,7 +2415,7 @@ RUNTIME_SHARD_parameters(Drop);
 RUNTIME_SHARD_setParam(Drop);
 RUNTIME_SHARD_getParam(Drop);
 RUNTIME_SHARD_activate(Drop);
-RUNTIME_SHARD_compose(Drop);
+RUNTIME_SHARD_composeV2(Drop);
 RUNTIME_SHARD_END(Drop);
 
 // Register DropFront
@@ -2438,7 +2431,7 @@ RUNTIME_SHARD_parameters(DropFront);
 RUNTIME_SHARD_setParam(DropFront);
 RUNTIME_SHARD_getParam(DropFront);
 RUNTIME_SHARD_activate(DropFront);
-RUNTIME_SHARD_compose(DropFront);
+RUNTIME_SHARD_composeV2(DropFront);
 RUNTIME_SHARD_END(DropFront);
 
 // Register Get
