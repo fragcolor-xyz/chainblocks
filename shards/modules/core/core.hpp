@@ -2086,7 +2086,10 @@ struct Push : public SeqBase {
     throw SHException("Param index out of range.");
   }
 
-  SHTypeInfo compose(const SHInstanceData &data) {
+  SHTypeInfo composeV2(const SHInstanceData &data) {
+    shassert(data.privateContext && "Private context should be valid");
+    auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
+
     const auto updateSeqInfo = [this, &data](const SHTypeInfo *existingSeqType = nullptr) {
       updateSeqType(_seqInfo, data.inputType, existingSeqType);
 
@@ -2119,63 +2122,61 @@ struct Push : public SeqBase {
       }
     };
 
+    auto type = findExposedVariablePtr(inherited->inherited, _name);
+
     if (_isTable) {
-      for (uint32_t i = 0; data.shared.len > i; i++) {
-        auto &cv = data.shared.elements[i];
-        if (cv.name == _name) {
-          if (cv.exposedType.basicType != SHType::Table) {
-            throw ComposeError("Expected a table variable.");
-          }
+      if (type) {
+        if (type->exposedType.basicType != SHType::Table) {
+          throw ComposeError("Expected a table variable.");
+        }
 
-          if (cv.tracked) {
-            // cannot push into exposed variables
-            throw ComposeError("Cannot push into exposed variables");
-          }
+        if (type->tracked) {
+          // cannot push into exposed variables
+          throw ComposeError("Cannot push into exposed variables");
+        }
 
-          if (cv.exposedType.table.types.elements) {
-            auto &tableKeys = data.shared.elements[i].exposedType.table.keys;
-            auto &tableTypes = data.shared.elements[i].exposedType.table.types;
-            for (uint32_t y = 0; y < tableKeys.len; y++) {
-              // if we got key it's not a variable
-              if (_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
-                updateTableInfo(false, &data.shared.elements[i].exposedType);
-                return data.inputType; // found lets escape
-              }
+        if (type->exposedType.table.types.elements) {
+          auto &tableKeys = type->exposedType.table.keys;
+          auto &tableTypes = type->exposedType.table.types;
+          for (uint32_t y = 0; y < tableKeys.len; y++) {
+            // if we got key it's not a variable
+            if (_key == tableKeys.elements[y] && tableTypes.elements[y].basicType == SHType::Seq) {
+              updateTableInfo(false, &type->exposedType);
+              return data.inputType; // found lets escape
             }
           }
         }
+      } else {
+        // not found
+        // implicitly initialize anyway
+        updateTableInfo(true);
+        _firstPush = true;
       }
-      // not found
-      // implicitly initialize anyway
-      updateTableInfo(true);
-      _firstPush = true;
     } else {
-      for (uint32_t i = 0; i < data.shared.len; i++) {
-        auto &cv = data.shared.elements[i];
-        if (_name == cv.name) {
-          if (cv.exposedType.basicType != SHType::Seq)
-            throw ComposeError(fmt::format("Push: error, variable {} is not a sequence.", _name));
-          // found, can we mutate it?
-          if (!cv.isMutable) {
-            throw ComposeError(fmt::format("Cannot mutate a non-mutable variable: {}", _name));
-          } else if (cv.isProtected) {
-            throw ComposeError(fmt::format("Cannot mutate a protected variable: {}", _name));
-          }
-
-          if (cv.tracked) {
-            // cannot push into exposed variables
-            throw ComposeError(fmt::format("Cannot push into exposed variables: {}", _name));
-          }
-
-          // ok now update into
-          updateSeqInfo(&cv.exposedType);
-          return data.inputType; // found lets escape
+      if (type) {
+        if (type->exposedType.basicType != SHType::Seq)
+          throw ComposeError(fmt::format("Push: error, variable {} is not a sequence.", _name));
+        // found, can we mutate it?
+        if (!type->isMutable) {
+          throw ComposeError(fmt::format("Cannot mutate a non-mutable variable: {}", _name));
+        } else if (type->isProtected) {
+          throw ComposeError(fmt::format("Cannot mutate a protected variable: {}", _name));
         }
+
+        if (type->tracked) {
+          // cannot push into exposed variables
+          throw ComposeError(fmt::format("Cannot push into exposed variables: {}", _name));
+        }
+
+        // ok now update into
+        updateSeqInfo(&type->exposedType);
+        return data.inputType; // found lets escape
+      } else {
+        // not found
+        // implicitly initialize anyway
+        updateSeqInfo();
+        _firstPush = true;
       }
-      // not found
-      // implicitly initialize anyway
-      updateSeqInfo();
-      _firstPush = true;
     }
 
     if (_firstPush) {
