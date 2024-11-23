@@ -30,7 +30,7 @@ profiling = { version = "1", default-features = false }
 tracy-client = { version = "0.17.4", optional = true }
 
 [patch.crates-io]
-objc = { git = "https://github.com/shards-lang/rust-objc.git", branch = "shards-0.2.5" }
+objc = { git = "https://github.com/shards-lang/rust-objc.git", branch = "shards-0.2.7" }
 metal = { git = "https://github.com/shards-lang/metal-rs.git", branch = "shards-0.29.0" }
 naga = { path = "../wgpu/naga" }
 
