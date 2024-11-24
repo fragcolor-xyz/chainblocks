@@ -99,19 +99,46 @@ struct NetworkBase {
     if (_sharedNetworkContext) {
       auto &io_context = _sharedNetworkContext->_io_context;
 
-      // defer all in the context or we will crash!
       if (_socket) {
-        std::scoped_lock<std::mutex> l(_socketMutex);
+        std::scoped_lock<std::mutex> lock(_socketMutex);
 
-        struct Container {
-          udp::socket socket;
-          Container(udp::socket &&s) : socket(std::move(s)) {}
-        };
+        if (_socket->is_open()) {
+          boost::system::error_code ec;
 
-        boost::asio::post(io_context, [socket_ = std::make_unique<Container>(std::move(_socket.value()))]() {
-          SPDLOG_LOGGER_TRACE(logger, "Closing socket");
-          socket_->socket.close();
-        });
+          // Cancel any pending asynchronous operations
+          (void)_socket->cancel(ec);
+          if (ec) {
+            SPDLOG_LOGGER_ERROR(logger, "Error cancelling socket operations: {}", ec.message());
+          } else {
+            SPDLOG_LOGGER_TRACE(logger, "Pending socket operations cancelled successfully.");
+          }
+        }
+
+        // Move the socket into a shared_ptr for safe asynchronous closure
+        auto socketPtr = std::make_shared<udp::socket>(std::move(_socket.value()));
+
+        // Check if io_context is running before posting
+        if (!_sharedNetworkContext->_io_context.stopped()) {
+          boost::asio::post(io_context, [socketPtr]() {
+            SPDLOG_LOGGER_TRACE(logger, "Closing socket");
+            boost::system::error_code ec;
+            (void)socketPtr->close(ec);
+            if (ec) {
+              SPDLOG_LOGGER_ERROR(logger, "Error closing socket: {}", ec.message());
+            } else {
+              SPDLOG_LOGGER_TRACE(logger, "Socket closed successfully.");
+            }
+          });
+        } else {
+          SPDLOG_LOGGER_WARN(logger, "io_context is stopped. Closing socket immediately.");
+          boost::system::error_code ec;
+          (void)socketPtr->close(ec);
+          if (ec) {
+            SPDLOG_LOGGER_ERROR(logger, "Error closing socket immediately: {}", ec.message());
+          } else {
+            SPDLOG_LOGGER_TRACE(logger, "Socket closed successfully.");
+          }
+        }
 
         _socket.reset();
       }
@@ -949,7 +976,7 @@ struct ClientShard : public NetworkBase {
                                       SPDLOG_LOGGER_DEBUG(logger, "Ignored error while receiving: {}", ec.message());
                                       return do_receive(); // continue receiving
                                     } else if (ec == boost::asio::error::operation_aborted) {
-                                      SPDLOG_LOGGER_ERROR(logger, "Socket aborted receiving: {}", ec.message());
+                                      SPDLOG_LOGGER_DEBUG(logger, "Socket aborted receiving: {}", ec.message());
                                       // _peer might be invalid at this point!
                                     } else {
                                       SPDLOG_LOGGER_ERROR(logger, "Error receiving: {}", ec.message());
