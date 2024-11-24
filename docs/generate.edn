@@ -104,10 +104,10 @@
      .parameters
      (ForEach
       (-> (ExpectTable)
-          (| (Take "name") >= .p_name)
+          (| (Take "name") (ExpectString) >= .p_name)
           (| (Take "types") >= (ExpectSeq) .p_types)
-          (| (Take "help") >= .p_help)
-          (| (Take "default") >= .p_default)
+          (| (Take "help") (ExpectString) >= .p_help)
+          (| (Take "default") (ExpectString) >= .p_default)
           (| (Take "optional") (ExpectBool) >= .p_optional)
           "| `" >> .o .p_name >> .o
           .p_optional (If (Is true)
@@ -163,7 +163,8 @@
 
                "=== \"Code\"\r\n\r\n" >> .o
                "    ```clj linenums=\"1\"\r\n" >> .o
-               "    --8<-- \"" >> .o .sample-script-fn (getFilename shardsSamplePath "" true) >> .o "\"\r\n" >> .o
+               "    --8<-- \"" >> .o 
+               .sample-script-fn (getFilename shardsSamplePath "" true) >> .o "\"\r\n" >> .o
                "    ```\r\n\r\n" >> .o
 
                "=== \"Output\"\r\n\r\n" >> .o
