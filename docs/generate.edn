@@ -218,8 +218,8 @@
      .values
      (ForEach
       (-> (ExpectTable)
-          (| (Take "label") >= .label)
-          (| (Take "description") >= .description)
+          (| (Take "label") (ExpectString) >= .label)
+          (| (Take "description") (ExpectString) >= .description)
           "| `" >> .o .label >> .o
           "` | " >> .o .description >> .o
           " |\r\n" >> .o))))
