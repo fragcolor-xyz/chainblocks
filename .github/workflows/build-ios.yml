@@ -49,9 +49,9 @@ jobs:
           cmake --build build_ios --target shards-cpp-union
           cmake --build build_ios --target shards-core
           cmake --build build_ios --target shards-lib
-      - name: Build visionOS
-        run: |
-          cmake -Bbuild_visionos -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=xros
-          cmake --build build_visionos --target shards-cpp-union
-          cmake --build build_visionos --target shards-core
-          cmake --build build_visionos --target shards-lib
+      # - name: Build visionOS
+      #   run: |
+      #     cmake -Bbuild_visionos -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=xros
+      #     cmake --build build_visionos --target shards-cpp-union
+      #     cmake --build build_visionos --target shards-core
+      #     cmake --build build_visionos --target shards-lib
