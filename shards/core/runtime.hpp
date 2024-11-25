@@ -702,11 +702,13 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void clear() {
     auto it = _scheduled.begin();
     while (it != _scheduled.end()) {
+      SHLOG_TRACE("Mesh {} stopping scheduled wire {}", label, (*it)->name);
       shards::stop((*it).get());
       ++it;
     }
     auto it2 = _pendingSchedule.begin();
     while (it2 != _pendingSchedule.end()) {
+      SHLOG_TRACE("Mesh {} stopping pending wire {}", label, (*it2)->name);
       shards::stop((*it2).get());
       ++it2;
     }
