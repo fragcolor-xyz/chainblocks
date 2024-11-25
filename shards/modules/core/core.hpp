@@ -1220,13 +1220,18 @@ struct Set : public SetUpdateBase {
 
     const SHExposedTypeInfo *existingExposedType = setBaseCompose(data, true, false, false);
 
+    bool global = _global;
+    if (existingExposedType->global) {
+      global = true;
+    }
+
     // bake exposed types
     if (_isTable) {
       // we are a table!
       _tableTypeInfo = updateTableType(_tableType, !_key.isVariable() ? &(SHVar &)_key : &Var::Empty, data.inputType,
                                        existingExposedType ? &existingExposedType->exposedType : nullptr);
 
-      if (_global) {
+      if (global) {
         _exposedInfo =
             ExposedInfo(ExposedInfo::GlobalVariable(_name.c_str(), SHCCSTR("The exposed table."), _tableTypeInfo, true));
       } else {
@@ -1236,7 +1241,7 @@ struct Set : public SetUpdateBase {
       const_cast<Shard *>(data.shard)->inlineShardId = InlineShard::CoreSetUpdateTable;
     } else {
       // just a variable!
-      if (_global) {
+      if (global) {
         _exposedInfo = ExposedInfo(
             ExposedInfo::GlobalVariable(_name.c_str(), SHCCSTR("The exposed variable."), SHTypeInfo(data.inputType), true));
       } else {
