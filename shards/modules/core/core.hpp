@@ -1221,7 +1221,7 @@ struct Set : public SetUpdateBase {
     const SHExposedTypeInfo *existingExposedType = setBaseCompose(data, true, false, false);
 
     bool global = _global;
-    if (existingExposedType->global) {
+    if (existingExposedType && existingExposedType->global) {
       global = true;
     }
 
