@@ -1485,7 +1485,7 @@ TEST_CASE("shards-lang") {
     err = shards_eval_env(sub_env, &ast2);
     REQUIRE_FALSE(err);
 
-    EvalEnv *envs[] = {env, sub_env};
+    SHLEvalEnv *envs[] = {env, sub_env};
 
     auto wire = shards_transform_envs(&envs[0], 2, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
@@ -1532,7 +1532,7 @@ TEST_CASE("shards-lang") {
     err = shards_eval_env(another_env, &ast4);
     REQUIRE_FALSE(err);
 
-    EvalEnv *envs[] = {env, sub_env1, sub_env2, another_env};
+    SHLEvalEnv *envs[] = {env, sub_env1, sub_env2, another_env};
 
     auto wire = shards_transform_envs(&envs[0], 4, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
