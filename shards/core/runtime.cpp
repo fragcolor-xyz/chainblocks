@@ -2568,6 +2568,14 @@ bool sh_current_interface_loaded{false};
 SHCore sh_current_interface{};
 
 extern "C" {
+SHLAst shards_read(SHStringWithLen name, SHStringWithLen code, SHStringWithLen base_path, const SHStringWithLen *include_dirs,
+                   uint32_t num_include_dirs);
+SHLEvalEnv *shards_create_env(SHStringWithLen namespace_);
+void shards_free_env(SHLEvalEnv *env);
+SHLError *shards_eval_env(SHLEvalEnv *env, const SHVar *ast);
+SHLWire shards_transform_env(SHLEvalEnv *env, SHStringWithLen name);
+void shards_free_wire(SHLWire *wire);
+
 SHVar *getWireVariable(SHWireRef wireRef, const char *name, uint32_t nameLen) {
   auto &wire = SHWire::sharedFromRef(wireRef);
   std::string_view nameView{name, nameLen};
@@ -3085,6 +3093,19 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
   result->imageNew = [](uint32_t len) { return imageNew(len); };
   result->imageClone = [](SHImage *img) { return imageClone(img); };
   result->imageDeriveDataLength = [](SHImage *img) { return imageDeriveDataLength(img); };
+
+  result->read = [](SHStringWithLen name, SHStringWithLen code, SHStringWithLen basePath, const SHStringWithLen *includeDirs,
+                    uint32_t numIncludeDirs) { return shards_read(name, code, basePath, includeDirs, numIncludeDirs); };
+
+  result->createEvalEnv = [](SHStringWithLen namespace_) { return shards_create_env(namespace_); };
+
+  result->freeEvalEnv = [](SHLEvalEnv *env) { shards_free_env(env); };
+
+  result->eval = [](SHLEvalEnv *env, const SHVar *ast) { return shards_eval_env(env, ast); };
+
+  result->transformEnv = [](SHLEvalEnv *env, SHStringWithLen name) { return shards_transform_env(env, name); };
+
+  result->freeWire = [](SHLWire *wire) { shards_free_wire(wire); };
 
   return result;
 }
