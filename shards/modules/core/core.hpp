@@ -2095,17 +2095,21 @@ struct Push : public SeqBase {
     shassert(data.privateContext && "Private context should be valid");
     auto inherited = reinterpret_cast<CompositionContext *>(data.privateContext);
 
-    const auto updateSeqInfo = [this, &data](const SHTypeInfo *existingSeqType = nullptr) {
+    // check if this type is already exposed
+    auto type = findExposedVariablePtr(inherited->inherited, _name);
+    auto global = _global || (type && type->global);
+
+    const auto updateSeqInfo = [this, &data, global](const SHTypeInfo *existingSeqType = nullptr) {
       updateSeqType(_seqInfo, data.inputType, existingSeqType);
 
-      if (_global) {
+      if (global) {
         _exposedInfo = ExposedInfo(ExposedInfo::GlobalVariable(_name.c_str(), SHCCSTR("The exposed sequence."), _seqInfo, true));
       } else {
         _exposedInfo = ExposedInfo(ExposedInfo::Variable(_name.c_str(), SHCCSTR("The exposed sequence."), _seqInfo, true));
       }
     };
 
-    const auto updateTableInfo = [this, &data](bool firstPush, const SHTypeInfo *existingTableType = nullptr) {
+    const auto updateTableInfo = [this, &data, global](bool firstPush, const SHTypeInfo *existingTableType = nullptr) {
       SHTypeInfo *existingSeqType{};
       if (existingTableType) {
         for (size_t i = 0; i < existingTableType->table.keys.len; i++) {
@@ -2119,15 +2123,13 @@ struct Push : public SeqBase {
       updateSeqType(_seqInfo, data.inputType, existingSeqType);
       updateTableType(_tableInfo, !_key.isVariable() ? &(SHVar &)_key : nullptr, _seqInfo, existingTableType);
 
-      if (_global) {
+      if (global) {
         _exposedInfo = ExposedInfo(ExposedInfo::GlobalVariable(_name.c_str(), SHCCSTR("The exposed table."), _tableInfo, true));
       } else {
         _exposedInfo =
             ExposedInfo(ExposedInfo::Variable(_name.c_str(), SHCCSTR("The exposed table."), SHTypeInfo(_tableInfo), true));
       }
     };
-
-    auto type = findExposedVariablePtr(inherited->inherited, _name);
 
     if (_isTable) {
       if (type) {
