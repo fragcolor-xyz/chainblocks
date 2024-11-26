@@ -420,8 +420,78 @@ extension SHVar: CustomStringConvertible {
     }
 }
 
+class OwnedVar {
+    var v: SHVar
+
+    init(value: SHVar) {
+        v = SHVar()
+        
+        withUnsafePointer(to: value) { ptr in
+            G.Core.pointee.cloneVar(&v, UnsafeMutablePointer(mutating: ptr))
+        }
+    }
+
+    deinit {
+        withUnsafePointer(to: v) { ptr in
+            G.Core.pointee.destroyVar(UnsafeMutablePointer(mutating: ptr))
+        }
+    }
+}
+
 class SeqVar {
+    var containerVar: SHVar
     
+    init() {
+        containerVar = SHVar()
+    }
+    
+    deinit {
+        withUnsafePointer(to: containerVar) { ptr in
+            G.Core.pointee.destroyVar(UnsafeMutablePointer(mutating: ptr))
+        }
+    }
+
+    func get() -> SHVar {
+        return containerVar
+    }
+
+    func resize(size: Int) {
+        withUnsafePointer(to: containerVar.payload.seqValue) { ptr in
+            G.Core.pointee.seqResize(UnsafeMutablePointer(mutating: ptr), UInt32(size))
+        }
+    }
+
+    func size() -> Int {
+        return Int(containerVar.payload.seqValue.len)
+    }
+    
+    func pushRaw(value: SHVar) {
+        let index = size()
+        resize(size: index + 1)
+        containerVar.payload.seqValue.elements[index] = value
+    }
+
+    func pushCloning(value: SHVar) {
+        let index = size()
+        resize(size: index + 1)
+        withUnsafePointer(to: value) { ptr in
+            G.Core.pointee.cloneVar(&containerVar.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
+        }
+    }
+    
+    // Notice that the memory of the result is still owned by SeqVar as when we destroy we destroy capacity!
+    // So a further push will reuse same memory!
+    @discardableResult func popRaw() -> SHVar {
+        assert(size() > 0)
+        let index = size() - 1
+        resize(size: index)
+        return containerVar.payload.seqValue.elements[index]
+    }
+    
+    func at(index: Int) -> SHVar {
+        assert(index >= 0 && index < size())
+        return containerVar.payload.seqValue.elements[index]
+    }
 }
 
 public struct Context {
