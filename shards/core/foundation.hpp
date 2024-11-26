@@ -465,8 +465,11 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
     }
   }
 
+  // Used in mesh when deciding if we should tick this wire or not
   bool paused{false};
 
+  // So far used only in activateStepMode, because that mode directly ticks the wire resuming the coroutine
+  // But indirectly used in SwitchTo, where we assign the actual child wire to tick
   SHWire *tickingWire() {
     SHWire *wire = this;
     while (wire->childWire) {

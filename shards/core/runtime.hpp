@@ -657,6 +657,8 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
         observer.before_tick(wire);
         shards::tick(wire->tickingWire(), now);
 
+        // Notice that we are not checking tickingWire here, but wire itself
+        // as childWire yield back to parent wire when they end, moreover they are not in the scheduled set
         if (unlikely(!shards::isRunning(wire))) {
           if (wire->finishedError.size() > 0) {
             _errors.emplace_back(wire->finishedError);
@@ -702,11 +704,13 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void clear() {
     auto it = _scheduled.begin();
     while (it != _scheduled.end()) {
+      SHLOG_TRACE("Mesh {} stopping scheduled wire {}", label, (*it)->name);
       shards::stop((*it).get());
       ++it;
     }
     auto it2 = _pendingSchedule.begin();
     while (it2 != _pendingSchedule.end()) {
+      SHLOG_TRACE("Mesh {} stopping pending wire {}", label, (*it2)->name);
       shards::stop((*it2).get());
       ++it2;
     }
@@ -872,6 +876,13 @@ private:
 
 namespace shards {
 inline bool stop(SHWire *wire, SHVar *result, SHContext *currentContext) {
+  // but avoid stopping if detached and scheduled
+  if (wire->childWire) {
+    // stop the child wire if any
+    shards::stop(wire->childWire);
+    wire->childWire = nullptr;
+  }
+
   if (wire->state == SHWire::State::Stopped) {
     // Clone the results if we need them
     if (result)

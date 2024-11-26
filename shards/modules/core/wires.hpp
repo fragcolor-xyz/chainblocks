@@ -190,7 +190,6 @@ struct BaseRunner : public WireBase {
           wire->cleanup();
         }
       } else if (!wire->detached) {
-        // but avoid stopping if detached and scheduled
         shards::stop(wire.get());
       }
     }
