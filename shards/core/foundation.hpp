@@ -220,14 +220,6 @@ private:
 };
 } // namespace shards
 
-struct SHSetImpl : public std::unordered_set<shards::OwnedVar, std::hash<SHVar>, std::equal_to<SHVar>,
-                                             boost::alignment::aligned_allocator<shards::OwnedVar, 16>> {
-#if SHARDS_TRACKING
-  SHSetImpl() {}
-  ~SHSetImpl() {}
-#endif
-};
-
 template <typename K, typename V>
 struct SHAlignedMap : public boost::container::flat_map<
                           K, V, std::less<K>,
@@ -695,9 +687,6 @@ public:
   iterator end() const { return iterator(layers.end(), layers.end()); }
 };
 
-using SHHashSet = SHSetImpl;
-using SHHashSetIt = SHHashSet::iterator;
-
 using SHMap = SHTableImpl;
 using SHMapIt = SHMap::iterator;
 
@@ -808,62 +797,6 @@ public:
           [](SHTable table) {
             shards::SHMap *map = reinterpret_cast<shards::SHMap *>(table.opaque);
             delete map;
-          },
-  };
-
-  SHSetInterface SetInterface{
-      .setGetIterator =
-          [](SHSet shset, SHSetIterator *outIter) {
-            if (outIter == nullptr)
-              SHLOG_FATAL("setGetIterator - outIter was nullptr");
-            shards::SHHashSet *set = reinterpret_cast<shards::SHHashSet *>(shset.opaque);
-            shards::SHHashSetIt *setIt = reinterpret_cast<shards::SHHashSetIt *>(outIter);
-            *setIt = set->begin();
-          },
-      .setNext =
-          [](SHSet shset, SHSetIterator *inIter, SHVar *outVar) {
-            if (inIter == nullptr)
-              SHLOG_FATAL("setGetIterator - inIter was nullptr");
-            shards::SHHashSet *set = reinterpret_cast<shards::SHHashSet *>(shset.opaque);
-            shards::SHHashSetIt *setIt = reinterpret_cast<shards::SHHashSetIt *>(inIter);
-            if ((*setIt) != set->end()) {
-              *outVar = (*(*setIt));
-              (*setIt)++;
-              return true;
-            } else {
-              return false;
-            }
-          },
-      .setSize =
-          [](SHSet shset) {
-            shards::SHHashSet *set = reinterpret_cast<shards::SHHashSet *>(shset.opaque);
-            return uint64_t(set->size());
-          },
-      .setContains =
-          [](SHSet shset, SHVar value) {
-            shards::SHHashSet *set = reinterpret_cast<shards::SHHashSet *>(shset.opaque);
-            return set->count(value) > 0;
-          },
-      .setInclude =
-          [](SHSet shset, SHVar value) {
-            shards::SHHashSet *set = reinterpret_cast<shards::SHHashSet *>(shset.opaque);
-            auto [_, inserted] = set->emplace(value);
-            return inserted;
-          },
-      .setExclude =
-          [](SHSet shset, SHVar value) {
-            shards::SHHashSet *set = reinterpret_cast<shards::SHHashSet *>(shset.opaque);
-            return set->erase(value) > 0;
-          },
-      .setClear =
-          [](SHSet shset) {
-            shards::SHHashSet *set = reinterpret_cast<shards::SHHashSet *>(shset.opaque);
-            set->clear();
-          },
-      .setFree =
-          [](SHSet shset) {
-            shards::SHHashSet *set = reinterpret_cast<shards::SHHashSet *>(shset.opaque);
-            delete set;
           },
   };
 };
@@ -1224,13 +1157,6 @@ struct InternalCore {
     SHTable res;
     res.api = &shards::GetGlobals().TableInterface;
     res.opaque = new shards::SHMap();
-    return res;
-  }
-
-  static SHSet setNew() {
-    SHSet res;
-    res.api = &shards::GetGlobals().SetInterface;
-    res.opaque = new shards::SHHashSet();
     return res;
   }
 

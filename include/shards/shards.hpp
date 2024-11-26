@@ -1045,15 +1045,6 @@ template <class Function> inline void ForEach(const SHTable &table, Function &&f
   }
 }
 
-template <class Function> inline void ForEach(const SHSet &set, Function &&f) {
-  SHSetIterator sit;
-  set.api->setGetIterator(set, &sit);
-  SHVar v;
-  while (set.api->setNext(set, &sit, &v)) {
-    f(v);
-  }
-}
-
 template <class Function> inline void ForEach(const SHSeq &seq, Function &&f) {
   for (size_t i = 0; i < seq.len; i++)
     f(seq.elements[i]);

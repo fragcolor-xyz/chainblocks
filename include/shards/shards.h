@@ -96,7 +96,6 @@ struct SHVar;
 SH_ARRAY_DECL(SHSeq, struct SHVar);
 
 struct SHTableImpl;
-struct SHSetImpl;
 
 struct SHTableInterface;
 // 64 bytes should be huge and well enough space for an iterator...
@@ -104,14 +103,6 @@ typedef char SHTableIterator[64];
 struct SHTable {
   struct SHTableImpl *opaque;
   struct SHTableInterface *api;
-};
-
-struct SHSetInterface;
-// 64 bytes should be huge and well enough space for an iterator...
-typedef char SHSetIterator[64];
-struct SHSet {
-  struct SHSetImpl *opaque;
-  struct SHSetInterface *api;
 };
 
 #if !defined(NDEBUG) && !defined(SH_RELWITHDEBINFO)
@@ -300,27 +291,6 @@ struct SHTableInterface {
   SHTableRemove tableRemove;
   SHTableClear tableClear;
   SHTableFree tableFree;
-};
-
-// set interface
-typedef void(__cdecl *SHSetGetIterator)(struct SHSet set, SHSetIterator *outIter);
-typedef SHBool(__cdecl *SHSetNext)(struct SHSet set, SHSetIterator *inIter, struct SHVar *outValue);
-typedef uint64_t(__cdecl *SHSetSize)(struct SHSet table);
-typedef SHBool(__cdecl *SHSetContains)(struct SHSet table, struct SHVar value);
-typedef SHBool(__cdecl *SHSetInclude)(struct SHSet table, struct SHVar value);
-typedef SHBool(__cdecl *SHSetExclude)(struct SHSet table, struct SHVar value);
-typedef void(__cdecl *SHSetClear)(struct SHSet table);
-typedef void(__cdecl *SHSetFree)(struct SHSet table);
-
-struct SHSetInterface {
-  SHSetGetIterator setGetIterator;
-  SHSetNext setNext;
-  SHSetSize setSize;
-  SHSetContains setContains;
-  SHSetInclude setInclude;
-  SHSetExclude setExclude;
-  SHSetClear setClear;
-  SHSetFree setFree;
 };
 
 #ifdef SH_NO_ANON
@@ -592,8 +562,6 @@ struct SHVarPayload {
     SHSeq seqValue;
 
     struct SHTable tableValue;
-
-    struct SHSet setValue;
 
     SHStringPayload string;
 
@@ -1020,8 +988,6 @@ SH_ARRAY_TYPE(SHTraits, SHTrait);
 
 typedef struct SHTable(__cdecl *SHTableNew)();
 
-typedef struct SHSet(__cdecl *SHSetNew)();
-
 typedef SHString(__cdecl *SHGetRootPath)();
 typedef void(__cdecl *SHSetRootPath)(SHString);
 
@@ -1122,9 +1088,6 @@ typedef struct _SHCore {
 
   // SHTable interface
   SHTableNew tableNew;
-
-  // SHSet interface
-  SHSetNew setNew;
 
   // Utility to use shards within shards
   SHComposeShards composeShards;

@@ -420,6 +420,10 @@ extension SHVar: CustomStringConvertible {
     }
 }
 
+class SeqVar {
+    
+}
+
 public struct Context {
     public var context: OpaquePointer?
 

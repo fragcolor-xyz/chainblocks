@@ -2530,7 +2530,6 @@ void shInit() {
   static_assert(sizeof(SHVarPayload) == 16);
   static_assert(sizeof(SHVar) == 32);
   static_assert(sizeof(SHMapIt) <= sizeof(SHTableIterator));
-  static_assert(sizeof(SHHashSetIt) <= sizeof(SHSetIterator));
   static_assert(sizeof(OwnedVar) == sizeof(SHVar));
   static_assert(sizeof(TableVar) == sizeof(SHVar));
   static_assert(sizeof(SeqVar) == sizeof(SHVar));
@@ -2747,13 +2746,6 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
     SHTable res;
     res.api = &shards::GetGlobals().TableInterface;
     res.opaque = new shards::SHMap();
-    return res;
-  };
-
-  result->setNew = []() noexcept {
-    SHSet res;
-    res.api = &shards::GetGlobals().SetInterface;
-    res.opaque = new shards::SHHashSet();
     return res;
   };
 
