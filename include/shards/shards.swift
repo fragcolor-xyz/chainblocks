@@ -1033,6 +1033,10 @@ class WireController {
         }
     }
 
+    func isRunning() -> Bool {
+        G.Core.pointee.isWireRunning(nativeRef)
+    }
+
     var nativeRef = SHWireRef(bitPattern: 0)
     var shards = [ShardController]()
     var refs: [String: UnsafeMutablePointer<SHVar>] = [:]

@@ -971,6 +971,7 @@ typedef void(__cdecl *SHSetWireTraits)(SHWireRef wire, SHSeq traits);
 typedef void(__cdecl *SHAddShard)(SHWireRef wire, ShardPtr shard);
 typedef void(__cdecl *SHRemShard)(SHWireRef wire, ShardPtr shard);
 typedef void(__cdecl *SHDestroyWire)(SHWireRef wire);
+typedef SHBool(__cdecl *SHIsWireRunning)(SHWireRef wire);
 typedef struct SHVar(__cdecl *SHStopWire)(SHWireRef wire);
 typedef struct SHComposeResult(__cdecl *SHComposeWire)(SHWireRef wire, struct SHInstanceData data);
 typedef struct SHRunWireOutput(__cdecl *SHRunWire)(SHWireRef wire, struct SHContext *context, const struct SHVar *input);
@@ -1155,6 +1156,7 @@ typedef struct _SHCore {
   SHAddShard addShard;
   SHRemShard removeShard;
   SHDestroyWire destroyWire;
+  SHIsWireRunning isWireRunning;
   SHStopWire stopWire; // must destroyVar once done
   SHComposeWire composeWire;
   SHRunWire runWire;

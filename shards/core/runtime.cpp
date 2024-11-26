@@ -2909,6 +2909,11 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
 
   result->destroyWire = [](SHWireRef wire) noexcept { SHWire::deleteRef(wire); };
 
+  result->isWireRunning = [](SHWireRef wire) noexcept {
+    auto &sc = SHWire::sharedFromRef(wire);
+    return shards::isRunning(sc.get());
+  };
+
   result->stopWire = [](SHWireRef wire) {
     auto &sc = SHWire::sharedFromRef(wire);
     SHVar output{};
