@@ -78,6 +78,18 @@ public struct Globals {
     public var Core: UnsafeMutablePointer<SHCore>
 
     init() {
+        // Get current directory and check if writable
+        let currentPath = FileManager.default.currentDirectoryPath
+        let isWritable = FileManager.default.isWritableFile(atPath: currentPath)
+
+        // If not writable, try to set to documents directory
+        if !isWritable {
+            if let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path {
+                FileManager.default.changeCurrentDirectoryPath(documentsPath)
+            }
+        }
+
+        // Finally init Shards
         Core = shardsInterface(UInt32(SHARDS_CURRENT_ABI))
     }
 }
@@ -943,6 +955,10 @@ class WireController {
         nativeRef = G.Core.pointee.createWire(cname)
     }
 
+    init(native: SHWireRef) {
+        nativeRef = native
+    }
+
     convenience init(shards: [ShardController]) {
         self.init()
         for item in shards {
@@ -1048,16 +1064,20 @@ class MeshController {
         G.Core.pointee.tick(nativeRef)
     }
 
+    func isEmpty() -> Bool {
+        G.Core.pointee.isEmpty(nativeRef)
+    }
+
     var nativeRef = SHMeshRef(bitPattern: 0)
     var wires = [WireController]()
 }
 
 extension SHStringWithLen {
-    // Create SHStringWithLen from a reference to a Swift String
-    static func from(_ swiftString: inout String) -> SHStringWithLen {
+    // Create SHStringWithLen from array of CChar
+    static func from(_ chars: ContiguousArray<CChar>) -> SHStringWithLen {
         var result = SHStringWithLen()
-        result.string = swiftString.utf8CString.withUnsafeBufferPointer { $0.baseAddress }
-        result.len = UInt64(swiftString.utf8CString.count - 1) // Subtract 1 to exclude null terminator
+        result.string = chars.withUnsafeBufferPointer { $0.baseAddress }
+        result.len = UInt64(chars.count - 1) // Subtract 1 to exclude null terminator
         return result
     }
 
@@ -1091,6 +1111,18 @@ extension SHStringWithLen {
     }
 }
 
+class SwiftSWL {
+    var chars: ContiguousArray<CChar> // store the CChar array directly
+
+    init(_ string: String) {
+        chars = string.utf8CString
+    }
+
+    func asSHStringWithLen() -> SHStringWithLen {
+        SHStringWithLen.from(chars)
+    }
+}
+
 class Shards {
     static func log(_ message: String) {
         message.utf8CString.withUnsafeBufferPointer { buffer in
@@ -1099,6 +1131,38 @@ class Shards {
             shString.len = UInt64(buffer.count - 1) // Subtract 1 to exclude null terminator
             G.Core.pointee.log(shString)
         }
+    }
+
+    static func evalWire(_ name: String, _ code: String, _ basePath: String) -> WireController? {
+        // Create SHStringWithLen instances
+        let nameStr = SwiftSWL(name)
+        let codeStr = SwiftSWL(code)
+        let basePathStr = SwiftSWL(basePath)
+
+        // Read the AST
+        var ast = G.Core.pointee.read(nameStr.asSHStringWithLen(), codeStr.asSHStringWithLen(), basePathStr.asSHStringWithLen(), nil, 0)
+
+        // Create evaluation environment
+        let emptyStr = SHStringWithLen.fromStatic("")
+        let env = G.Core.pointee.createEvalEnv(emptyStr)
+
+        // Evaluate the AST
+        let error = G.Core.pointee.eval(env, &ast.ast) // consumes ast
+        guard error == nil else {
+            G.Core.pointee.freeEvalEnv(env)
+            return nil
+        }
+
+        // Transform environment into a wire
+        var wire = G.Core.pointee.transformEnv(env, nameStr.asSHStringWithLen()) // consumes env
+        guard wire.error == nil else {
+            G.Core.pointee.freeWire(&wire)
+            return nil
+        }
+
+        // Create WireController from the resulting wire
+        let wireController = WireController(native: wire.wire.pointee!)
+        return wireController
     }
 }
 

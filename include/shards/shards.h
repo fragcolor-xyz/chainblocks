@@ -1082,6 +1082,34 @@ typedef struct SHImage *(__cdecl *SHImageNewProc)(uint32_t dataLen);
 typedef struct SHImage *(__cdecl *SHImageCloneProc)(struct SHImage *);
 typedef uint32_t(__cdecl *SHImageDeriveDataLengthProc)(struct SHImage *);
 
+struct SHLError {
+  char *message;
+  uint32_t line;
+  uint32_t column;
+};
+
+struct SHLAst {
+  /// of Program ast object, ref counted, count at 0 when returned, receiver must clone it!
+  struct SHVar ast;
+  struct SHLError *error;
+};
+
+struct SHLWire {
+  SHWireRef *wire;
+  struct SHLError *error;
+};
+
+struct SHLEvalEnv;
+
+typedef struct SHLAst(__cdecl *SHReadProc)(struct SHStringWithLen name, struct SHStringWithLen code,
+                                           struct SHStringWithLen basePath, const struct SHStringWithLen *includeDirs,
+                                           uint32_t numIncludeDirs);
+typedef struct SHLEvalEnv *(__cdecl *SHCreateEvalEnv)(struct SHStringWithLen namespace_);
+typedef void(__cdecl *SHFreeEvalEnv)(struct SHLEvalEnv *env);
+typedef struct SHLError *(__cdecl *SHEvalProc)(struct SHLEvalEnv *env, const struct SHVar *ast);
+typedef struct SHLWire(__cdecl *SHTransformEnv)(struct SHLEvalEnv *env, struct SHStringWithLen name);
+typedef void(__cdecl *SHFreeWire)(struct SHLWire *wire);
+
 typedef struct _SHCore {
   // Aligned allocator
   SHAlloc alloc;
@@ -1214,6 +1242,14 @@ typedef struct _SHCore {
   SHFindObjectInfo findObjectInfo;
   SHFindObjectTypeId findObjectTypeId;
   SHType2Name type2Name;
+
+  // Language parsing and evaluation
+  SHReadProc read;
+  SHCreateEvalEnv createEvalEnv;
+  SHFreeEvalEnv freeEvalEnv;
+  SHEvalProc eval;
+  SHTransformEnv transformEnv;
+  SHFreeWire freeWire;
 
   // Utility to deal with SHSeqs
   SH_ARRAY_PROCS(SHSeq, seq);
