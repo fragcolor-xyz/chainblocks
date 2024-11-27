@@ -637,7 +637,7 @@ struct StopWire : public WireBase {
       context->stopFlow(input);
       return input;
     } else {
-      shards::stop(wire.get());
+      shards::stop(wire.get(), nullptr, context);
       if (passthrough) {
         return input;
       } else {

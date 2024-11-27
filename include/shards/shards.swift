@@ -438,6 +438,17 @@ class OwnedVar {
     init(owning: SHVar) {
         v = owning
     }
+    
+    init(string: String){
+        v = SHVar()
+        var tmp = SHVar()
+        tmp.valueType = VarType.String.asSHType()
+        string.utf8.withContiguousStorageIfAvailable { buffer in
+            tmp.payload.stringValue = UnsafeRawPointer(buffer.baseAddress)?.assumingMemoryBound(to: CChar.self)
+            tmp.payload.stringLen = UInt32(buffer.count)
+            G.Core.pointee.cloneVar(&v, &tmp)
+        }
+    }
 
     deinit {
         withUnsafeMutablePointer(to: &v) { ptr in
