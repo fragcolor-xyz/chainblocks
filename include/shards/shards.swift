@@ -212,7 +212,7 @@ public enum VarType: UInt8, CustomStringConvertible, CaseIterable {
     }
 }
 
-extension SHVar: CustomStringConvertible {
+extension SHVar: @retroactive CustomStringConvertible {
     public var description: String {
         switch type {
         case .NoValue:
@@ -423,31 +423,55 @@ extension SHVar: CustomStringConvertible {
 class OwnedVar {
     var v: SHVar
 
-    init(value: SHVar) {
+    init() {
         v = SHVar()
-        
-        withUnsafePointer(to: value) { ptr in
+    }
+
+    init(cloning: SHVar) {
+        v = SHVar()
+
+        withUnsafePointer(to: cloning) { ptr in
             G.Core.pointee.cloneVar(&v, UnsafeMutablePointer(mutating: ptr))
         }
     }
 
+    init(owning: SHVar) {
+        v = owning
+    }
+
     deinit {
-        withUnsafePointer(to: v) { ptr in
-            G.Core.pointee.destroyVar(UnsafeMutablePointer(mutating: ptr))
+        withUnsafeMutablePointer(to: &v) { ptr in
+            G.Core.pointee.destroyVar(ptr)
+        }
+    }
+
+    func ptr() -> UnsafeMutablePointer<SHVar> {
+        return withUnsafeMutablePointer(to: &v) { ptr in
+            UnsafeMutablePointer(mutating: ptr)
         }
     }
 }
 
 class SeqVar {
     var containerVar: SHVar
-    
+
     init() {
         containerVar = SHVar()
+        containerVar.valueType = VarType.Seq.asSHType()
     }
     
+    init (cloning: SHVar) {
+        assert(cloning.valueType == VarType.Seq.asSHType())
+        
+        containerVar = SHVar()
+        withUnsafePointer(to: cloning) { ptr in
+            G.Core.pointee.cloneVar(&containerVar, UnsafeMutablePointer(mutating: ptr))
+        }
+    }
+
     deinit {
-        withUnsafePointer(to: containerVar) { ptr in
-            G.Core.pointee.destroyVar(UnsafeMutablePointer(mutating: ptr))
+        withUnsafeMutablePointer(to: &containerVar) { ptr in
+            G.Core.pointee.destroyVar(ptr)
         }
     }
 
@@ -455,16 +479,22 @@ class SeqVar {
         return containerVar
     }
 
+    func ptr() -> UnsafeMutablePointer<SHVar> {
+        return withUnsafeMutablePointer(to: &containerVar) { ptr in
+            ptr
+        }
+    }
+
     func resize(size: Int) {
-        withUnsafePointer(to: containerVar.payload.seqValue) { ptr in
-            G.Core.pointee.seqResize(UnsafeMutablePointer(mutating: ptr), UInt32(size))
+        withUnsafeMutablePointer(to: &containerVar.payload.seqValue) { ptr in
+            G.Core.pointee.seqResize(ptr, UInt32(size))
         }
     }
 
     func size() -> Int {
         return Int(containerVar.payload.seqValue.len)
     }
-    
+
     func pushRaw(value: SHVar) {
         let index = size()
         resize(size: index + 1)
@@ -478,7 +508,17 @@ class SeqVar {
             G.Core.pointee.cloneVar(&containerVar.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
         }
     }
-    
+
+    func push(string: String) {
+        var tmp = SHVar()
+        tmp.valueType = VarType.String.asSHType()
+        string.utf8.withContiguousStorageIfAvailable { buffer in
+            tmp.payload.stringValue = UnsafeRawPointer(buffer.baseAddress)?.assumingMemoryBound(to: CChar.self)
+            tmp.payload.stringLen = UInt32(buffer.count)
+            pushCloning(value: tmp)
+        }
+    }
+
     // Notice that the memory of the result is still owned by SeqVar as when we destroy we destroy capacity!
     // So a further push will reuse same memory!
     @discardableResult func popRaw() -> SHVar {
@@ -487,7 +527,7 @@ class SeqVar {
         resize(size: index)
         return containerVar.payload.seqValue.elements[index]
     }
-    
+
     func at(index: Int) -> SHVar {
         assert(index >= 0 && index < size())
         return containerVar.payload.seqValue.elements[index]
@@ -594,7 +634,7 @@ public extension IShard {}
         error.message.string = b.errorCache.withUnsafeBufferPointer {
             $0.baseAddress
         }
-        error.message.len = UInt64(b.errorCache.count)
+        error.message.len = UInt64(b.errorCache.count - 1)
         return error
     }
 }
@@ -657,7 +697,7 @@ public extension IShard {}
         error.message.string = b.errorCache.withUnsafeBufferPointer {
             $0.baseAddress
         }
-        error.message.len = UInt64(b.errorCache.count)
+        error.message.len = UInt64(b.errorCache.count - 1)
         value.error = error
         return value
     }
@@ -677,7 +717,7 @@ public extension IShard {}
         error.message.string = b.errorCache.withUnsafeBufferPointer {
             $0.baseAddress
         }
-        error.message.len = UInt64(b.errorCache.count)
+        error.message.len = UInt64(b.errorCache.count - 1)
         return error
     }
 }
@@ -696,7 +736,7 @@ public extension IShard {}
         error.message.string = b.errorCache.withUnsafeBufferPointer {
             $0.baseAddress
         }
-        error.message.len = UInt64(b.errorCache.count)
+        error.message.len = UInt64(b.errorCache.count - 1)
         return error
     }
 }
@@ -715,7 +755,7 @@ public extension IShard {}
         errorMsg.string = error.withUnsafeBufferPointer {
             $0.baseAddress
         }
-        errorMsg.len = UInt64(error.count)
+        errorMsg.len = UInt64(error.count - 1)
         G.Core.pointee.abortWire(ctx, errorMsg)
         return withUnsafePointer(to: b.output) { $0 }
     }
@@ -852,7 +892,7 @@ class ShardController: Equatable, Identifiable {
         cname.string = n.withUnsafeBufferPointer {
             $0.baseAddress
         }
-        cname.len = UInt64(n.count)
+        cname.len = UInt64(n.count - 1)
         self.init(native: G.Core.pointee.createShard(cname)!)
     }
 
@@ -1046,12 +1086,6 @@ class WireController {
 
     deinit {
         if nativeRef != nil {
-            // release any ref we created
-            // before destroy otherwise dangling check fails!
-            for ref in refs {
-                G.Core.pointee.releaseVariable(ref.value)
-            }
-
             G.Core.pointee.destroyWire(nativeRef)
 
             // wire will delete shards
@@ -1091,20 +1125,27 @@ class WireController {
         }
     }
 
-    func variable(name: String) -> UnsafeMutablePointer<SHVar> {
-        if let current = refs[name] {
-            return current
-        } else {
-            let n = name.utf8CString
-            var cname = SHStringWithLen()
-            cname.string = n.withUnsafeBufferPointer {
-                $0.baseAddress
-            }
-            cname.len = UInt64(n.count)
-            let r = G.Core.pointee.referenceWireVariable(nativeRef, cname)!
-            refs[name] = r
-            return r
+    private func addExternalVar(name: String, varPtr: UnsafeMutablePointer<SHVar>) {
+        varPtr.pointee.flags |= UInt16(SHVAR_FLAGS_EXTERNAL)
+        var ev = SHExternalVariable()
+        ev.var = varPtr
+
+        let n = name.utf8CString
+        var cname = SHStringWithLen()
+        cname.string = n.withUnsafeBufferPointer {
+            $0.baseAddress
         }
+        cname.len = UInt64(n.count - 1)
+
+        G.Core.pointee.setExternalVariable(nativeRef, cname, &ev)
+    }
+
+    func addExternal(name: String, owned: OwnedVar) {
+        addExternalVar(name: name, varPtr: owned.ptr())
+    }
+
+    func addExternal(name: String, sequence: SeqVar) {
+        addExternalVar(name: name, varPtr: sequence.ptr())
     }
 
     func isRunning() -> Bool {
@@ -1113,7 +1154,6 @@ class WireController {
 
     var nativeRef = SHWireRef(bitPattern: 0)
     var shards = [ShardController]()
-    var refs: [String: UnsafeMutablePointer<SHVar>] = [:]
 }
 
 class MeshController {
@@ -1203,10 +1243,10 @@ class SwiftSWL {
 
 class Shards {
     static func log(_ message: String) {
-        message.utf8CString.withUnsafeBufferPointer { buffer in
+        message.utf8.withContiguousStorageIfAvailable { buffer in
             var shString = SHStringWithLen()
-            shString.string = buffer.baseAddress
-            shString.len = UInt64(buffer.count - 1) // Subtract 1 to exclude null terminator
+            shString.string = UnsafeRawPointer(buffer.baseAddress)?.assumingMemoryBound(to: CChar.self)
+            shString.len = UInt64(buffer.count)
             G.Core.pointee.log(shString)
         }
     }
