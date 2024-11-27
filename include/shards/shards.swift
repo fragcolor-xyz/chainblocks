@@ -212,7 +212,7 @@ public enum VarType: UInt8, CustomStringConvertible, CaseIterable {
     }
 }
 
-extension SHVar: @retroactive CustomStringConvertible {
+extension SHVar: CustomStringConvertible {
     public var description: String {
         switch type {
         case .NoValue:
