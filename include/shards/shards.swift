@@ -370,9 +370,16 @@ extension SHVar: CustomStringConvertible {
 
     public var string: String {
         assert(type == .String, "String variable expected!")
-        let stringPtr = UnsafeMutablePointer<CChar>(mutating: payload.stringValue)
-        let buffer = UnsafeMutableBufferPointer<CChar>(start: stringPtr, count: Int(payload.stringLen))
-        return .init(cString: Array(buffer))
+        guard let stringPtr = payload.stringValue else {
+            return ""
+        }
+        let length = Int(payload.stringLen)
+        guard length > 0 else {
+            return ""
+        }
+        // Cast `CChar` (Int8) to `UInt8` for decoding
+        let buffer = UnsafeBufferPointer(start: stringPtr, count: length).map { UInt8(bitPattern: $0) }
+        return String(decoding: buffer, as: UTF8.self)
     }
 
     init(value: ShardPtr) {
@@ -438,16 +445,10 @@ class OwnedVar {
     init(owning: SHVar) {
         v = owning
     }
-    
-    init(string: String){
+
+    init(string: String) {
         v = SHVar()
-        var tmp = SHVar()
-        tmp.valueType = VarType.String.asSHType()
-        string.utf8.withContiguousStorageIfAvailable { buffer in
-            tmp.payload.stringValue = UnsafeRawPointer(buffer.baseAddress)?.assumingMemoryBound(to: CChar.self)
-            tmp.payload.stringLen = UInt32(buffer.count)
-            G.Core.pointee.cloneVar(&v, &tmp)
-        }
+        set(string: string)
     }
 
     deinit {
@@ -461,6 +462,53 @@ class OwnedVar {
             UnsafeMutablePointer(mutating: ptr)
         }
     }
+
+    func set(string: String) {
+        string.utf8CString.withUnsafeBufferPointer { buffer in
+            var tmp = SHVar()
+            tmp.valueType = VarType.String.asSHType()
+            tmp.payload.stringValue = buffer.baseAddress
+            tmp.payload.stringLen = UInt32(buffer.count - 1) // Subtract 1 to exclude null terminator
+            G.Core.pointee.cloneVar(&v, &tmp)
+        }
+    }
+}
+
+class TableVar {
+    var containerVar: SHVar
+
+    init() {
+        containerVar = SHVar()
+        containerVar.valueType = VarType.Table.asSHType()
+        containerVar.payload.tableValue = G.Core.pointee.tableNew()
+    }
+
+    init(cloning: SHVar) {
+        assert(cloning.valueType == VarType.Table.asSHType())
+
+        containerVar = SHVar()
+        withUnsafePointer(to: cloning) { ptr in
+            G.Core.pointee.cloneVar(&containerVar, UnsafeMutablePointer(mutating: ptr))
+        }
+    }
+
+    deinit {
+        withUnsafeMutablePointer(to: &containerVar) { ptr in
+            G.Core.pointee.destroyVar(ptr)
+        }
+    }
+
+    func insertOrUpdate(key: SHVar, cloning: SHVar) {
+        let vPtr = containerVar.payload.tableValue.api.pointee.tableAt(containerVar.payload.tableValue, key)
+        withUnsafePointer(to: cloning) { ptr in
+            G.Core.pointee.cloneVar(vPtr, UnsafeMutablePointer(mutating: ptr))
+        }
+    }
+
+    func get(key: SHVar) -> SHVar {
+        let vPtr = containerVar.payload.tableValue.api.pointee.tableAt(containerVar.payload.tableValue, key)
+        return vPtr!.pointee
+    }
 }
 
 class SeqVar {
@@ -470,10 +518,10 @@ class SeqVar {
         containerVar = SHVar()
         containerVar.valueType = VarType.Seq.asSHType()
     }
-    
-    init (cloning: SHVar) {
+
+    init(cloning: SHVar) {
         assert(cloning.valueType == VarType.Seq.asSHType())
-        
+
         containerVar = SHVar()
         withUnsafePointer(to: cloning) { ptr in
             G.Core.pointee.cloneVar(&containerVar, UnsafeMutablePointer(mutating: ptr))
@@ -519,13 +567,13 @@ class SeqVar {
             G.Core.pointee.cloneVar(&containerVar.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
         }
     }
-
+    
     func push(string: String) {
-        var tmp = SHVar()
-        tmp.valueType = VarType.String.asSHType()
-        string.utf8.withContiguousStorageIfAvailable { buffer in
-            tmp.payload.stringValue = UnsafeRawPointer(buffer.baseAddress)?.assumingMemoryBound(to: CChar.self)
-            tmp.payload.stringLen = UInt32(buffer.count)
+        string.utf8CString.withUnsafeBufferPointer { buffer in
+            var tmp = SHVar()
+            tmp.valueType = VarType.String.asSHType()
+            tmp.payload.stringValue = buffer.baseAddress
+            tmp.payload.stringLen = UInt32(buffer.count - 1) // Subtract 1 to exclude null terminator
             pushCloning(value: tmp)
         }
     }
@@ -1159,6 +1207,10 @@ class WireController {
         addExternalVar(name: name, varPtr: sequence.ptr())
     }
 
+    func addExternal(name: String, raw: inout SHVar) {
+        addExternalVar(name: name, varPtr: &raw)
+    }
+
     func isRunning() -> Bool {
         G.Core.pointee.isWireRunning(nativeRef)
     }
@@ -1254,10 +1306,10 @@ class SwiftSWL {
 
 class Shards {
     static func log(_ message: String) {
-        message.utf8.withContiguousStorageIfAvailable { buffer in
+        message.utf8CString.withUnsafeBufferPointer { buffer in
             var shString = SHStringWithLen()
-            shString.string = UnsafeRawPointer(buffer.baseAddress)?.assumingMemoryBound(to: CChar.self)
-            shString.len = UInt64(buffer.count)
+            shString.string = buffer.baseAddress
+            shString.len = UInt64(buffer.count - 1) // Subtract 1 to exclude null terminator
             G.Core.pointee.log(shString)
         }
     }
