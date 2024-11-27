@@ -2064,6 +2064,25 @@ TEST_CASE("WireDoppelgangerPool acquire and release", "[WireDoppelgangerPool]") 
   }
 }
 
+TEST_CASE("Mesh-schedule-wire-running") {
+  auto mesh = SHMesh::make();
+  std::shared_ptr<SHWire> wire = Wire("main")
+                                     .looped(false)
+                                     .let(Var("Hello"))
+                                     .shard("Log");
+
+  mesh->schedule(wire);
+  REQUIRE(shards::isRunning(wire.get()));
+  mesh->tick();
+  REQUIRE(!shards::isRunning(wire.get()));
+  mesh->tick();
+  REQUIRE(!shards::isRunning(wire.get()));
+  mesh->tick();
+  REQUIRE(!shards::isRunning(wire.get()));
+  mesh->tick();
+  REQUIRE(!shards::isRunning(wire.get()));
+}
+
 #ifndef SHARDS_VALGRIND
 TEST_CASE("Mesh restart wire") {
   auto mesh = SHMesh::make();
