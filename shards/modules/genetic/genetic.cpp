@@ -548,8 +548,8 @@ private:
     void before_stop(SHWire *wire) {
       // Collect fitness last result
       auto fitnessVar = wire->finishedOutput;
-      if (fitnessVar.valueType == SHType::Float) {
-        self.fitness = fitnessVar.payload.floatValue;
+      if (fitnessVar.has_value() && fitnessVar->valueType == SHType::Float) {
+        self.fitness = fitnessVar->payload.floatValue;
       }
     }
 

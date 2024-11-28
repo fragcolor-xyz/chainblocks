@@ -340,21 +340,25 @@ struct Wait : public WireBase {
       if (passthrough) {
         return input;
       } else {
+        if (!wire->finishedOutput.has_value()) {
+          throw ActivationError(fmt::format("Wire '{}' did not set an output", wire->name));
+        }
+
         // Check for potential issues with object types returned by the wire
-        if (wire->finishedOutput.valueType == SHType::Object) {
-          if ((wire->finishedOutput.flags & SHVAR_FLAGS_USES_OBJINFO) != SHVAR_FLAGS_USES_OBJINFO) {
+        if (wire->finishedOutput->valueType == SHType::Object) {
+          if ((wire->finishedOutput->flags & SHVAR_FLAGS_USES_OBJINFO) != SHVAR_FLAGS_USES_OBJINFO) {
             SHLOG_ERROR("Object returned by wire '{}' does not have SHVAR_FLAGS_USES_OBJINFO flag set. This may lead to "
                         "premature destruction.",
                         wire->name);
             throw ActivationError(fmt::format("Object returned by wire '{}' lacks reference counting", wire->name));
           }
-          if (!wire->finishedOutput.objectInfo || !wire->finishedOutput.objectInfo->reference) {
+          if (!wire->finishedOutput->objectInfo || !wire->finishedOutput->objectInfo->reference) {
             SHLOG_ERROR("Object returned by wire '{}' has no reference counting. This will lead to premature destruction.",
                         wire->name);
             throw ActivationError(fmt::format("Object returned by wire '{}' lacks reference counting", wire->name));
           }
         }
-        return wire->finishedOutput;
+        return wire->finishedOutput.value();
       }
     }
   }
@@ -528,21 +532,25 @@ struct Peek : public WireBase {
         throw ActivationError(wire->finishedError);
       }
 
+      if (!wire->finishedOutput.has_value()) {
+        return Var::Empty;
+      }
+
       // Check for potential issues with object types returned by the wire
-      if (wire->finishedOutput.valueType == SHType::Object) {
-        if ((wire->finishedOutput.flags & SHVAR_FLAGS_USES_OBJINFO) != SHVAR_FLAGS_USES_OBJINFO) {
+      if (wire->finishedOutput->valueType == SHType::Object) {
+        if ((wire->finishedOutput->flags & SHVAR_FLAGS_USES_OBJINFO) != SHVAR_FLAGS_USES_OBJINFO) {
           SHLOG_ERROR("Object returned by wire '{}' does not have SHVAR_FLAGS_USES_OBJINFO flag set. This may lead to premature "
                       "destruction.",
                       wire->name);
           throw ActivationError(fmt::format("Object returned by wire '{}' lacks reference counting", wire->name));
         }
-        if (!wire->finishedOutput.objectInfo || !wire->finishedOutput.objectInfo->reference) {
+        if (!wire->finishedOutput->objectInfo || !wire->finishedOutput->objectInfo->reference) {
           SHLOG_ERROR("Object returned by wire '{}' has no reference counting. This will lead to premature destruction.",
                       wire->name);
           throw ActivationError(fmt::format("Object returned by wire '{}' lacks reference counting", wire->name));
         }
       }
-      return wire->finishedOutput;
+      return wire->finishedOutput.value();
     }
   }
 };
@@ -641,8 +649,12 @@ struct StopWire : public WireBase {
       if (passthrough) {
         return input;
       } else {
-        _output = wire->finishedOutput;
-        return _output;
+        if (!wire->finishedOutput.has_value()) {
+          return Var::Empty;
+        } else {
+          _output = wire->finishedOutput.value();
+          return _output;
+        }
       }
     }
   }
@@ -1023,7 +1035,11 @@ struct SwitchTo : public WireBase {
 
     // return the last or final output of pWire
     if (pWire->state > SHWire::State::IterationEnded) { // failed or ended
-      return pWire->finishedOutput;
+      if (!pWire->finishedOutput.has_value()) {
+        return Var::Empty;
+      } else {
+        return pWire->finishedOutput.value();
+      }
     } else {
       return pWire->previousOutput;
     }

@@ -885,8 +885,8 @@ inline bool stop(SHWire *wire, SHVar *result, SHContext *currentContext) {
 
   if (wire->state == SHWire::State::Stopped) {
     // Clone the results if we need them
-    if (result)
-      cloneVar(*result, wire->finishedOutput);
+    if (result && wire->finishedOutput.has_value())
+      cloneVar(*result, wire->finishedOutput.value());
 
     return true;
   }
@@ -939,8 +939,8 @@ inline bool stop(SHWire *wire, SHVar *result, SHContext *currentContext) {
   wire->currentInput.reset();
 
   // Clone the results if we need them
-  if (result)
-    cloneVar(*result, wire->finishedOutput);
+  if (result && wire->finishedOutput.has_value())
+    cloneVar(*result, wire->finishedOutput.value());
 
   return res;
 }

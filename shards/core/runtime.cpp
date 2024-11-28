@@ -1575,7 +1575,7 @@ void run(SHWire *wire, shards::Coroutine *coro) {
 
   // Reset state
   wire->state = SHWire::State::Prepared;
-  wire->finishedOutput = Var::Empty;
+  wire->finishedOutput.reset();
   wire->finishedError.clear();
 
   // Create a new context and copy the sink in
@@ -2822,7 +2822,7 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
                     shards::isRunning(wire),
                     wire->state == SHWire::State::Failed || !wire->finishedError.empty(),
                     SHStringWithLen{wire->finishedError.c_str(), wire->finishedError.size()},
-                    &wire->finishedOutput};
+                    wire->finishedOutput.has_value() ? &wire->finishedOutput.value() : nullptr};
     return info;
   };
 
