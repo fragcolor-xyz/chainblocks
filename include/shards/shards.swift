@@ -909,7 +909,7 @@ func createSwiftShard<T: IShard>(_: T.Type) -> UnsafeMutablePointer<Shard>? {
     return UnsafeMutableRawPointer(cwrapper).assumingMemoryBound(to: Shard.self)
 }
 
-struct Parameter {
+struct ShardParameter {
     private weak var owner: ShardController?
     var info: ParameterInfo
 
@@ -974,7 +974,7 @@ class ShardController: Equatable, Identifiable {
                 let nparam = nparams!.elements[Int(i)]
                 let nparamId = "\(blkname!)-\(nparam.name!)"
                 if let info = ShardController.infos[nparamId] {
-                    params.append(Parameter(shard: self, info: info))
+                    params.append(ShardParameter(shard: self, info: info))
                 } else {
                     let info = ParameterInfo(
                         name: .init(cString: nparam.name!),
@@ -983,7 +983,7 @@ class ShardController: Equatable, Identifiable {
                         index: Int(i)
                     )
                     ShardController.infos[nparamId] = info
-                    params.append(Parameter(shard: self, info: info))
+                    params.append(ShardParameter(shard: self, info: info))
                 }
             }
         }
@@ -1021,7 +1021,7 @@ class ShardController: Equatable, Identifiable {
         .init(cString: nativeShard!.pointee.name(nativeShard)!)
     }
 
-    var parameters: [Parameter] {
+    var parameters: [ShardParameter] {
         params
     }
 
@@ -1085,7 +1085,7 @@ class ShardController: Equatable, Identifiable {
     }
 
     var nativeShard: ShardPtr
-    var params = [Parameter]()
+    var params = [ShardParameter]()
     static var infos: [String: ParameterInfo] = [:]
 }
 
@@ -1331,6 +1331,9 @@ class Shards {
 
         // Read the AST
         var ast = G.Core.pointee.read(nameStr.asSHStringWithLen(), codeStr.asSHStringWithLen(), basePathStr.asSHStringWithLen(), nil, 0)
+        guard ast.error == nil else {
+            return nil
+        }
 
         // Create evaluation environment
         let emptyStr = SHStringWithLen.fromStatic("")
