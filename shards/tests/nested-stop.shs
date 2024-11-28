@@ -1,0 +1,36 @@
+@wire(apple {
+  @wire(berry {
+    0.1 | SleepBlocking!
+    Msg("Stopping apple")
+    Stop
+  })
+  
+  @wire(carrot {
+    Once({0 >= carrot-counter})
+    Inc(carrot-counter)
+    carrot-counter | Log("Carrot counter") | If(IsLess(3) {
+      0.1 | SleepBlocking!
+      Restart
+    } {
+      0.1 | SleepBlocking!
+      SwitchTo(berry)
+    })
+  })
+  
+  @wire(durian {
+    Once({0 >= durian-counter})
+    Inc(durian-counter)
+    durian-counter | Log("Durian counter") | If(IsLess(3) {
+      0.1 | SleepBlocking!
+      Restart
+    } {
+      0.1 | SleepBlocking!
+      SwitchTo(carrot)
+    })
+  })
+  
+  SwitchTo(durian)
+})
+
+Detach(apple Restart: true)
+Wait(apple)

@@ -637,7 +637,7 @@ struct StopWire : public WireBase {
       context->stopFlow(input);
       return input;
     } else {
-      shards::stop(wire.get());
+      shards::stop(wire.get(), nullptr, context);
       if (passthrough) {
         return input;
       } else {
@@ -799,7 +799,6 @@ struct ResumeWire : public WireBase {
 struct SwitchTo : public WireBase {
   std::deque<ParamVar> _vars;
   bool fromStart{false};
-  bool stopOnCleanup{false};
 
   static SHOptionalString help() { return SHCCSTR("Suspends the current Wire and switches execution to the specified Wire."); }
 
@@ -825,9 +824,7 @@ struct SwitchTo : public WireBase {
       {"Restart",
        SHCCSTR("If the Wire should always restart from the beginning instead of resuming from its previous state."),
        {CoreInfo::BoolType}},
-      {"StopOnCleanup",
-       SHCCSTR("If the child Wire should be stopped when the parent Wire is Destroyed or Stopped."),
-       {CoreInfo::BoolType}}};
+  };
 
   static SHParametersInfo parameters() { return params; }
 
@@ -892,9 +889,6 @@ struct SwitchTo : public WireBase {
     case 1:
       fromStart = value.payload.boolValue;
       break;
-    case 2:
-      stopOnCleanup = value.payload.boolValue;
-      break;
     default:
       break;
     }
@@ -906,8 +900,6 @@ struct SwitchTo : public WireBase {
       return wireref;
     case 1:
       return Var(fromStart);
-    case 2:
-      return Var(stopOnCleanup);
     default:
       return Var::Empty;
     }
@@ -934,17 +926,6 @@ struct SwitchTo : public WireBase {
   }
 
   void cleanup(SHContext *context) {
-    // Notice we don't stop wire normally!
-    // it does not make sense cos maybe another wire wants to pick it up and resume it!
-    // we should not be the owners of the wire, we just want to switch to it!
-    // think like a state machine, we are just switching to another state
-    if (stopOnCleanup) {
-      if (wire) {
-        SHLOG_TRACE("SwitchTo: stopping wire: {}", wire->name);
-        shards::stop(wire.get());
-      }
-    }
-
     for (auto &v : _vars) {
       v.cleanup();
     }

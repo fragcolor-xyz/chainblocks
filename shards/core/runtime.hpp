@@ -879,7 +879,7 @@ inline bool stop(SHWire *wire, SHVar *result, SHContext *currentContext) {
   // but avoid stopping if detached and scheduled
   if (wire->childWire) {
     // stop the child wire if any
-    shards::stop(wire->childWire);
+    shards::stop(wire->childWire, nullptr, currentContext);
     wire->childWire = nullptr;
   }
 
@@ -912,7 +912,7 @@ inline bool stop(SHWire *wire, SHVar *result, SHContext *currentContext) {
 
       // Another issue, if we resume from current context to current context we dead lock here!!
       if (currentContext && currentContext == wire->context) {
-        SHLOG_WARNING("Trying to stop wire {} from the same context it's running in!", wire->name);
+        throw ActivationError(fmt::format("Trying to stop wire {} from the same context it's running in!", wire->name));
       } else {
         shards::tick<true>(wire->tickingWire(), SHDuration{});
       }
