@@ -4019,41 +4019,54 @@ struct Repeat {
     } else {
       repeats = 0;
     }
-    do {
-      if (!forever) {
-        if (repeats <= 0)
-          break;
-        repeats--;
-      }
 
-      SHVar repeatOutput{};
-      auto state = _blks.activate<true>(context, input, repeatOutput);
-      if (state != SHWireState::Continue)
-        break;
-    } while (true);
+    SHVar repeatOutput;
+
+    if (forever) {
+      while (true) {
+        auto state = _blks.activate<true>(context, input, repeatOutput);
+        if (state != SHWireState::Continue)
+          break;
+      }
+    } else {
+      for (int i = 0; i < repeats; ++i) {
+        auto state = _blks.activate<true>(context, input, repeatOutput);
+        if (state != SHWireState::Continue)
+          break;
+      }
+    }
+
     return input;
   }
 
   FLATTEN ALWAYS_INLINE const SHVar &activateUntilPred(SHContext *context, const SHVar &input) {
-    std::optional<int> repeats = !_times.isNone() ? std::make_optional((int)(Var &)_times.get()) : std::nullopt;
-    do {
-      if (repeats) {
-        if ((*repeats) <= 0)
+    SHVar pres{};
+    SHVar repeatOutput{};
+
+    if (_times.isNone()) {
+      // Infinite loop
+      while (true) {
+        auto state = _pred.activate<true>(context, input, pres);
+        if (unlikely(state > SHWireState::Return || pres.payload.boolValue))
           break;
-        (*repeats)--;
+
+        state = _blks.activate<true>(context, input, repeatOutput);
+        if (state != SHWireState::Continue)
+          break;
       }
+    } else {
+      // Finite loop
+      int repeats = _times.get().payload.intValue;
+      while (repeats-- > 0) {
+        auto state = _pred.activate<true>(context, input, pres);
+        if (unlikely(state > SHWireState::Return || pres.payload.boolValue))
+          break;
 
-      SHVar pres{};
-      auto state = _pred.activate<true>(context, input, pres);
-      // logic flow here!
-      if (unlikely(state > SHWireState::Return || pres.payload.boolValue))
-        break;
-
-      SHVar repeatOutput{};
-      state = _blks.activate<true>(context, input, repeatOutput);
-      if (state != SHWireState::Continue)
-        break;
-    } while (true);
+        state = _blks.activate<true>(context, input, repeatOutput);
+        if (state != SHWireState::Continue)
+          break;
+      }
+    }
     return input;
   }
 };

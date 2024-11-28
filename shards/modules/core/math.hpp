@@ -530,9 +530,8 @@ template <class TOp> struct UnaryVarOperation : public UnaryOperation<TOp> {
 
   void cleanup(SHContext *context) { _value.cleanup(); }
 
-  ALWAYS_INLINE SHVar activate(SHContext *context, const SHVar &input) {
+  ALWAYS_INLINE void activate(SHContext *context, const SHVar &input) {
     this->operate(_value.get(), _value.get());
-    return input;
   }
 };
 
