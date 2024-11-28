@@ -361,7 +361,7 @@ struct Evolve {
                             TickObserver obs{*i};
                             auto fitwire = SHWire::sharedFromRef(i->fitnessWire.payload.wireValue);
                             auto wire = SHWire::sharedFromRef(i->wire.payload.wireValue);
-                            i->mesh->schedule(obs, fitwire, wire->finishedOutput);
+                            i->mesh->schedule(obs, fitwire, *wire->finishedOutput);
                           });
 
             _exec->run(flow).get();
