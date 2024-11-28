@@ -7,7 +7,7 @@ SwitchTo(wire-to-switch-to false)
 """
 
 explicit: """@wire(main-wire{
-SwitchTo(Wire: wire-to-switch-to Restart: false StopOnCleanup: false)
+SwitchTo(Wire: wire-to-switch-to Restart: false)
 })
 """
 

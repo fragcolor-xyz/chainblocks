@@ -464,11 +464,12 @@ class OwnedVar {
     }
 
     func set(string: String) {
-        string.utf8CString.withUnsafeBufferPointer { buffer in
+        string.withCString { cString in
             var tmp = SHVar()
             tmp.valueType = VarType.String.asSHType()
-            tmp.payload.stringValue = buffer.baseAddress
-            tmp.payload.stringLen = UInt32(buffer.count - 1) // Subtract 1 to exclude null terminator
+            tmp.payload.stringValue = cString
+            let length = string.lengthOfBytes(using: .utf8)
+            tmp.payload.stringLen = UInt32(length)
             G.Core.pointee.cloneVar(&v, &tmp)
         }
     }
@@ -508,6 +509,10 @@ class TableVar {
     func get(key: SHVar) -> SHVar {
         let vPtr = containerVar.payload.tableValue.api.pointee.tableAt(containerVar.payload.tableValue, key)
         return vPtr!.pointee
+    }
+
+    func clear() {
+        containerVar.payload.tableValue.api.pointee.tableClear(containerVar.payload.tableValue)
     }
 }
 
@@ -550,6 +555,10 @@ class SeqVar {
         }
     }
 
+    func clear() {
+        resize(size: 0)
+    }
+
     func size() -> Int {
         return Int(containerVar.payload.seqValue.len)
     }
@@ -567,7 +576,7 @@ class SeqVar {
             G.Core.pointee.cloneVar(&containerVar.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
         }
     }
-    
+
     func push(string: String) {
         string.utf8CString.withUnsafeBufferPointer { buffer in
             var tmp = SHVar()
@@ -1189,14 +1198,13 @@ class WireController {
         var ev = SHExternalVariable()
         ev.var = varPtr
 
-        let n = name.utf8CString
-        var cname = SHStringWithLen()
-        cname.string = n.withUnsafeBufferPointer {
-            $0.baseAddress
+        name.withCString { cString in
+            var cname = SHStringWithLen()
+            cname.string = cString
+            let length = name.lengthOfBytes(using: .utf8)
+            cname.len = UInt64(length)
+            G.Core.pointee.setExternalVariable(nativeRef, cname, &ev)
         }
-        cname.len = UInt64(n.count - 1)
-
-        G.Core.pointee.setExternalVariable(nativeRef, cname, &ev)
     }
 
     func addExternal(name: String, owned: OwnedVar) {
@@ -1306,10 +1314,11 @@ class SwiftSWL {
 
 class Shards {
     static func log(_ message: String) {
-        message.utf8CString.withUnsafeBufferPointer { buffer in
+        message.withCString { cString in
             var shString = SHStringWithLen()
-            shString.string = buffer.baseAddress
-            shString.len = UInt64(buffer.count - 1) // Subtract 1 to exclude null terminator
+            shString.string = cString
+            let length = message.lengthOfBytes(using: .utf8)
+            shString.len = UInt64(length)
             G.Core.pointee.log(shString)
         }
     }
@@ -1365,5 +1374,14 @@ class Shards {
     public func getViewSafeArea(uiEdgeInsets: UnsafeMutablePointer<UIEdgeInsets>, viewPtr: UnsafeMutableRawPointer?) {
         let view = Unmanaged<UIView>.fromOpaque(viewPtr!).takeUnretainedValue()
         uiEdgeInsets.pointee = view.safeArea
+    }
+
+    extension WireController {
+        public func wait() async {
+            // Check copier status every 100ms
+            while isRunning() {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
+        }
     }
 #endif
