@@ -120,11 +120,14 @@ jobs:
         if: ${{ steps.setup.outputs.rust-cache == 'true' }}
         with:
           key: ${{ steps.setup.outputs.build-type }}
+      - name: Verify CMake version
+        shell: bash
+        run: cmake --version
       - name: Set up dev dependencies
         shell: bash
         run: |
           choco install -y --force --version=18.1.6 llvm
-          choco install -y cmake ninja
+          choco install -y ninja
       - name: Build
         env:
           RUST_BACKTRACE: full
