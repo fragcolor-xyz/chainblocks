@@ -2434,6 +2434,7 @@ void SHWire::cleanup(bool force) {
     SHLOG_TRACE("Running cleanup on wire: {} users count: {}", name, wireUsers.size());
 
     warmedUp = false;
+    previousOutput = {};
 
     dispatcher.trigger(SHWire::OnCleanupEvent{this});
 
