@@ -2564,12 +2564,12 @@ BUILTIN("decompress-strings") {
   auto mesh = SHMesh::make();
   mesh->schedule(wire);
   mesh->tick();
-  if (wire->finishedOutput.valueType != SHType::Seq) {
+  if (wire->finishedOutput->valueType != SHType::Seq) {
     throw shards::SHException("Failed to decompress strings!");
   }
 
-  for (uint32_t i = 0; i < wire->finishedOutput.payload.seqValue.len; i++) {
-    auto pair = wire->finishedOutput.payload.seqValue.elements[i];
+  for (uint32_t i = 0; i < wire->finishedOutput->payload.seqValue.len; i++) {
+    auto pair = wire->finishedOutput->payload.seqValue.elements[i];
     if (pair.valueType != SHType::Seq || pair.payload.seqValue.len != 2) {
       throw shards::SHException("Failed to decompress strings!");
     }
