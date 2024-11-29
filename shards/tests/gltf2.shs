@@ -9,3 +9,21 @@ ForEach({
 })
 
 models | Log("Models")
+
+
+"File " | GLTF.Parse({})
+; Output: 
+ModelHierarchy {
+  ; <nodes>
+}
+
+Node {
+  ; <drawables>
+}
+
+Drawable {
+  material: {
+    id: "95376f49-7169-4363-8d8b-155b424a7eaf"
+    t: 0
+  }
+}

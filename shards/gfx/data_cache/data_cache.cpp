@@ -116,12 +116,13 @@ AssetInfo DataCache::generateDerivedKey(AssetInfo sourceKey, uint64_t generatorI
 }
 
 std::shared_ptr<AssetLoadRequest> DataCache::loadDerived(AssetInfo key, uint64_t generatorID) {
-  key.
+  // key.
   // auto req = std::make_shared<AssetLoadRequest>();
   // req->key = key;
   // req->generatorID = generatorID;
   // io->enqueueLoadRequest(req);
   // return req;
+  return nullptr;
 }
 
 // TODO: Mayhaps replace this with a per-context cache, athough fully shared might be better
