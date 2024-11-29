@@ -1,0 +1,5 @@
+0 >= value
+Time.NowMs = start
+Repeat(Repeat(Repeat(Inc(value) Times: 1000) Times: 1000) Times: 1000)
+Time.NowMs | Sub(start) | Log("Time taken")
+value | Log("Value")

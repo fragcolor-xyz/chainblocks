@@ -85,3 +85,4 @@ GIST-all-MiniLM-L6-v2-config.json
 GIST-all-MiniLM-L6-v2-tokenizer.json
 ml-embeddings-manifest.json
 shards.ml.embeddings.version.txt
+profile.json
