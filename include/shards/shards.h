@@ -1071,6 +1071,7 @@ struct SHLEvalEnv;
 typedef struct SHLAst(__cdecl *SHReadProc)(struct SHStringWithLen name, struct SHStringWithLen code,
                                            struct SHStringWithLen basePath, const struct SHStringWithLen *includeDirs,
                                            uint32_t numIncludeDirs);
+typedef struct SHLAst(__cdecl *SHLoadAstProc)(const uint8_t *bytes, uint32_t size);
 typedef struct SHLEvalEnv *(__cdecl *SHCreateEvalEnv)(struct SHStringWithLen namespace_);
 typedef void(__cdecl *SHFreeEvalEnv)(struct SHLEvalEnv *env);
 typedef struct SHLError *(__cdecl *SHEvalProc)(struct SHLEvalEnv *env, const struct SHVar *ast);
@@ -1210,6 +1211,7 @@ typedef struct _SHCore {
 
   // Language parsing and evaluation
   SHReadProc read;
+  SHLoadAstProc loadAst;
   SHCreateEvalEnv createEvalEnv;
   SHFreeEvalEnv freeEvalEnv;
   SHEvalProc eval;

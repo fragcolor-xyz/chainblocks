@@ -1357,6 +1357,41 @@ class Shards {
         let wireController = WireController(native: wire.wire.pointee!)
         return wireController
     }
+
+    static func evalWire(_ name: String, _ ast: [UInt8]) -> WireController? {
+        // Create SHStringWithLen instances
+        let nameStr = SwiftSWL(name)
+
+        // Read the AST
+        var ast = ast.withUnsafeBufferPointer { buffer in
+            G.Core.pointee.loadAst(buffer.baseAddress!, UInt32(buffer.count))
+        }
+        guard ast.error == nil else {
+            return nil
+        }
+
+        // Create evaluation environment
+        let emptyStr = SHStringWithLen.fromStatic("")
+        let env = G.Core.pointee.createEvalEnv(emptyStr)
+
+        // Evaluate the AST
+        let error = G.Core.pointee.eval(env, &ast.ast) // consumes ast
+        guard error == nil else {
+            G.Core.pointee.freeEvalEnv(env)
+            return nil
+        }
+
+        // Transform environment into a wire
+        var wire = G.Core.pointee.transformEnv(env, nameStr.asSHStringWithLen()) // consumes env
+        guard wire.error == nil else {
+            G.Core.pointee.freeWire(&wire)
+            return nil
+        }
+
+        // Create WireController from the resulting wire
+        let wireController = WireController(native: wire.wire.pointee!)
+        return wireController
+    }
 }
 
 #if canImport(UIKit)

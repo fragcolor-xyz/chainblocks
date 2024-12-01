@@ -2570,6 +2570,7 @@ SHCore sh_current_interface{};
 extern "C" {
 SHLAst shards_read(SHStringWithLen name, SHStringWithLen code, SHStringWithLen base_path, const SHStringWithLen *include_dirs,
                    uint32_t num_include_dirs);
+SHLAst shards_load_ast(const uint8_t *bytes, uint32_t size);
 SHLEvalEnv *shards_create_env(SHStringWithLen namespace_);
 void shards_free_env(SHLEvalEnv *env);
 SHLError *shards_eval_env(SHLEvalEnv *env, const SHVar *ast);
@@ -3094,6 +3095,8 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
 
   result->read = [](SHStringWithLen name, SHStringWithLen code, SHStringWithLen basePath, const SHStringWithLen *includeDirs,
                     uint32_t numIncludeDirs) { return shards_read(name, code, basePath, includeDirs, numIncludeDirs); };
+
+  result->loadAst = [](const uint8_t *bytes, uint32_t size) { return shards_load_ast(bytes, size); };
 
   result->createEvalEnv = [](SHStringWithLen namespace_) { return shards_create_env(namespace_); };
 

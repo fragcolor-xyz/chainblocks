@@ -87,7 +87,7 @@ pub extern "C" fn shards_read(
 }
 
 #[no_mangle]
-pub extern "C" fn shards_load_ast(bytes: *mut u8, size: u32) -> SHLAst {
+pub extern "C" fn shards_load_ast(bytes: *const u8, size: u32) -> SHLAst {
   let bytes = unsafe { from_raw_parts_allow_null(bytes, size as usize) };
   let decoded_bin: Result<Program, _> = flexbuffers::from_slice(bytes);
   match decoded_bin {
