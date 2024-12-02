@@ -112,6 +112,10 @@ SHTypeInfo deriveTypeInfo(const SHVar &value, const SHInstanceData &data, std::v
       }
     }
     varType.fixedSize = value.payload.seqValue.len;
+    // if the len is 0 we should make it a [Any] seq!
+    if (value.payload.seqValue.len == 0) {
+      shards::arrayPush(varType.seqTypes, SHTypeInfo{SHType::Any});
+    }
     break;
   }
   case SHType::Table: {

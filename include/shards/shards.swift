@@ -367,6 +367,16 @@ extension SHVar: CustomStringConvertible {
         }
         self = v
     }
+    
+    init(string: StaticString) {
+        var v = SHVar()
+        v.payload.stringValue = string.withUTF8Buffer { buffer in
+            unsafeBitCast(buffer.baseAddress, to: UnsafePointer<CChar>.self)
+        }
+        v.payload.stringLen = UInt32(string.utf8CodeUnitCount)
+        v.payload.stringCapacity = 0
+        self = v
+    }
 
     public var string: String {
         assert(type == .String, "String variable expected!")
@@ -509,6 +519,10 @@ class TableVar {
     func get(key: SHVar) -> SHVar {
         let vPtr = containerVar.payload.tableValue.api.pointee.tableAt(containerVar.payload.tableValue, key)
         return vPtr!.pointee
+    }
+    
+    func get(key: StaticString) -> SHVar {
+        return get(key: SHVar(string: key))
     }
 
     func clear() {
