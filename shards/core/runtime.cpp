@@ -1124,7 +1124,9 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
     for (const auto &[key, pVar] : ctx.wire->getExternalVariables()) {
       const SHExternalVariable &extVar = pVar;
       const SHVar &var = *extVar.var;
-      shassert((var.flags & SHVAR_FLAGS_EXTERNAL) != 0);
+      if ((var.flags & SHVAR_FLAGS_EXTERNAL) == 0) {
+        throw std::runtime_error(fmt::format("Variable '{}' must have SHVAR_FLAGS_EXTERNAL flag set", key.payload.stringValue));
+      }
 
       const SHTypeInfo *type{};
       if (extVar.type) {

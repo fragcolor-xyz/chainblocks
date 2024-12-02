@@ -436,6 +436,10 @@ extension SHVar: CustomStringConvertible {
         v.payload.objectValue = pointer
         self = v
     }
+    
+    func isNone() -> Bool {
+        return type == .NoValue
+    }
 }
 
 class OwnedVar {
@@ -1222,11 +1226,11 @@ class WireController {
         }
     }
 
-    func addExternal(name: String, owned: OwnedVar) {
+    func addExternal(name: String, owned: inout OwnedVar) {
         addExternalVar(name: name, varPtr: owned.ptr())
     }
 
-    func addExternal(name: String, sequence: SeqVar) {
+    func addExternal(name: String, sequence: inout SeqVar) {
         addExternalVar(name: name, varPtr: sequence.ptr())
     }
 
@@ -1236,6 +1240,10 @@ class WireController {
 
     func isRunning() -> Bool {
         G.Core.pointee.isWireRunning(nativeRef)
+    }
+    
+    func setPriority(_ priority: Int) {
+        G.Core.pointee.setWirePriority(nativeRef, Int32(priority))
     }
 
     var nativeRef = SHWireRef(bitPattern: 0)
