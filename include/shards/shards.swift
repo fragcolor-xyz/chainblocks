@@ -370,6 +370,7 @@ extension SHVar: CustomStringConvertible {
     
     init(string: StaticString) {
         var v = SHVar()
+        v.valueType = String
         v.payload.stringValue = string.withUTF8Buffer { buffer in
             unsafeBitCast(buffer.baseAddress, to: UnsafePointer<CChar>.self)
         }
