@@ -1172,32 +1172,17 @@ class WireController {
     }
 
     deinit {
+        for variable in variables {
+            G.Core.pointee.releaseVariable(variable.value)
+        }
+        
         if nativeRef != nil {
             G.Core.pointee.destroyWire(nativeRef)
-
-            // wire will delete shards
-            for shard in shards {
-                shard.nativeShard = nil
-            }
         }
     }
 
     func add(shard: ShardController) {
-        if !shards.contains(shard) {
-            shards.append(shard)
-            G.Core.pointee.addShard(nativeRef, shard.nativeShard)
-        } else {
-            fatalError("Wire already had the same shard!")
-        }
-    }
-
-    func remove(shard: ShardController) {
-        if let idx = shards.firstIndex(of: shard) {
-            G.Core.pointee.removeShard(nativeRef, shard.nativeShard)
-            shards.remove(at: idx)
-        } else {
-            fatalError("Wire did not have that shard!")
-        }
+        G.Core.pointee.addShard(nativeRef, shard.nativeShard)
     }
 
     var looped: Bool = false {
@@ -1237,6 +1222,43 @@ class WireController {
     func addExternal(name: String, raw: inout SHVar) {
         addExternalVar(name: name, varPtr: &raw)
     }
+    
+    func referenceVariable(name: String) -> UnsafeMutablePointer<SHVar> {
+        if variables[name] != nil {
+            return variables[name]!
+        } else {
+            return name.withCString { cString in
+                var cname = SHStringWithLen()
+                cname.string = cString
+                let length = name.lengthOfBytes(using: .utf8)
+                cname.len = UInt64(length)
+                let ptr = G.Core.pointee.referenceWireVariable(nativeRef, cname)!
+                variables[name] = ptr
+                return ptr
+            }
+        }
+    }
+    
+    func setVariable(name: String, value: SHVar, tracked: Bool = false) {
+        let dst = referenceVariable(name: name)
+        if tracked {
+            dst.pointee.flags |= UInt16(SHVAR_FLAGS_TRACKED) // make sure this is there!
+        }
+        withUnsafePointer(to: value) { src in
+            G.Core.pointee.cloneVar(dst, src)
+        }
+    }
+    
+    func setVariable(name: String, value: String, tracked: Bool = false) {
+        value.withCString { cString in
+            var tmp = SHVar()
+            tmp.valueType = VarType.String.asSHType()
+            tmp.payload.stringValue = cString
+            let length = value.lengthOfBytes(using: .utf8)
+            tmp.payload.stringLen = UInt32(length)
+            setVariable(name: name, value: tmp, tracked: tracked)
+        }
+    }
 
     func isRunning() -> Bool {
         G.Core.pointee.isWireRunning(nativeRef)
@@ -1247,7 +1269,7 @@ class WireController {
     }
 
     var nativeRef = SHWireRef(bitPattern: 0)
-    var shards = [ShardController]()
+    var variables: [String: UnsafeMutablePointer<SHVar>] = [:]
 }
 
 class MeshController {
@@ -1260,16 +1282,11 @@ class MeshController {
     }
 
     func schedule(wire: WireController) {
-        wires.append(wire)
         G.Core.pointee.schedule(nativeRef, wire.nativeRef, true)
     }
 
     func unschedule(wire: WireController) {
         G.Core.pointee.unschedule(nativeRef, wire.nativeRef)
-        let idx = wires.firstIndex {
-            $0.nativeRef == wire.nativeRef
-        }
-        wires.remove(at: idx!)
     }
 
     func tick() -> Bool {
@@ -1281,7 +1298,6 @@ class MeshController {
     }
 
     var nativeRef = SHMeshRef(bitPattern: 0)
-    var wires = [WireController]()
 }
 
 extension SHStringWithLen {

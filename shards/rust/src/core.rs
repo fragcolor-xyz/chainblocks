@@ -308,8 +308,10 @@ pub fn writeCachedString1(id: u32, string: &'static str) -> SHOptionalString {
   }
 }
 
-pub fn deriveType(var: &Var, data: &InstanceData) -> DerivedType {
-  let t = unsafe { (*Core).deriveTypeInfo.unwrap_unchecked()(var as *const _, data as *const _) };
+pub fn deriveType(var: &Var, data: &InstanceData, mutable_: bool) -> DerivedType {
+  let t = unsafe {
+    (*Core).deriveTypeInfo.unwrap_unchecked()(var as *const _, data as *const _, mutable_)
+  };
   DerivedType(t)
 }
 

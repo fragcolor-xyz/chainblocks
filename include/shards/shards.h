@@ -1026,7 +1026,7 @@ typedef SHBool(__cdecl *SHIsEqualVar)(const struct SHVar *v1, const struct SHVar
 typedef int(__cdecl *SHCompareVar)(const struct SHVar *v1, const struct SHVar *v2);
 typedef SHBool(__cdecl *SHIsEqualType)(const struct SHTypeInfo *t1, const struct SHTypeInfo *t2);
 
-typedef struct SHTypeInfo(__cdecl *SHDeriveTypeInfo)(const struct SHVar *v, const struct SHInstanceData *data);
+typedef struct SHTypeInfo(__cdecl *SHDeriveTypeInfo)(const struct SHVar *v, const struct SHInstanceData *data, bool mutable_);
 typedef void(__cdecl *SHFreeDerivedTypeInfo)(struct SHTypeInfo *t);
 
 typedef void *(__cdecl *SHAlloc)(uint32_t size);

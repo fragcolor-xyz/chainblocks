@@ -83,7 +83,7 @@ SHTypeInfo cloneTypeInfo(const SHTypeInfo &other) {
 }
 
 SHTypeInfo deriveTypeInfo(const SHVar &value, const SHInstanceData &data, std::vector<SHExposedTypeInfo> *expInfo,
-                          bool resolveContextVariables) {
+                          bool resolveContextVariables, bool mutable_) {
   ZoneScopedN("deriveTypeInfo");
 
   SHTypeInfo varType{};
@@ -113,7 +113,7 @@ SHTypeInfo deriveTypeInfo(const SHVar &value, const SHInstanceData &data, std::v
     }
     varType.fixedSize = value.payload.seqValue.len;
     // if the len is 0 we should make it a [Any] seq!
-    if (value.payload.seqValue.len == 0) {
+    if (mutable_ && value.payload.seqValue.len == 0) {
       shards::arrayPush(varType.seqTypes, SHTypeInfo{SHType::Any});
     }
     break;
