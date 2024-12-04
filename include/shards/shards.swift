@@ -1172,10 +1172,6 @@ class WireController {
     }
 
     deinit {
-        for variable in variables {
-            G.Core.pointee.releaseVariable(variable.value)
-        }
-        
         if nativeRef != nil {
             G.Core.pointee.destroyWire(nativeRef)
         }
@@ -1222,43 +1218,6 @@ class WireController {
     func addExternal(name: String, raw: inout SHVar) {
         addExternalVar(name: name, varPtr: &raw)
     }
-    
-    func referenceVariable(name: String) -> UnsafeMutablePointer<SHVar> {
-        if variables[name] != nil {
-            return variables[name]!
-        } else {
-            return name.withCString { cString in
-                var cname = SHStringWithLen()
-                cname.string = cString
-                let length = name.lengthOfBytes(using: .utf8)
-                cname.len = UInt64(length)
-                let ptr = G.Core.pointee.referenceWireVariable(nativeRef, cname)!
-                variables[name] = ptr
-                return ptr
-            }
-        }
-    }
-    
-    func setVariable(name: String, value: SHVar, tracked: Bool = false) {
-        let dst = referenceVariable(name: name)
-        if tracked {
-            dst.pointee.flags |= UInt16(SHVAR_FLAGS_TRACKED) // make sure this is there!
-        }
-        withUnsafePointer(to: value) { src in
-            G.Core.pointee.cloneVar(dst, src)
-        }
-    }
-    
-    func setVariable(name: String, value: String, tracked: Bool = false) {
-        value.withCString { cString in
-            var tmp = SHVar()
-            tmp.valueType = VarType.String.asSHType()
-            tmp.payload.stringValue = cString
-            let length = value.lengthOfBytes(using: .utf8)
-            tmp.payload.stringLen = UInt32(length)
-            setVariable(name: name, value: tmp, tracked: tracked)
-        }
-    }
 
     func isRunning() -> Bool {
         G.Core.pointee.isWireRunning(nativeRef)
@@ -1268,8 +1227,14 @@ class WireController {
         G.Core.pointee.setWirePriority(nativeRef, Int32(priority))
     }
 
+    func stop() {
+        var result = G.Core.pointee.stopWire(nativeRef)
+        withUnsafeMutablePointer(to: &result) { resultPtr in
+            G.Core.pointee.destroyVar(resultPtr)
+        }
+    }
+    
     var nativeRef = SHWireRef(bitPattern: 0)
-    var variables: [String: UnsafeMutablePointer<SHVar>] = [:]
 }
 
 class MeshController {
