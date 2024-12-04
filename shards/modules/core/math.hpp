@@ -121,8 +121,11 @@ struct BinaryBase : public Base {
   OpType validateTypes(const SHTypeInfo &lhs, const SHType &rhs, SHTypeInfo &resultType) {
     OpType opType = OpType::Invalid;
     if (rhs != SHType::Seq && lhs.basicType == SHType::Seq) {
-      if (lhs.seqTypes.len != 1 || rhs != lhs.seqTypes.elements[0].basicType)
+      if (lhs.seqTypes.len != 1)
+        throw ComposeError(fmt::format("Operation not supported with input sequence with multiple types: {}", lhs));
+      if (rhs != lhs.seqTypes.elements[0].basicType)
         throw formatTypeError(lhs.seqTypes.elements[0].basicType, rhs);
+
       opType = Seq1;
     } else if (rhs == SHType::Seq && lhs.basicType == SHType::Seq) {
       // TODO need to have deeper types compatibility at least
