@@ -35,6 +35,7 @@ pub fn get_param_var_type(
     Ok(TypeOrDerived::Derived(deriveType(
       &var.get_param(),
       instance_data,
+      false,
     )))
   }
 }

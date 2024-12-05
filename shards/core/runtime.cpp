@@ -1124,14 +1124,16 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
     for (const auto &[key, pVar] : ctx.wire->getExternalVariables()) {
       const SHExternalVariable &extVar = pVar;
       const SHVar &var = *extVar.var;
-      shassert((var.flags & SHVAR_FLAGS_EXTERNAL) != 0);
+      if ((var.flags & SHVAR_FLAGS_EXTERNAL) == 0) {
+        throw std::runtime_error(fmt::format("Variable '{}' must have SHVAR_FLAGS_EXTERNAL flag set", key.payload.stringValue));
+      }
 
       const SHTypeInfo *type{};
       if (extVar.type) {
         type = extVar.type;
       } else {
         static TypeCache typeCache;
-        type = &typeCache.insertUnique(TypeInfo(var, data));
+        type = &typeCache.insertUnique(TypeInfo(var, data, nullptr, true, true));
       }
 
       SHExposedTypeInfo expInfo{key.payload.stringValue, {}, *type, true /* mutable */};
@@ -3075,8 +3077,8 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
 
   result->isEqualType = [](const SHTypeInfo *t1, const SHTypeInfo *t2) -> SHBool { return *t1 == *t2; };
 
-  result->deriveTypeInfo = [](const SHVar *v, const struct SHInstanceData *data) -> SHTypeInfo {
-    return deriveTypeInfo(*v, *data);
+  result->deriveTypeInfo = [](const SHVar *v, const struct SHInstanceData *dat, bool mutable_) -> SHTypeInfo {
+    return deriveTypeInfo(*v, *dat, nullptr, true, mutable_);
   };
 
   result->freeDerivedTypeInfo = [](SHTypeInfo *t) { freeDerivedInfo(*t); };

@@ -367,6 +367,17 @@ extension SHVar: CustomStringConvertible {
         }
         self = v
     }
+    
+    init(string: StaticString) {
+        var v = SHVar()
+        v.valueType = String
+        v.payload.stringValue = string.withUTF8Buffer { buffer in
+            unsafeBitCast(buffer.baseAddress, to: UnsafePointer<CChar>.self)
+        }
+        v.payload.stringLen = UInt32(string.utf8CodeUnitCount)
+        v.payload.stringCapacity = 0
+        self = v
+    }
 
     public var string: String {
         assert(type == .String, "String variable expected!")
@@ -424,6 +435,10 @@ extension SHVar: CustomStringConvertible {
         v.payload.objectTypeId = typeId
         v.payload.objectValue = pointer
         self = v
+    }
+    
+    func isNone() -> Bool {
+        return type == .NoValue
     }
 }
 
@@ -509,6 +524,10 @@ class TableVar {
     func get(key: SHVar) -> SHVar {
         let vPtr = containerVar.payload.tableValue.api.pointee.tableAt(containerVar.payload.tableValue, key)
         return vPtr!.pointee
+    }
+    
+    func get(key: StaticString) -> SHVar {
+        return get(key: SHVar(string: key))
     }
 
     func clear() {
@@ -1155,30 +1174,11 @@ class WireController {
     deinit {
         if nativeRef != nil {
             G.Core.pointee.destroyWire(nativeRef)
-
-            // wire will delete shards
-            for shard in shards {
-                shard.nativeShard = nil
-            }
         }
     }
 
     func add(shard: ShardController) {
-        if !shards.contains(shard) {
-            shards.append(shard)
-            G.Core.pointee.addShard(nativeRef, shard.nativeShard)
-        } else {
-            fatalError("Wire already had the same shard!")
-        }
-    }
-
-    func remove(shard: ShardController) {
-        if let idx = shards.firstIndex(of: shard) {
-            G.Core.pointee.removeShard(nativeRef, shard.nativeShard)
-            shards.remove(at: idx)
-        } else {
-            fatalError("Wire did not have that shard!")
-        }
+        G.Core.pointee.addShard(nativeRef, shard.nativeShard)
     }
 
     var looped: Bool = false {
@@ -1207,11 +1207,11 @@ class WireController {
         }
     }
 
-    func addExternal(name: String, owned: OwnedVar) {
+    func addExternal(name: String, owned: inout OwnedVar) {
         addExternalVar(name: name, varPtr: owned.ptr())
     }
 
-    func addExternal(name: String, sequence: SeqVar) {
+    func addExternal(name: String, sequence: inout SeqVar) {
         addExternalVar(name: name, varPtr: sequence.ptr())
     }
 
@@ -1222,9 +1222,19 @@ class WireController {
     func isRunning() -> Bool {
         G.Core.pointee.isWireRunning(nativeRef)
     }
+    
+    func setPriority(_ priority: Int) {
+        G.Core.pointee.setWirePriority(nativeRef, Int32(priority))
+    }
 
+    func stop() {
+        var result = G.Core.pointee.stopWire(nativeRef)
+        withUnsafeMutablePointer(to: &result) { resultPtr in
+            G.Core.pointee.destroyVar(resultPtr)
+        }
+    }
+    
     var nativeRef = SHWireRef(bitPattern: 0)
-    var shards = [ShardController]()
 }
 
 class MeshController {
@@ -1237,16 +1247,11 @@ class MeshController {
     }
 
     func schedule(wire: WireController) {
-        wires.append(wire)
         G.Core.pointee.schedule(nativeRef, wire.nativeRef, true)
     }
 
     func unschedule(wire: WireController) {
         G.Core.pointee.unschedule(nativeRef, wire.nativeRef)
-        let idx = wires.firstIndex {
-            $0.nativeRef == wire.nativeRef
-        }
-        wires.remove(at: idx!)
     }
 
     func tick() -> Bool {
@@ -1258,7 +1263,6 @@ class MeshController {
     }
 
     var nativeRef = SHMeshRef(bitPattern: 0)
-    var wires = [WireController]()
 }
 
 extension SHStringWithLen {

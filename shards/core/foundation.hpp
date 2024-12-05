@@ -182,8 +182,8 @@ struct TypeInfo {
   TypeInfo() {}
 
   TypeInfo(const SHVar &var, const SHInstanceData &data, std::vector<SHExposedTypeInfo> *expInfo = nullptr,
-           bool resolveContextVariables = true) {
-    _info = deriveTypeInfo(var, data, expInfo, resolveContextVariables);
+           bool resolveContextVariables = true, bool mutable_ = false) {
+    _info = deriveTypeInfo(var, data, expInfo, resolveContextVariables, mutable_);
   }
 
   TypeInfo(const SHTypeInfo &info) { _info = cloneTypeInfo(info); }
