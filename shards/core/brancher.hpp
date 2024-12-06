@@ -146,10 +146,11 @@ public:
   // This grabs all the variables that are needed and references them
   void initVariableReferences(SHContext *context) {
     for (const auto &req : _mergedRequirements._innerInfo) {
-      std::string_view name = req.name; // calls strlen :(
+      std::string_view name = req.name; // TODO calls strlen :(
       if (!mesh->hasRef(toSWL(name))) {
         SHLOG_TRACE("Branch: referencing required variable: {}", name);
         auto vp = referenceVariable(context, name);
+        // TODO, this should just be mesh external variables, just like we do for wire
         mesh->addRef(toSWL(name), vp);
         refs.push_back(vp);
       }
