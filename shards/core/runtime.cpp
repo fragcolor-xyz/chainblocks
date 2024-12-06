@@ -2698,6 +2698,18 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
     sc->getExternalVariables().erase(vName);
   };
 
+  result->getMeshVariable = [](SHMeshRef mesh, SHStringWithLen name) noexcept {
+    auto smesh = reinterpret_cast<std::shared_ptr<SHMesh> *>(mesh);
+    auto vName = shards::OwnedVar::Foreign(name);
+    return &(*smesh)->getVariables()[vName];
+  };
+
+  result->setMeshVariableType = [](SHMeshRef mesh, SHStringWithLen name, const SHExposedTypeInfo *type) noexcept {
+    auto smesh = reinterpret_cast<std::shared_ptr<SHMesh> *>(mesh);
+    auto vName = shards::OwnedVar::Foreign(name);
+    (*smesh)->setMetadata(&(*smesh)->getVariables()[vName], *type);
+  };
+
   result->suspend = [](SHContext *context, double seconds) noexcept {
     try {
       return shards::suspend(context, seconds);

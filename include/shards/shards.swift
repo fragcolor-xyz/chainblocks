@@ -440,6 +440,22 @@ extension SHVar: CustomStringConvertible {
     func isNone() -> Bool {
         return type == .NoValue
     }
+    
+    mutating func addRef() {
+        self.refcount += 1
+        self.flags |= UInt16(SHVAR_FLAGS_REF_COUNTED)
+    }
+    
+    mutating func releaseRef() {
+        assert(refcount > 0, "Refcount must be positive!")
+        refcount -= 1
+        if refcount == 0 {
+            flags &= ~UInt16(SHVAR_FLAGS_REF_COUNTED)
+            withUnsafeMutablePointer(to: &self) { ptr in
+                G.Core.pointee.destroyVar(ptr)
+            }
+        }
+    }
 }
 
 class OwnedVar {
@@ -1260,6 +1276,16 @@ class MeshController {
 
     func isEmpty() -> Bool {
         G.Core.pointee.isEmpty(nativeRef)
+    }
+    
+    func getVariable(name: String) -> UnsafeMutablePointer<SHVar> {
+        return name.withCString { cString in
+            var cname = SHStringWithLen()
+            cname.string = cString
+            let length = name.lengthOfBytes(using: .utf8)
+            cname.len = UInt64(length)
+            return G.Core.pointee.getMeshVariable(nativeRef, cname)!
+        }
     }
 
     var nativeRef = SHMeshRef(bitPattern: 0)

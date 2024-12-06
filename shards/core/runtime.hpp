@@ -848,6 +848,7 @@ private:
                      boost::alignment::aligned_allocator<std::pair<const shards::OwnedVar, SHVar>, 16>>
       variables;
 
+  // this is used for the above global variables, not refs
   std::unordered_map<SHVar *, SHExposedTypeInfo> variablesMetadata;
 
   // variables with lifetime managed externally

@@ -957,6 +957,8 @@ typedef void(__cdecl *SHSchedule)(SHMeshRef mesh, SHWireRef wire, SHBool compose
 typedef SHBool(__cdecl *SHTick)(SHMeshRef mesh);
 typedef void(__cdecl *SHTerminate)(SHMeshRef mesh);
 typedef void(__cdecl *SHSleep)(double seconds);
+typedef struct SHVar *(__cdecl *SHGetMeshVariable)(SHMeshRef mesh, struct SHStringWithLen name);
+typedef void(__cdecl *SHSetMeshVariableType)(SHMeshRef mesh, struct SHStringWithLen name, const struct SHExposedTypeInfo *type);
 
 #define SH_ARRAY_TYPE(_array_, _value_)                                          \
   typedef void(__cdecl * _array_##Free)(_array_ *);                              \
@@ -1171,6 +1173,9 @@ typedef struct _SHCore {
   // Alternatives of the above that allocate memory for the variables
   SHAllocExternalVariable allocExternalVariable;
   SHFreeExternalVariable freeExternalVariable;
+
+  SHGetMeshVariable getMeshVariable;
+  SHSetMeshVariableType setMeshVariableType;
 
   // To be used within shards, to suspend the coroutine
   SHSuspend suspend;
