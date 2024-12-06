@@ -150,7 +150,7 @@ public:
       if (!mesh->hasRef(toSWL(name))) {
         SHLOG_TRACE("Branch: referencing required variable: {}", name);
         auto vp = referenceVariable(context, name);
-        // TODO, this should just be mesh external variables, just like we do for wire
+        // TODO, this should just be mesh external variables, just like we do for wires
         mesh->addRef(toSWL(name), vp);
         refs.push_back(vp);
       }
