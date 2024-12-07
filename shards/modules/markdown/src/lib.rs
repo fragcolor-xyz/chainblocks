@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright © 2021 Fragcolor Pte. Ltd. */
 
+use htmd::HtmlToMarkdown;
 use shards::core::register_shard;
 use shards::shard::Shard;
 use shards::types::{common_type, AutoSeqVar, ClonedVar, ParamVar, STRINGS_TYPES, STRING_TYPES};
 use shards::types::{Context, ExposedTypes, InstanceData, Type, Types, Var};
-use htmd::HtmlToMarkdown;
 
 use pulldown_cmark::{
   BlockQuoteKind, CodeBlockKind, Event, LinkType, MetadataBlockKind, Options, Parser, Tag, TagEnd,
@@ -611,27 +611,20 @@ impl Shard for MarkdownParseShard {
   }
 }
 
-#[no_mangle]
-pub extern "C" fn shardsRegister_markdown_rust(core: *mut shards::shardsc::SHCore) {
-  unsafe {
-    shards::core::Core = core;
-  }
-
-  register_shard::<MarkdownParseShard>();
-  register_shard::<MarkdownFromHTMLShard>();
-}
-
 #[derive(shards::shard)]
 #[shard_info("Markdown.FromHTML", "Converts HTML to Markdown")]
 struct MarkdownFromHTMLShard {
   #[shard_required]
   required: ExposedTypes,
+
+  output: ClonedVar,
 }
 
 impl Default for MarkdownFromHTMLShard {
   fn default() -> Self {
     Self {
       required: ExposedTypes::new(),
+      output: ClonedVar::default(),
     }
   }
 }
@@ -663,10 +656,27 @@ impl Shard for MarkdownFromHTMLShard {
 
   fn activate(&mut self, _context: &Context, input: &Var) -> Result<Option<Var>, &str> {
     let html: &str = input.try_into()?;
-    
-    match HtmlToMarkdown::new().convert(html) {
-      Ok(markdown) => Ok(Some(Var::ephemeral_string(&markdown))),
-      Err(_) => Err("Failed to convert HTML to Markdown")
+
+    let converter = HtmlToMarkdown::builder()
+      .skip_tags(vec!["script", "style"])
+      .build();
+
+    match converter.convert(html) {
+      Ok(markdown) => {
+        self.output = Var::ephemeral_string(&markdown).into();
+        Ok(Some(self.output.0))
+      }
+      Err(_) => Err("Failed to convert HTML to Markdown"),
     }
   }
+}
+
+#[no_mangle]
+pub extern "C" fn shardsRegister_markdown_rust(core: *mut shards::shardsc::SHCore) {
+  unsafe {
+    shards::core::Core = core;
+  }
+
+  register_shard::<MarkdownParseShard>();
+  register_shard::<MarkdownFromHTMLShard>();
 }

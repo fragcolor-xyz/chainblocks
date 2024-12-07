@@ -10,7 +10,8 @@ edition = "2021"
 crate-type = ["rlib", "staticlib"]
 
 [dependencies]
-lazy_static = "1.5.0"
+lazy_static = "1.5"
 shards = { path = "../../rust" }
-compile-time-crc32 = "0.1.2"
-pulldown-cmark = { version = "0.12.0", default-features = false }
+compile-time-crc32 = "0.1"
+pulldown-cmark = { version = "0.12", default-features = false }
+htmd = "0.1"

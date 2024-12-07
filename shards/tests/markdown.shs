@@ -6,3 +6,7 @@ Repeat({
   Do(parser) | Log
   When(Is([]) Return)
 })
+
+none | Http.Get("https://github.com/fragcolor-xyz/shards") | Markdown.FromHTML = md
+
+"md.md" | FS.Write(md Overwrite: true)
