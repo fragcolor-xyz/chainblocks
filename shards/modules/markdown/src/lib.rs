@@ -5,6 +5,7 @@ use shards::core::register_shard;
 use shards::shard::Shard;
 use shards::types::{common_type, AutoSeqVar, ClonedVar, ParamVar, STRINGS_TYPES, STRING_TYPES};
 use shards::types::{Context, ExposedTypes, InstanceData, Type, Types, Var};
+use htmd::HtmlToMarkdown;
 
 use pulldown_cmark::{
   BlockQuoteKind, CodeBlockKind, Event, LinkType, MetadataBlockKind, Options, Parser, Tag, TagEnd,
@@ -617,4 +618,55 @@ pub extern "C" fn shardsRegister_markdown_rust(core: *mut shards::shardsc::SHCor
   }
 
   register_shard::<MarkdownParseShard>();
+  register_shard::<MarkdownFromHTMLShard>();
+}
+
+#[derive(shards::shard)]
+#[shard_info("Markdown.FromHTML", "Converts HTML to Markdown")]
+struct MarkdownFromHTMLShard {
+  #[shard_required]
+  required: ExposedTypes,
+}
+
+impl Default for MarkdownFromHTMLShard {
+  fn default() -> Self {
+    Self {
+      required: ExposedTypes::new(),
+    }
+  }
+}
+
+#[shards::shard_impl]
+impl Shard for MarkdownFromHTMLShard {
+  fn input_types(&mut self) -> &Types {
+    &STRING_TYPES
+  }
+
+  fn output_types(&mut self) -> &Types {
+    &STRING_TYPES
+  }
+
+  fn warmup(&mut self, ctx: &Context) -> Result<(), &str> {
+    self.warmup_helper(ctx)?;
+    Ok(())
+  }
+
+  fn cleanup(&mut self, ctx: Option<&Context>) -> Result<(), &str> {
+    self.cleanup_helper(ctx)?;
+    Ok(())
+  }
+
+  fn compose(&mut self, data: &InstanceData) -> Result<Type, &str> {
+    self.compose_helper(data)?;
+    Ok(self.output_types()[0])
+  }
+
+  fn activate(&mut self, _context: &Context, input: &Var) -> Result<Option<Var>, &str> {
+    let html: &str = input.try_into()?;
+    
+    match HtmlToMarkdown::new().convert(html) {
+      Ok(markdown) => Ok(Some(Var::ephemeral_string(&markdown))),
+      Err(_) => Err("Failed to convert HTML to Markdown")
+    }
+  }
 }
