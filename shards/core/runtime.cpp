@@ -1139,7 +1139,6 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
       SHExposedTypeInfo expInfo{key.payload.stringValue, {}, *type, true /* mutable */};
       expInfo.tracked = var.flags & SHVAR_FLAGS_TRACKED;
       std::string_view sName(key.payload.stringValue, key.payload.stringLen);
-      shassert(sName.data() && !sName.empty() && "Invalid name in external variable");
       ctx.sharedContext->inherited.insert(sName, expInfo);
     }
 
@@ -1151,7 +1150,6 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
         auto metadata = mesh->getMetadata(&v.second);
         if (metadata) {
           std::string_view sName(v.first.payload.stringValue, v.first.payload.stringLen);
-          shassert(sName.data() && !sName.empty() && "Invalid name in shared variable");
           ctx.sharedContext->inherited.insert(sName, *metadata);
         }
       }
@@ -1162,7 +1160,6 @@ SHComposeResult internalComposeWire(const std::vector<Shard *> &wire, SHInstance
     for (uint32_t i = 0; i < data.shared.len; i++) {
       auto &info = data.shared.elements[i];
       std::string_view sName(info.name);
-      shassert(sName.data() && !sName.empty() && "Invalid name in shared");
       ctx.sharedContext->inherited.insert(sName, info);
     }
   }
