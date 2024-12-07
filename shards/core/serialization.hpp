@@ -398,7 +398,8 @@ struct Serialization {
         break;
       }
 
-      auto wire = SHWire::make(&buf[0]);
+      std::string_view wireName(&buf[0], len);
+      auto wire = SHWire::make(wireName);
       output.payload.wireValue = wire->newRef();
       wires.emplace(hash, SHWire::addRef(output.payload.wireValue));
       SHLOG_TRACE("Deserializing wire: {}", wire->name);

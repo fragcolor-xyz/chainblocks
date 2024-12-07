@@ -347,11 +347,27 @@ extension SHVar: CustomStringConvertible {
         v.payload.floatValue = SHFloat(value)
         self = v
     }
+    
+    public init(value: Double) {
+        var v = SHVar()
+        v.valueType = Float
+        v.payload.floatValue = SHFloat(value)
+        self = v
+    }
 
     public var float: Float {
         get {
             assert(type == .Float, "Float variable expected!")
             return Float(payload.floatValue)
+        } set {
+            self = .init(value: newValue)
+        }
+    }
+    
+    public var double: Double {
+        get {
+            assert(type == .Float, "Double variable expected!")
+            return Double(payload.floatValue)
         } set {
             self = .init(value: newValue)
         }
