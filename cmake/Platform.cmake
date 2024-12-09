@@ -11,6 +11,8 @@ if(APPLE)
   enable_language(Swift)
   set(CMAKE_Swift_LANGUAGE_VERSION 5)
 
+  enable_language(OBJC)
+
   # Remember to set proper linker to your final targets if you use swift files!
   # set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)
 endif()

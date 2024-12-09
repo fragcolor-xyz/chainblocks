@@ -213,3 +213,8 @@ add_subdirectory(tracy)
 # Add the wrapper include path that contains tracy/Wrapper.hpp that defines the correct TRACY_CALLSTACK based on the stack size configuration
 target_include_directories(TracyClient PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/tracy_wrapper>)
 target_compile_definitions(TracyClient PUBLIC TRACY_CALLSTACK_SIZE=${TRACY_CALLSTACK_SIZE})
+
+if(WIN32)
+  set(GGML_VULKAN ON CACHE BOOL "" FORCE)
+endif()
+add_subdirectory(llama.cpp)

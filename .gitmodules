@@ -102,3 +102,6 @@
 [submodule "deps/crdt-lite"]
 	path = deps/crdt-lite
 	url = https://github.com/sinkingsugar/crdt-lite.git
+[submodule "deps/llama.cpp"]
+	path = deps/llama.cpp
+	url = https://github.com/shards-lang/llama.cpp.git
