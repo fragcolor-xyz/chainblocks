@@ -30,19 +30,19 @@
 @template(test-repeat [] {
   0 >= i
   7 = times
-
+  
   Repeat({
     Math.Inc(i)
     i | Log("i") | IsLessEqual(5) | Log("i") | Assert.Is(true)
   } Times: times Until: {i | Is(5)})
   i | Assert.Is(5)
-
+  
   0 > i
   Repeat({
     Math.Inc(i)
   } Until: {i | Is(10)})
   i | Assert.Is(10)
-
+  
   0 > i
   Repeat({
     Math.Inc(i)
@@ -54,55 +54,55 @@
   [1 2 3] >= sq
   99 | Insert(0 sq)
   sq | Log("sq") | Assert.Is([99 1 2 3] true)
-
+  
   [1 2 3] > sq
   99 | Insert(1 sq)
   sq | Log("sq") | Assert.Is([1 99 2 3] true)
-
+  
   [1 2 3] > sq
   1 >= index
   99 | Insert(index sq)
   sq | Log("sq") | Assert.Is([1 99 2 3] true)
-
+  
   [1 2 3] > sq
   99 | Insert(3 sq)
   sq | Log("sq") | Assert.Is([1 2 3 99] true)
-
+  
   Shuffle(sq)
-
+  
   [1 2 3] > sq
   99 | Insert(100 sq)
   sq | Log("sq") | Assert.Is([1 2 3 99] true)
-
+  
   [1 2 3] > sq
   99 | Insert(-2 sq)
   sq | Log("sq") | Assert.Is([99 1 2 3] true)
-
+  
   "My string" >= str
   "long " | Insert(3 str) | str | Log("str") | Assert.Is("My long string" true)
-
+  
   "0x020304" | HexToBytes >= bytes
   "0xff" | HexToBytes | Insert(2 bytes) | bytes | Log("bytes") | Assert.Is(#("0x0203ff04" | HexToBytes) true)
 })
 
 @wire(test-wire {
   Msg("Running tests!")
-
+  
   Get(var-with-default Default: 10) ; will either be var-with-default value if existed or 10
   Assert.Is(10 true)
-
+  
   Const("""\sHello""") | Log
-
+  
   @test-seq-insert()
   @test-repeat()
-
+  
   "phys" | ToHex | Log
-
+  
   10 | ToHex | Assert.Is("0x0a" true)
-
+  
   1 = var-1
   2 = var-2
-
+  
   3
   Match([
     var-1 {"Yes 1"}
@@ -110,7 +110,7 @@
     none {"No"}
   ] Passthrough: false)
   Assert.Is("No" true)
-
+  
   [1]
   Match([
     [var-1] {"Yes 1"}
@@ -118,7 +118,7 @@
     none {"No"}
   ] Passthrough: false)
   Assert.Is("Yes 1" true)
-
+  
   2
   Match([
     var-1 {"Yes 1"}
@@ -126,101 +126,101 @@
     none {"No"}
   ] Passthrough: false)
   Assert.Is("Yes 2" true)
-
+  
   false
   Match([
     true {"Yes"}
     false {"No"}
   ] Passthrough: false)
   Assert.Is("No" true)
-
+  
   false
   Match([
     true {"Yes"}
     none {"No"}
   ] Passthrough: false)
   Assert.Is("No" true)
-
+  
   true
   Cond([
     {Is(true)} {Msg("Cond was true!!") | false}
     {Is(false)} {Msg("Cond was false!") | true}] Passthrough: false)
   Assert.Is(false true)
   Log
-
+  
   true
   Cond([
     {Is(false) | Or | Is(true)} {Msg("Cond was true!!") | false}
     {Is(false)} {Msg("Cond was false!") | true}] Passthrough: false)
   Assert.Is(false true)
   Log
-
+  
   true
   Cond([
     {Is(false) | And | Is(true)} {Assert.Is(none true)}
     {Is(true)} {Msg("Cond was false!") | true}] Passthrough: false)
   Assert.Is(true true)
   Log
-
+  
   false
   Cond([
     {Is(true)} {Msg("Cond was true!!") | false}
     {Is(false)} {Msg("Cond was false!") | true}] Passthrough: false)
   Assert.Is(true true)
   Log
-
+  
   false
   Cond([
     {Is(true)} {Msg("Cond was true!!") | false}
     {Is(false) | And | IsNot(true)} {Msg("Cond was false!") | true}] Passthrough: false)
   Assert.Is(true true)
   Log
-
+  
   false
   Cond([
     {Is(false) | And | IsNot(false)} {Assert.Is(none true)}
     {Is(false)} {Msg("Cond was true!") | false}] Passthrough: false)
   Assert.Is(false true)
   Log
-
+  
   10
   Cond([
     {true} {Msg("Cond was true!!") | false}
     {Is(10)} {Msg("Cond was false!") | true}] Threading: true Passthrough: false)
   Assert.Is(true true)
   Log
-
+  
   10
   Cond([
     {true} {Msg("Cond was true!!") | false}
     {Is(10)} {Msg("Cond was false!") | true}] Threading: false Passthrough: false)
   Assert.Is(false true)
   Log
-
+  
   [10 20 30 40 50]
   ExpectIntSeq
   ExpectLike([1 2 3 4])
   IntsToBytes
   Log
-
+  
   "Hello"
   Assert.Is("Hello" true)
   Log
-
+  
   77
   Assert.Is(77 true)
   Log
-
+  
   10
   Math.Add(10)
   Assert.Is(#(10 | Math.Add(10)) true)
   Log
-
+  
   11
   Math.Subtract(10)
   Assert.Is(#(11 | Math.Subtract(10)) true)
   Log
-
+  
   ; double precision
   3.141592653589793238
   Is(3.141592653589793) ; 16 digits
@@ -230,59 +230,59 @@
   Is(3.14159265358979) ; 15 digits
   Assert.Is(false true)
   Log
-
+  
   @f4(10.3 3.6 2.1 1.1)
   Math.Multiply(@f4(2 2 2 2))
   Assert.Is(@f4(20.6 7.2 4.2 2.2) true)
   Log
-
+  
   @f3(10.3 2.1 1.1)
   Math.Multiply(@f3(2 2 2))
   Assert.Is(@f3(20.6 4.2 2.2) true)
   Log
-
+  
   @f3(10.3 2.1 1.1)
   Math.Multiply(2.0)
   Assert.Is(@f3(20.6 4.2 2.2) true)
   Log("Float3 broadcast")
-
+  
   2.0 | Math.Multiply(@f3(4.0 1.0 2.0))
   Assert.Is(@f3(8 2 4) true)
   Log("Float3 broadcast")
-
+  
   2.0 >= f-2
   @f3(4.0 1.0 2.0) | Math.Multiply(f-2)
   Assert.Is(@f3(8 2 4) true)
   Log("Float3 broadcast")
-
+  
   @f3(4.0 1.0 2.0) >= v-3
   2.0 | Math.Multiply(v-3)
   Assert.Is(@f3(8 2 4) true)
   Log("Float3 broadcast")
-
+  
   @wire(when-done-wire {
     v-3 | Log("OnStop Copy")
   } Priority: -1000)
-
+  
   WhenDone(when-done-wire) ; high on purpose to test lifetime issues
-
+  
   @f2(10.3 2.1)
   Math.Multiply(2.0)
   Assert.Is(@f2(20.6 4.2) true)
   Log("Float2 broadcast")
-
+  
   2.0 | Math.Multiply(@f2(4.0 1.0))
   Assert.Is(@f2(8 2) true)
   Log("Float2 broadcast")
-
+  
   0.5 >= f
   @f2(2.0 1.0) >= v-2
   f | Math.Divide(v-2) | Assert.Is(@f2(0.25 0.5) true) | Log("Divide Float/Float2 broadcast")
   v-2 | Math.Divide(f) | Assert.Is(@f2(4.0 2.0) true) | Log("Divide Float2/Float broadcast")
-
+  
   v-2 | Min(f) | Assert.Is(@f2(0.5 0.5) true) | Log("Min Float2 broadcast")
   v-2 | Max(f) | Assert.Is(@f2(2.0 1.0) true) | Log("Max Float2 broadcast")
-
+  
   @i2(1 2) | Math.Multiply(2) | Log("Int2 Multiply") | Assert.Is(@i2(2 4))
   Math.Divide(2) | Assert.Is(@i2(1 2))
   @i3(1 2 3) | Math.Multiply(2) | Log("Int3 Multiply") | Assert.Is(@i3(2 4 6))
@@ -293,15 +293,15 @@
   Math.Divide(2) | Assert.Is(@i8(1 2 3 4 4 3 2 1))
   @i16(1 2 3 4 4 3 2 1 4 3 2 1 1 2 3 4) | Math.Multiply(2) | Log("Int16 Multiply") | Assert.Is(@i16(2 4 6 8 8 6 4 2 8 6 4 2 2 4 6 8))
   Math.Divide(2) | Assert.Is(@i16(1 2 3 4 4 3 2 1 4 3 2 1 1 2 3 4))
-
+  
   @i4(3 8 9 11) | Math.Mod(4) | Assert.Is(@i4(3 0 1 3))
-
+  
   @f4(4 4 4 4)
   Math.FastSqrt
   {ToString | Assert.Is("@f4(1.99999 1.99999 1.99999 1.99999)" true)}
   Math.FastInvSqrt
   {ToString | Assert.Is("@f4(0.707108 0.707108 0.707108 0.707108)" true)}
-
+  
   10
   Push(list1)
   20
@@ -319,7 +319,7 @@
   Take(2)
   Assert.Is(30 true)
   Log
-
+  
   Repeat({
     10 | Push(list1)
     20 | Push(list1)
@@ -336,7 +336,7 @@
     Assert.Is(30 true)
     Log
   } Times: 5)
-
+  
   0
   Set(counter)
   Repeat({
@@ -347,7 +347,7 @@
   Get(counter)
   Assert.Is(5 true)
   Log
-
+  
   20
   Set(a)
   30
@@ -358,7 +358,7 @@
   Get(b)
   Assert.Is(20)
   Log
-
+  
   "Value1" | Set(tab11 "v1")
   "Value2" | Set(tab11 "v2")
   Get(tab11 "v1")
@@ -367,15 +367,15 @@
   Get(tab11 "v2")
   Assert.IsNot("Value1" true)
   Log
-
+  
   Count(tab11)
   Assert.Is(2 true)
-
+  
   "My input"
   Do(inner)
   Assert.Is("My input 2" true)
   Log
-
+  
   ; test some casting
   ToBytes
   BytesToInts
@@ -384,14 +384,14 @@
   IntsToBytes
   BytesToString
   Assert.Is("My input 2" true)
-
+  
   {"x": 10 "y": 20 "hello": "world"} >= table-a
   {"x": 10 "y": 20 "hello": "world"} >= table-b
   {"x": 10 "y": 20 "no": "way"} >= table-c
-
+  
   table-a | Is(table-b) | Assert.Is(true true)
   table-a | Is(table-c) | Assert.IsNot(true true)
-
+  
   ; b0r
   0
   Math.And(0xFF)
@@ -417,51 +417,51 @@
   ; result
   Get(x)
   Log
-
+  
   @color(2 2 2 255) >= color
   Log
-
+  
   color | Math.Add(@color(1 1 1 0)) | Log("color") | Assert.Is(@color(3 3 3 255))
-
+  
   @color(1 2 3 4) > color
   Math.Inc(color)
   color | Log | Assert.Is(@color(2 3 4 5))
-
+  
   color | Math.Multiply(2) | Log | Assert.Is(@color(4 6 8 10))
-
+  
   9.0 | Math.Mod(4.0) | Log | Assert.Is(1.0)
-
+  
   [1.0 2.0 3.0 4.0]
   Math.Multiply(2.0)
   Log
   Assert.Is([2.0 4.0 6.0 8.0] true)
-
+  
   Const([1.0 2.0 3.0 4.0])
   Math.Multiply([2.0 1.0 1.0 2.0])
   Log
   Assert.Is([2.0 2.0 3.0 8.0] true)
   {Lowest | Assert.Is(2.0 true)}
   {Highest | Assert.Is(8.0 true)}
-
+  
   5 | ToFloat | Math.Divide(10.0)
   Assert.Is(0.5 true)
-
+  
   {"key1": 10 "key2": 20} >= htable ; tests varify
   Take("key1") | Assert.Is(10 true)
   htable | Take("key2") | Assert.Is(20 true)
-
+  
   Const({"key1": 10 "key2": 20.0}) >= htable2 ; tests varify
   ; also test correct take deducting table type
   Take("key1") | Math.Multiply(2) | Assert.Is(20 true)
   htable2 | Take("key2") | Math.Multiply(2.0) | Assert.Is(40.0 true)
   htable2 | Take(["key1" "key2"]) | Math.Multiply([2 2.0])
   Log | Assert.Is([20 40.0] true)
-
+  
   10 | ToFloat | Set(fx)
   Get(fx) | Assert.Is(10.0 true)
   Get(fx) | Assert.IsNot(10 true)
   5.0 | Math.Divide(fx) | Assert.Is(0.5 true)
-
+  
   10 | Push(myseq)
   20 | Push(myseq)
   30 | Push(myseq)
@@ -470,9 +470,9 @@
   Math.Add(1)
   Assert.Is(11 true)
   Log
-
+  
   Clear(myseq)
-
+  
   12 | Push(myseq)
   22 | Push(myseq)
   32 | Push(myseq)
@@ -481,7 +481,7 @@
   Math.Add(1)
   Assert.Is(13 true)
   Log
-
+  
   10 | Push(tab1 "myseq")
   20 | Push(tab1 "myseq")
   30 | Push(tab1 "myseq")
@@ -490,9 +490,9 @@
   Math.Add(1)
   Assert.Is(11 true)
   Log
-
+  
   Clear(tab1 "myseq")
-
+  
   12 | Push(tab1 "myseq")
   22 | Push(tab1 "myseq")
   32 | Push(tab1 "myseq")
@@ -501,7 +501,7 @@
   Math.Add(1)
   Assert.Is(13 true)
   Log
-
+  
   10 | Push(tab1new "myseq")
   20 | Push(tab1new "myseq")
   30 | Push(tab1new "myseq")
@@ -510,9 +510,9 @@
   Math.Add(1)
   Assert.Is(11 true)
   Log
-
+  
   Clear(tab1new "myseq")
-
+  
   12 | Push(tab1new "myseq")
   22 | Push(tab1new "myseq")
   32 | Push(tab1new "myseq")
@@ -521,7 +521,7 @@
   Math.Add(1)
   Assert.Is(13 true)
   Log
-
+  
   @i2(10 11) | Push(myseq2)
   @i2(20 21) | Push(myseq2)
   @i2(30 31) | Push(myseq2)
@@ -533,19 +533,19 @@
   Math.Add(1)
   Assert.Is(11 true)
   Log
-
+  
   Repeat({
     Pop(myseq2flat)
     Log
   } Times: 6)
-
+  
   {"a": 10
    "b": 22
    "d": 50}
   Flatten
   ; the following can be out of order, todo
   ; Assert.Is(["a" 10 "b" 22 "d" 50] true)
-
+  
   2 | Push(unsortedList)
   4 | Push(unsortedList)
   1 | Push(unsortedList)
@@ -555,21 +555,21 @@
   Sort(unsortedList)
   Log
   Assert.Is([0 1 1 2 4 5] true)
-
+  
   2 | Push(unsortedList2)
   4 | Push(unsortedList2)
   1 | Push(unsortedList2)
   0 | Push(unsortedList2)
   1 | Push(unsortedList2)
   5 | Push(unsortedList2)
-
+  
   2 | Push(unsortedList3)
   4 | Push(unsortedList3)
   1 | Push(unsortedList3)
   0 | Push(unsortedList3)
   1 | Push(unsortedList3)
   5 | Push(unsortedList3)
-
+  
   Sort(unsortedList2 [unsortedList3])
   Log
   Assert.Is([0 1 1 2 4 5] true)
@@ -579,7 +579,7 @@
   Get(unsortedList3)
   Log
   Assert.Is([0 1 1 2 4 5] true)
-
+  
   Clear(unsortedList)
   2 | Push(unsortedList)
   4 | Push(unsortedList)
@@ -592,37 +592,37 @@
   Assert.Is([5 4 2 1 1 0] true)
   Count(unsortedList)
   Assert.Is(6 true)
-
+  
   Get(unsortedList)
   IndexOf(2)
   Assert.Is(2 true)
-
+  
   Get(unsortedList)
   IndexOf(5)
   Assert.Is(0 true)
-
+  
   Get(unsortedList)
   IndexOf([1 1])
   Assert.Is(3 true)
-
+  
   Get(unsortedList)
   IndexOf([1 1 0])
   Assert.Is(3 true)
-
+  
   Get(unsortedList)
   IndexOf(10)
   Assert.Is(-1 true)
-
+  
   Get(unsortedList)
   IndexOf([1 1 0 1])
   Assert.IsNot(3 true)
-
+  
   Const([1 1 0])
   Set(toFindVar)
   Get(unsortedList)
   IndexOf(toFindVar)
   Assert.Is(3 true)
-
+  
   Remove(unsortedList Predicate: {IsMore(3)})
   Sort(unsortedList Desc: true)
   Assert.Is([2 1 1 0] true)
@@ -631,7 +631,7 @@
   Get(unsortedList)
   Log
   Assert.Is([2 1 1 0] true)
-
+  
   Get(unsortedList2)
   Set(unsortedList2Copy)
   Remove(unsortedList2Copy [unsortedList3] Predicate: {IsMore(3)})
@@ -643,30 +643,30 @@
   Assert.Is([0 1 1 2] true)
   Count(unsortedList2)
   Assert.Is(6 true)
-
+  
   Const([[2 "x"] [3 "y"] [1 "z"]])
   Ref(constSeq)
   Sort(constSeq Key: {Take(0)})
   Assert.Is([[1 "z"] [2 "x"] [3 "y"]] true)
-
+  
   1.0 | Push(meanTest)
   2.0 | Push(meanTest)
   0.0 | Push(meanTest)
   3.0 | Push(meanTest)
   Get(meanTest) | Math.Mean(Kind: Mean::Arithmetic) | Log
   Assert.Is(1.5 true)
-
+  
   1.0 | Push(meanTest2)
   2.0 | Push(meanTest2)
   3.0 | Push(meanTest2)
   Get(meanTest2) | Math.Mean(Kind: Mean::Geometric) | Log
   ToString
   Assert.Is("1.81712" true)
-
+  
   Get(meanTest2) | Math.Mean(Kind: Mean::Harmonic) | Log
   ToString
   Assert.Is("1.63636" true)
-
+  
   1 | Set(indexAsVar)
   Get(meanTest)
   Take(indexAsVar)
@@ -675,16 +675,24 @@
   Get(meanTest)
   Take(indexAsVar2)
   Assert.Is([2.0 0.0] true)
-
+  
   Repeat({
     Pop(meanTest)
     Math.Add(1.0)
     Log
   } Times: 4)
-
+  
   Get(unsortedList) | Limit(2) | Set(limitTest) | Count(limitTest)
   Assert.Is(2 true)
-
+  
+  [1 2 3 4 5]
+  {Limit(3) | Log
+    Assert.Is([1 2 3] true)
+  }
+  {RLimit(3) | Log
+    Assert.Is([3 4 5] true)
+  }
+  
   10 | Set(repeatsn)
   0 >= iterCount
   Repeat({
@@ -692,28 +700,28 @@
   } Times: repeatsn)
   iterCount
   Assert.Is(10 true)
-
+  
   0 | Math.Add(10) | Assert.Is(10 true)
-
+  
   0x0000000000070090
   BitSwap64
   ToHex | Log
   Assert.Is("0x9000070000000000" true)
-
+  
   "Test"
   IsAny(["Test" "A"])
   Log
-
+  
   0x00070090
   BitSwap32
   Assert.Is(0x90000700 true)
   ToHex | Log
-
+  
   "Hello file append..."
   WriteFile("test.bin" Append: true)
   "Hello file append..."
   WriteFile("test.bin" Append: true)
-
+  
   "Hello Pandas" = pandas
   ToBytes
   ToBase64 | Log("base64")
@@ -729,7 +737,7 @@
   Math.Xor([77 78 77 11 16])
   Assert.Is([72 101 108 108 111 32 80 97 110 100 97 115 0] true)
   Log
-
+  
   pandas
   ToBytes
   ToHex >= hex-pandas
@@ -739,28 +747,28 @@
   FromBytes
   ExpectString
   Assert.Is("Hello Pandas" true)
-
+  
   ; show induced mutability with Ref
   "Hello reference" ; Const
   Ref(ref1) ; no copy will happen!
   Get(ref1)
   Assert.Is("Hello reference" true)
-
+  
   Const([1 2 3 4 5])
   Set(pretest)
   Assert.Is([1 2 3 4 5] true)
-
+  
   0 | PrependTo(pretest)
   Get(pretest)
   Assert.Is([0 1 2 3 4 5] true)
   Log
-
+  
   "." | FS.Iterate(Recursive: false) | Log
   Take(4) | FS.Extension | Log
-
+  
   "." | FS.Iterate(Recursive: false) | Log
   Take(4) | FS.Filename(NoExtension: true) | Log
-
+  
   "../src"
   When(Predicate: FS.IsDirectory
     Action: {
@@ -768,40 +776,40 @@
       Take(4) | FS.Extension | Log
     }
   )
-
+  
   "a/b/c/d" | FS.RelativeTo("a")
   Regex.Replace("""\\""" "/")
   Log("Relative path")
   Assert.Is("b/c/d")
-
+  
   ["." "a"] | FS.Join | Regex.Replace("""\\""" "/") | Log("Joined Path") | Assert.Is("./a")
   ["a/b" "c"] | FS.Join | Regex.Replace("""\\""" "/") | Log("Joined Path") | Assert.Is("a/b/c")
-
+  
   "The result is: " | Set(text1)
   "Hello world, " | AppendTo(text1)
   "this is a string" | AppendTo(text1)
   Get(text1) | Log
   Assert.Is("The result is: Hello world, this is a string" true)
-
+  
   "The result is: " | Set(text2)
   "Hello world, " | AppendTo(text2)
   "this is a string again" | AppendTo(text2)
   Get(text2) | Log
   Assert.IsNot("The result is: Hello world, this is a string" true)
-
+  
   "## " | PrependTo(text2)
   Get(text2) | Log
   Assert.Is("## The result is: Hello world, this is a string again" true)
-
+  
   "0xF00D" | HexToBytes >= hexbytes-mut
   "0xC0FFEE" | HexToBytes | AppendTo(hexbytes-mut)
   hexbytes-mut | ToHex | Assert.Is("0xf00dc0ffee" true)
   "0x0BAD" | HexToBytes | PrependTo(hexbytes-mut)
   hexbytes-mut | ToHex | Assert.Is("0x0badf00dc0ffee" true)
   StringToBytes | BytesToString | Assert.Is("0x0badf00dc0ffee" true)
-
+  
   "4e2" | HexToBytes | Log
-
+  
   "text.txt" | FS.Write(text2 Overwrite: true)
   FS.Read
   Assert.Is("## The result is: Hello world, this is a string again" true)
@@ -828,7 +836,7 @@
   "text-copy3.txt" | FS.Absolute
   FS.Remove
   Assert.Is(true true)
-
+  
   "test-lwt.txt"
   {FS.Write(text2 Overwrite: true)}
   {FS.LastWriteTime | Log("Last write time 0") = test-lwt0}
@@ -836,9 +844,9 @@
   {FS.Write(text2 Overwrite: true)}
   {FS.LastWriteTime | Log("Last write time 1") = test-lwt1}
   test-lwt1 | IsMore(test-lwt0) | Assert.Is(true true)
-
+  
   "test-lwt.txt" | FS.SetWriteTime(test-lwt1)
-
+  
   Get(text1)
   ToJson(Pure: false)
   Log
@@ -846,25 +854,25 @@
   FromJson(Pure: false)
   ExpectString
   Assert.Is("The result is: Hello world, this is a string" true)
-
+  
   Get(unsortedList2Copy)
   ToJson(Pure: false)
   Log
   Assert.Is("""{"type":"Seq","values":[{"type":"Int","value":0},{"type":"Int","value":1},{"type":"Int","value":1},{"type":"Int","value":2}]}""" true)
-
+  
   Get(tab1new)
   ToJson(Pure: false)
   Log
   Assert.Is("""{"type":"Table","values":[{"key":{"type":"String","value":"myseq"},"value":{"type":"Seq","values":[{"type":"Int","value":12},{"type":"Int","value":22},{"type":"Int","value":32}]}}]}""" true)
-
+  
   @f4(1 2 3 4)
   Take(0)
   Assert.Is(1.0 true)
-
+  
   @f4(1 2 3 4)
   Take([2 3])
   Assert.Is(@f2(3 4) true)
-
+  
   1 | Push(s1)
   2 | Push(s1)
   3 | Push(s1)
@@ -874,52 +882,52 @@
   Get(s1)
   Is(s2)
   Assert.Is(true true)
-
+  
   Get(s1)
   DShard("Is" [s2])
   Assert.Is(true true)
-
+  
   4 | Push(s1)
   5 | Push(s1)
-
+  
   Get(s1)
   Slice(1 4)
   Assert.Is([2 3 4] true)
-
+  
   Get(s1)
   Slice(From: 1 To: 5 Step: 2)
   Assert.Is([2 4] true)
-
+  
   Get(s1)
   Slice(3 -1)
   Assert.Is([4] true)
-
+  
   [1 2 3 4 5 6 6 7] | IntsToBytes
   Slice(2 5)
   BytesToInts | Assert.Is([3 4 5] true)
-
+  
   "Hello sliced world"
   Log
   Slice(From: 4 To: 11)
   Assert.Is("o slice" true)
   Log
-
+  
   "passing by..."
   Drop(s2)
   Assert.Is("passing by..." true)
   Get(s2)
   Assert.Is([1 2] true)
-
+  
   Time.Now
   Log
   Time.NowMs
   Log
-
+  
   "baz.dat"
   Regex.Match("""([a-z]+)\.([a-z]+)""")
   Log("Regex Match-1")
   Assert.Is(["baz.dat" "baz" "dat"] true)
-
+  
   "[$&]" = replacementVar
   "Quick brown fox"
   Regex.Replace("""a|e|i|o|u""" replacementVar)
@@ -927,11 +935,11 @@
   Assert.Is("Q[u][i]ck br[o]wn f[o]x" true)
   {Take(1) | Assert.Is(91 true)}
   {Take([1 2 3]) | Assert.Is([91 117 93] true)}
-
+  
   "How many many do you see?"
   Regex.Search("""many""") = twomany
   Count(twomany) | Assert.Is(2 true)
-
+  
   ToBytes
   Set(bytesTest)
   Get(bytesTest)
@@ -940,10 +948,10 @@
   Log
   {Take(1) | Assert.Is(2 true)}
   {Take([1 2 3]) | Assert.Is([2 0 0] true)}
-
+  
   "grüßEN" | String.ToUpper | Assert.Is("GRÜßEN" true)
   "grüßEN" | String.ToLower | Assert.Is("grüßen" true)
-
+  
   "A" | ParseInt(Base: 16) | Assert.Is(10 true)
   "12345678901" | ParseInt | Assert.Is(12345678901 true)
   "2.1" | ParseFloat | Assert.Is(2.1 true)
@@ -954,8 +962,8 @@
   "+3.14" | ParseFloat | Assert.Is(3.14 true)
   "-2.718" | ParseFloat | Assert.Is(-2.718 true)
   "  -1.23e-5" | ParseFloat | Assert.Is(-0.0000123 true)
-
-
+  
+  
   "  3.14 "
   {String.Contains("3.14") | Assert.Is(true true)}
   {{"3" = tre}
@@ -963,21 +971,21 @@
   }
   {String.Contains("9") | Assert.Is(false true)}
   String.Trim | ParseFloat | Assert.Is(3.14 true)
-
+  
   1.0 >= one
   Math.Inc(one)
   one | Assert.Is(2.0 true)
-
+  
   5 >= five
   Math.Dec(five)
   five | Assert.Is(4 true)
-
+  
   ; test stack ops
   Push
   Pop
   Assert.Is(4 true)
   Log
-
+  
   8
   Push
   7
@@ -985,7 +993,7 @@
   Drop
   Pop
   Assert.Is(8 true)
-
+  
   Const([111 112 101 114 97 116 111 114])
   Set(seq-a)
   Const([111 112 101 114 97 116 105 111 110 115])
@@ -993,7 +1001,7 @@
   Get(seq-a)
   IsMore(seq-b)
   Assert.Is(true true)
-
+  
   Const([111 112 101 114 97])
   Update(seq-a)
   Const([111 112 101 114 97 116 105])
@@ -1001,7 +1009,7 @@
   Get(seq-a)
   IsLess(seq-b)
   Assert.Is(true true)
-
+  
   Const([111 112 101 114 97 99])
   Update(seq-a)
   Const([111 112 101 114 97 99])
@@ -1009,7 +1017,7 @@
   Get(seq-a)
   IsMoreEqual(seq-b)
   Assert.Is(true true)
-
+  
   @i4(111 112 101 200)
   Set(int4-a)
   @i4(111 112 99 300)
@@ -1017,7 +1025,7 @@
   Get(int4-a)
   IsMore(int4-b)
   Assert.Is(true true)
-
+  
   @i4(111 112 101 300)
   Update(int4-a)
   @i4(111 112 101 100)
@@ -1025,7 +1033,7 @@
   Get(int4-a)
   IsMore(int4-b)
   Assert.Is(true true)
-
+  
   """{
     "pi": 3.141,
     "happy": true,
@@ -1049,18 +1057,18 @@
   Take("pi")
   Assert.Is(3.141 true)
   Log
-
+  
   Get(seq-a)
   Map({
     Log("Map-1")
     $i | Log("index")
   })
-
+  
   Get(seq-a)
   Map({
     Math.Add(1)
   })
-
+  
   Log("Map-2")
   Assert.Is([112 113 102 115 98 100] true)
   RTake([0 1 3 4])
@@ -1069,7 +1077,7 @@
   Assert.Is(113 true)
   s1 | Reduce(Min($0)) | Log
   Assert.Is(98 true)
-
+  
   Await({
     Get(seq-a)
     Reduce({
@@ -1080,80 +1088,80 @@
   })
   Log
   Assert.Is(634 true)
-
+  
   ; utf8 testing
   "在庫なし"
   Assert.Is("在庫なし" true)
   Log
-
+  
   Const([[1 2 3] [2 3 4] [3 4 5]]) = nestedSeq
   Reduce({Math.Add($0)})
   Assert.Is([6 9 12] true)
   Log
-
+  
   nestedSeq | Math.Multiply([2 3 4])
   Log
   Assert.Is([[2 4 6] [6 9 12] [12 16 20]] true)
-
+  
   nestedSeq | Math.Multiply([[2 3 4]])
   Log
   Assert.Is([[2 6 12] [4 9 16] [6 12 20]] true)
-
+  
   nestedSeq >> adder-args
   nestedSeq >> adder-args
   adder-args | Do(adderSeq)
   Log
   Assert.Is([[2 4 6] [4 6 8] [6 8 10]] true)
-
+  
   Clear(adder-args)
-
+  
   Const([2 3 4]) >> adder-args-1
   Const([2 3 4]) >> adder-args-1
   adder-args-1 | Do(adderSeq2)
   Log
   Assert.Is([4 6 8] true)
-
+  
   11 | Push
   10 | Do(adder)
   Assert.Is(21 true)
-
+  
   11 | Push
   11 | Do(adder)
   Assert.Is(22 true)
-
+  
   8.0
   Math.Pow(2.0)
   Assert.Is(64.0 true)
-
+  
   seq-a | Log("before erase")
   Erase([2 0] seq-a)
   Get(seq-a)
   Log
   Assert.Is([112 114 97 99] true)
-
+  
   {a: 1 b: 2 c: 3} >= table-abc
   Erase(["a" "c"] table-abc)
   table-abc | Assert.Is({b: 2} true)
-
+  
   [10 20 30 40 50] >= seq-check2
   Erase([1 2 3] seq-check2) ; indices sorted in ascending order => error
   seq-check2 | Assert.Is([10 50] true)
-
+  
   [10 20 30 40 50] >= seq-check3
   Erase([3 1 2] seq-check3) ; indices sequence randomly sorted
   seq-check3 | Assert.Is([10 50] true)
-
+  
   DropFront(seq-a)
   ; this also tests that we fixup input as well
   Get(seq-a)
   seq-a | Assert.Is([114 97 99] true)
-
+  
   PopFront(seq-a)
   Assert.Is(114 true)
-
+  
   Get(seq-a)
   Assert.Is([97 99] true)
-
+  
   Maybe({
       Take(3)
     } Else: {
@@ -1161,78 +1169,78 @@
     } Silent: true
   )
   Assert.Is(97 true)
-
+  
   Time.EpochMs
   Log
-
+  
   Time.Epoch
   Log
-
+  
   @i3(3 3 3) | Flatten | Assert.Is([3 3 3] true) >> i3s
   @i3(6 6 6) | Flatten | Assert.Is([6 6 6] true) >> i3s
   i3s | Flatten | Assert.Is([3 3 3 6 6 6] true)
   Log
-
+  
   RandomFloat | IsLess(1.0) | Assert.Is(true true)
   RandomBytes(16) = random-bytes
   Count(random-bytes) | Assert.Is(16 true)
-
+  
   true
   When({Is(true)} {Assert.Is(true true)})
   When({Is(false)} {Assert.Is(false true)})
   WhenNot({Is(true)} {Assert.Is(false true)})
   WhenNot({Is(false)} {Assert.Is(true true)})
-
+  
   true
   If({Is(true)} Then: {Msg("true!")} Else: {Msg("false!")})
   Assert.Is(true true)
-
+  
   false
   If({Is(true)} Then: {Const(10)} Else: {Const(20)} Passthrough: false)
   Assert.Is(20 true)
-
+  
   true | Not
   If({Is(false)} Then: {Const(10)} Else: {Const(20)} Passthrough: false)
   Assert.Is(10 true)
-
+  
   10 | Math.LShift(2) | Math.RShift(2) | Assert.Is(10 true)
   ToBytes >= b10 ; adds bytes serialization coverage (Not working)
-
+  
   "x is a letter."
   Replace(["x" "is" "letter"] ["y" "was" "x"])
   Assert.Is("y was a x." true)
   Replace(["y" "x"] "a")
   Assert.Is("a was a a." true)
-
+  
   @f2(10 20) >> m
   Math.Multiply(@f2(-1 -1))
   {Take(0) >= d | Assert.Is(-10.0 true)}
   {Take(1) >= c | Assert.Is(-20.0 true)}
-
+  
   [1 2 3 4 5]
   Replace([4 3 2 1] [5 4 3 2])
   Assert.Is([2 3 4 5 5] true)
   Hash | Log("[2 3 4 5 5] hash")
-
+  
   true | Hash | Log >= thash
   false | Hash | Log | Is(thash)
   Assert.IsNot(true true)
-
+  
   [5 4 3 2 1]
   Replace([4 3 2 1] [5 4 3 2])
   Assert.Is([5 5 4 3 2] true)
-
+  
   [5 4 3 2 1]
   Replace([4 3 2 1] 0)
   Assert.Is([5 0 0 0 0] true) >= feach_seq
   PopFront(feach_seq)
   feach_seq | ForEach({Assert.Is(0 true)})
-
+  
   {} >= empty_table
   "value1" | Set(empty_table "key1")
   Get(empty_table "key1")
   Assert.Is("value1" true)
-
+  
   0 >= table-foreach-res
   {"a": 10
    "b": 20
@@ -1243,23 +1251,23 @@
   })
   table-foreach-res
   Assert.Is(60 true)
-
+  
   "Hey" >= fval | Log >> seq-a | seq-a | Log
-
+  
   Const([-0.1 -0.2 0.4])
   Math.Abs
   Assert.Is([0.1 0.2 0.4] true)
-
+  
   -0.1 | Math.Abs | Assert.Is(0.1 true)
-
+  
   {a: 1 b: 2 c: 3} >= table-abc
   {a: 2 d: 4} | Merge(table-abc)
   Assert.Is({a: 2 b: 2 c: 3 d: 4} true)
-
+  
   "global1" | Set(global1 Global: true)
-
+  
   Msg("All looking good!")
-
+  
   ; test fro a possible issue with thread pool on ending
   Await({
     Maybe({

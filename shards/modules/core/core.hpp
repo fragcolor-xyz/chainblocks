@@ -3786,6 +3786,101 @@ struct Limit {
   }
 };
 
+struct RLimit {
+  static inline shards::ParamsInfo paramsInfo = ParamsInfo(ParamsInfo::Param(
+      "Max", SHCCSTR("The maximum number of elements to take from the end of the input sequence."), CoreInfo::IntType));
+
+  SHSeq _cachedResult{};
+  int64_t _max = 0;
+
+  void destroy() {
+    if (_cachedResult.elements) {
+      shards::arrayFree(_cachedResult);
+    }
+  }
+
+  static SHOptionalString help() {
+    return SHCCSTR("This shard truncates the input sequence to the last specified number of elements (Max) and outputs the "
+                   "truncated sequence. "
+                   "If Max is set to 1, it outputs a single element.");
+  }
+
+  static SHTypesInfo inputTypes() { return CoreInfo::AnySeqType; }
+
+  static SHOptionalString inputHelp() { return SHCCSTR("The input sequence to truncate."); }
+
+  static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
+
+  static SHOptionalString outputHelp() {
+    return SHCCSTR("The truncated sequence containing the last 'Max' elements, or a single element if Max is 1.");
+  }
+
+  static SHParametersInfo parameters() { return SHParametersInfo(paramsInfo); }
+
+  SHTypeInfo compose(const SHInstanceData &data) {
+    // Ensure the input is a sequence
+    if (data.inputType.basicType != SHType::Seq) {
+      throw ComposeError("RLimit shard expects a sequence as input.");
+    }
+
+    // Allow any sequence type for output
+    return data.inputType;
+  }
+
+  void setParam(int index, const SHVar &value) {
+    if (index == 0) {
+      _max = value.payload.intValue;
+    } else {
+      throw SHException("RLimit: Parameter index out of range.");
+    }
+  }
+
+  SHVar getParam(int index) {
+    if (index == 0) {
+      return shards::Var(_max);
+    }
+    throw SHException("RLimit: Parameter index out of range.");
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    int64_t inputLen = input.payload.seqValue.len;
+
+    if (_max <= 0) {
+      // If Max is zero or negative, return an empty sequence
+      SHVar emptySeq;
+      emptySeq.valueType = SHType::Seq;
+      emptySeq.payload.seqValue.elements = nullptr;
+      emptySeq.payload.seqValue.len = 0;
+      return emptySeq;
+    }
+
+    if (_max == 1) {
+      // Optimization for Max = 1: Return the last element
+      if (inputLen == 0) {
+        throw ActivationError("RLimit: Input sequence is empty.");
+      }
+      return input.payload.seqValue.elements[inputLen - 1];
+    } else {
+      // General case: Take the last 'Max' elements
+      int64_t start = inputLen - _max;
+      if (start < 0) {
+        start = 0;
+      }
+      int64_t len = inputLen - start;
+
+      // Resize the cached result to hold 'len' elements
+      shards::arrayResize(_cachedResult, len);
+
+      // Clone the last 'len' elements into the cached result
+      for (int64_t i = 0; i < len; ++i) {
+        cloneVar(_cachedResult.elements[i], input.payload.seqValue.elements[start + i]);
+      }
+
+      return shards::Var(_cachedResult);
+    }
+  }
+};
+
 struct ForRangeShard {
   static SHOptionalString help() {
     return SHCCSTR("Executes a series of shards while an iteration value is within a specified range.");
@@ -4089,6 +4184,7 @@ RUNTIME_CORE_SHARD_TYPE(Take);
 RUNTIME_CORE_SHARD_TYPE(RTake);
 RUNTIME_CORE_SHARD_TYPE(Slice);
 RUNTIME_CORE_SHARD_TYPE(Limit);
+RUNTIME_CORE_SHARD_TYPE(RLimit);
 RUNTIME_CORE_SHARD_TYPE(Push);
 RUNTIME_CORE_SHARD_TYPE(Sequence);
 RUNTIME_CORE_SHARD_TYPE(Pop);

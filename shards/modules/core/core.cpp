@@ -2539,6 +2539,21 @@ RUNTIME_SHARD_getParam(Limit);
 RUNTIME_SHARD_activate(Limit);
 RUNTIME_SHARD_END(Limit);
 
+// Register RLimit
+RUNTIME_CORE_SHARD_FACTORY(RLimit);
+RUNTIME_SHARD_destroy(RLimit);
+RUNTIME_SHARD_help(RLimit);
+RUNTIME_SHARD_inputTypes(RLimit);
+RUNTIME_SHARD_inputHelp(RLimit);
+RUNTIME_SHARD_outputTypes(RLimit);
+RUNTIME_SHARD_outputHelp(RLimit);
+RUNTIME_SHARD_parameters(RLimit);
+RUNTIME_SHARD_compose(RLimit);
+RUNTIME_SHARD_setParam(RLimit);
+RUNTIME_SHARD_getParam(RLimit);
+RUNTIME_SHARD_activate(RLimit);
+RUNTIME_SHARD_END(RLimit);
+
 // Register Repeat
 RUNTIME_CORE_SHARD_FACTORY(Repeat);
 RUNTIME_SHARD_help(Repeat);
@@ -3066,6 +3081,7 @@ SHARDS_REGISTER_FN(core) {
   REGISTER_CORE_SHARD(RTake);
   REGISTER_CORE_SHARD(Slice);
   REGISTER_CORE_SHARD(Limit);
+  REGISTER_CORE_SHARD(RLimit);
   REGISTER_CORE_SHARD(Repeat);
   REGISTER_CORE_SHARD(Sort);
   REGISTER_CORE_SHARD(Remove);
