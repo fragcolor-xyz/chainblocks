@@ -863,11 +863,13 @@ public extension IShard {}
 @inlinable public func bridgeActivate<T: IShard>(_: T.Type, shard: ShardPtr, ctx: OpaquePointer?, input: UnsafePointer<SHVar>?) -> UnsafePointer<SHVar>? {
     let a = UnsafeRawPointer(shard!).assumingMemoryBound(to: SwiftShard.self).pointee
     let b = Unmanaged<T>.fromOpaque(a.swiftClass).takeUnretainedValue()
+    // Obtain a mutable pointer to b.output
+    let pResult: UnsafeMutablePointer<SHVar> = withUnsafeMutablePointer(to: &b.output) { $0 }
     let result = b.activate(context: Context(context: ctx), input: input!.pointee)
     switch result {
     case let .success(res):
         b.output = res
-        return withUnsafePointer(to: b.output) { $0 }
+        return UnsafePointer(pResult)
     case let .failure(error):
         var errorMsg = SHStringWithLen()
         let error = error.message.utf8CString
@@ -876,7 +878,7 @@ public extension IShard {}
         }
         errorMsg.len = UInt64(error.count - 1)
         G.Core.pointee.abortWire(ctx, errorMsg)
-        return withUnsafePointer(to: b.output) { $0 }
+        return UnsafePointer(pResult)
     }
 }
 
@@ -1437,6 +1439,10 @@ class Shards {
         // Create WireController from the resulting wire
         let wireController = WireController(native: wire.wire.pointee!)
         return wireController
+    }
+    
+    static func suspend(_ context: Context, _ duration: Double) -> SHWireState {
+        G.Core.pointee.suspend(context.context, duration)
     }
 }
 
