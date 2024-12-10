@@ -20,6 +20,7 @@ struct ModelData {
     } while (!usageCounter.compare_exchange_weak(expected, desired, std::memory_order_release));
 
     if (desired == 1) {
+      SHLOG_DEBUG("Initializing llama backend");
       llama_backend_init();
     }
   }
@@ -27,6 +28,7 @@ struct ModelData {
   ~ModelData() {
     uint32_t prev = usageCounter.fetch_sub(1, std::memory_order_acq_rel);
     if (prev == 1) {
+      SHLOG_DEBUG("Freeing llama backend");
       llama_backend_free();
     }
   }
