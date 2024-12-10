@@ -1,6 +1,8 @@
 # Platform-specific features
 if(APPLE)
-  list(APPEND ML_RUST_FEATURES "metal")
+  if(MACOSX)
+    list(APPEND ML_RUST_FEATURES "metal")
+  endif()
   list(APPEND ML_RUST_FEATURES "accelerate")
 endif()
 

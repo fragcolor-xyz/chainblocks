@@ -3078,7 +3078,8 @@ struct Take {
       valid = true;
       _seqOutput = false;
     } else {
-      throw ComposeError("Take: Expected indices to be either Seq, Int or String");
+      throw ComposeError(fmt::format("Take: Expected indices to be either Seq, Int or String, but got: {}, with input: {}",
+                                     _indices, data.inputType));
     }
 
     _tableOutput = isTable;

@@ -604,8 +604,8 @@ void releaseVariable(SHVar *variable) {
     return;
   }
 
-  shassert((variable->flags & SHVAR_FLAGS_REF_COUNTED) == SHVAR_FLAGS_REF_COUNTED);
-  shassert(variable->refcount > 0);
+  shassert((variable->flags & SHVAR_FLAGS_REF_COUNTED) == SHVAR_FLAGS_REF_COUNTED && "Variable is not ref counted");
+  shassert(variable->refcount > 0 && "Variable ref count is 0");
 
   variable->refcount--;
   if (variable->refcount == 0) {

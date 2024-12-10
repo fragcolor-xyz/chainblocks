@@ -87,3 +87,5 @@ ml-embeddings-manifest.json
 shards.ml.embeddings.version.txt
 profile.json
 .env
+shards/tests/embeddings_v1.gguf
+lib/ml/embeddings_v1.gguf

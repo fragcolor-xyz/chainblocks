@@ -213,3 +213,18 @@ add_subdirectory(tracy)
 # Add the wrapper include path that contains tracy/Wrapper.hpp that defines the correct TRACY_CALLSTACK based on the stack size configuration
 target_include_directories(TracyClient PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/tracy_wrapper>)
 target_compile_definitions(TracyClient PUBLIC TRACY_CALLSTACK_SIZE=${TRACY_CALLSTACK_SIZE})
+
+if(NOT EMSCRIPTEN)
+  # TODO vulkan build support
+  # if(WIN32 OR LINUX)
+  #   set(GGML_VULKAN ON CACHE BOOL "" FORCE)
+  # endif()
+  set(GGML_STATIC ON CACHE BOOL "" FORCE)
+  set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+  set(GGML_AVX ON CACHE BOOL "" FORCE)
+  set(GGML_AVX2 ON CACHE BOOL "" FORCE)
+  set(GGML_F16C ON CACHE BOOL "" FORCE)
+  set(GGML_FMA ON CACHE BOOL "" FORCE)
+  set(GGML_OPENMP OFF CACHE BOOL "" FORCE) # omp is very omp...
+  add_subdirectory(llama.cpp)
+endif()

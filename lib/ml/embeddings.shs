@@ -1,116 +1,65 @@
 @define(ml/cache-path "" IgnoreRedefined: true)
-@define(ml/embeddings/use-gpu true IgnoreRedefined: true)
-@define(ml/embeddings/manifest "https://develop.fragcolor.com/ml-embeddings-manifest.json")
 @define(ml/embeddings/max-tokens 512)
 @define(ml/embeddings/overlap 64)
 @define(ml/embeddings/chunk-size #(512 | Sub(64)))
 @define(ml/embeddings/size 384)
+@define(ml/embeddings/model-url "https://develop.fragcolor.com/noinstruct-small-embedding-v0-q5_k_m.gguf")
+@define(ml/embeddings/model-file "embeddings_v1.gguf")
 
 @wire(ml/embeddings/download-deps {
-  none | Http.Get(URL: @ml/embeddings/manifest Timeout: 30 Retry: 2) | FromJson | ExpectTable = manifest
-  manifest:version | ExpectString = version
-  [@ml/cache-path "shards.ml.embeddings.version.txt"] | String.Join
-  If(FS.IsFile {
-      FS.Read | IsNot(version)
-    } {
-      true
-    }
-  ) = need-update | Log("Embeddings model needs update")
-
-  When({need-update} {
-    manifest:tokenizer | ExpectString = tokenizer-url
-    manifest:model | ExpectString = model-url
-    manifest:config | ExpectString = config-url
-
-    [tokenizer-url model-url config-url]
-    TryMany({
-      = url
-      none | Http.Get(URL: url Bytes: true Timeout: 120 Retry: 2)
-    })
-    {
-      Take(0) = tokenizer-bytes
-      [@ml/cache-path "shards.ml.embeddings.tokenizer.bin"] | String.Join | FS.Write(tokenizer-bytes Overwrite: true)
-    }
-    {
-      Take(1) = model-bytes
-      [@ml/cache-path "shards.ml.embeddings.model.bin"] | String.Join | FS.Write(model-bytes Overwrite: true)
-    }
-    {
-      Take(2) = config-bytes
-      [@ml/cache-path "shards.ml.embeddings.config.bin"] | String.Join | FS.Write(config-bytes Overwrite: true)
-    }
-
-    [@ml/cache-path "shards.ml.embeddings.version.txt"] | String.Join | FS.Write(version Overwrite: true)
+  [@ml/cache-path @ml/embeddings/model-file] | String.Join = model-path
+  WhenNot(FS.IsFile {
+    none | Http.Get(URL: @ml/embeddings/model-url Bytes: true Timeout: 120 Retry: 2) = model-bytes
+    model-path | FS.Write(model-bytes Overwrite: true)
   })
+  model-path
 })
 
 @wire(ml/embeddings/load {
-  Do(ml/embeddings/download-deps)
-
-  [@ml/cache-path "shards.ml.embeddings.tokenizer.bin"] | String.Join | FS.Read | Await(ML.Tokenizer) = ml/embeddings/tokenizer
-  [@ml/cache-path "shards.ml.embeddings.config.bin"] | String.Join | FS.Read | Await(FromJson) | ExpectTable = ml/embeddings/config
-  [@ml/cache-path "shards.ml.embeddings.model.bin"] | String.Join | FS.Read(Bytes: true)
-  Await(ML.Model(
-    Model: MLModels::Bert
-    Format: MLFormats::SafeTensor
-    Configuration: ml/embeddings/config
-    GPU: @ml/embeddings/use-gpu
-  )) = ml/embeddings/model
-
-  {
-    tokenizer: ml/embeddings/tokenizer
-    model: ml/embeddings/model
-  }
+  Do(ml/embeddings/download-deps) | Await(LLM.Model)
 } Pure: true)
 
 @define(ml/embeddings/prepare {
   Once({
-    Msg("Loading model...")
+    Msg("Loading embeddings model...")
     Detach(ml/embeddings/load) ; this allows us to Stop/Cleanup md/load once everything is loaded
-    Wait(ml/embeddings/load)
-    {Take("tokenizer") = ml/embeddings/tokenizer}
-    {Take("model") = ml/embeddings/model}
+    Wait(ml/embeddings/load) = ml/embeddings/model
   })
 })
 
+@wire(ml/embed/activate {
+  ; share a wire, to allocate just one context
+  LLM.Embed(ml/embeddings/model 2)
+})
+
 @wire(ml/embed {
-  ML.Tokens(ml/embeddings/tokenizer AsTensor: true GPU: @ml/embeddings/use-gpu) = tokens
-  Tensor.Shape | RTake(0)
+  LLM.Tokenize(ml/embeddings/model) = tokens
+  Count(tokens)
   If(IsMore(@ml/embeddings/max-tokens) {
       = num-tokens
       0 >= processed
-      Sequence(tensors Type: @type([Tensor]))
+      Sequence(chunks Type: @type([[Type::Float]]))
       Repeat({
         ; compute the end index for the current chunk
         processed | Add(@ml/embeddings/max-tokens) | Min(num-tokens) = slice-end
         slice-end | WhenNot(IsMore(processed) Return) ; early exit if we've processed all tokens here
-        tokens | Tensor.Slice(
-          Dim: 1
-          Start: processed
-          End: slice-end
-        ) = tokens-chunk
+        tokens | Slice(From: processed To: slice-end) = tokens-chunk
         ; notice we advance by chunk-size, not max-tokens, to leave an overlap
         processed | Add(@ml/embeddings/chunk-size) > processed
-
-        tokens-chunk | Tensor.ZerosLike = tokens-zeros
-        [tokens-chunk tokens-zeros] | ML.Forward(Model: ml/embeddings/model) | Take(0)
-        {Tensor.Shape | Take(1) | ToFloat = num-tokens-float}
-        Tensor.Sum([1]) | Tensor.Div(num-tokens-float) >> tensors
+        
+        tokens-chunk | Do(ml/embed/activate) >> chunks
       } Until: {processed | IsMoreEqual(num-tokens)})
-      tensors
+      chunks
     } {
-      ToFloat = num-tokens-float
-      tokens | Tensor.ZerosLike = tokens-zeros
-      [tokens tokens-zeros] | ML.Forward(Model: ml/embeddings/model) | Take(0)
-      Tensor.Sum([1]) | Tensor.Div(num-tokens-float) = embedding
-      [embedding]
+      tokens | Do(ml/embed/activate) = embeddings
+      [embeddings]
     }
   )
 })
 
 @wire(ml/cosine-similarity {
-  {Take(0) = tensor-a}
-  {Take(1) = tensor-b}
+  {Take(0) | Tensor([@ml/embeddings/size]) = tensor-a}
+  {Take(1) | Tensor([@ml/embeddings/size]) = tensor-b}
   tensor-a | Tensor.Mul(tensor-b) | Tensor.Sum | Tensor.ToFloat = sum-ij
   tensor-a | Tensor.Mul(tensor-a) | Tensor.Sum | Tensor.ToFloat = sum-i2
   tensor-b | Tensor.Mul(tensor-b) | Tensor.Sum | Tensor.ToFloat = sum-j2
