@@ -107,7 +107,7 @@ struct Tokenize {
   std::vector<llama_token> _tokensCache;
 
   SHVar activate(SHContext *context, const SHVar &input) {
-    auto data = varAsObjectChecked<ModelData>(_model.get(), Model::Type);
+    auto &data = varAsObjectChecked<ModelData>(_model.get(), Model::Type);
     auto model = data.model.get();
 
     auto text = SHSTRVIEW(input);
@@ -150,7 +150,7 @@ struct Detokenize {
   std::string _text;
 
   SHVar activate(SHContext *context, const SHVar &input) {
-    auto data = varAsObjectChecked<ModelData>(_model.get(), Model::Type);
+    auto &data = varAsObjectChecked<ModelData>(_model.get(), Model::Type);
     auto model = data.model.get();
 
     std::vector<llama_token> tokens;
@@ -249,7 +249,7 @@ struct Embed {
       llama_batch_free(_batch);
       _batch = {};
       _prevModel = dataVar;
-      auto data = varAsObjectChecked<ModelData>(dataVar, Model::Type);
+      auto &data = varAsObjectChecked<ModelData>(dataVar, Model::Type);
       auto model = data.model.get();
 
       if (llama_model_has_decoder(model) && llama_model_has_encoder(model)) {
