@@ -215,8 +215,10 @@ target_include_directories(TracyClient PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_
 target_compile_definitions(TracyClient PUBLIC TRACY_CALLSTACK_SIZE=${TRACY_CALLSTACK_SIZE})
 
 if(NOT EMSCRIPTEN)
-  if(WIN32)
-    set(GGML_VULKAN ON CACHE BOOL "" FORCE)
-  endif()
+  # TODO vulkan build support
+  # if(WIN32 OR LINUX)
+  #   set(GGML_VULKAN ON CACHE BOOL "" FORCE)
+  # endif()
+  set(GGML_OPENMP OFF CACHE BOOL "" FORCE) # omp is very omp...
   add_subdirectory(llama.cpp)
 endif()
