@@ -1,6 +1,6 @@
-"/Users/sugar/Downloads/gist-small-embedding-v0.Q5_K_M.gguf" | LLM.Model = model
+"/Users/sugar/Downloads/noinstruct-small-embedding-v0-q5_k_m.gguf" | LLM.Model = model
 
 "hello world!" | LLM.Tokenize(Model: model) | Log = tokens
 LLM.Detokenize(Model: model) | Log | String.Trim | Assert.Is("hello world!")
 
-tokens | LLM.Embed(Model: model) | Log
+tokens | LLM.Embed(Model: model, Normalization: 1) | Log

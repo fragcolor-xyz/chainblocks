@@ -173,8 +173,48 @@ struct Embed {
   static SHTypesInfo inputTypes() { return shards::CoreInfo::IntSeqType; }
   static SHTypesInfo outputTypes() { return shards::CoreInfo::FloatSeqType; }
 
+  Embed() {
+    _norm = Var(0);
+  }
+
   PARAM_PARAMVAR(_model, "Model", "The model to use", {Model::VarType});
-  PARAM_IMPL(PARAM_IMPL_FOR(_model));
+  PARAM_PARAMVAR(_norm, "Normalization", "Normalization type: -1=none, 0=max_abs, 2=euclidean, >2=p-norm", {shards::CoreInfo::IntType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_model), PARAM_IMPL_FOR(_norm));
+
+  static void normalize_embeddings(const float *inp, float *out, int n, int embd_norm) {
+    double sum = 0.0;
+
+    switch (embd_norm) {
+    case -1: // no normalization
+      sum = 1.0;
+      break;
+    case 0: // max absolute
+      for (int i = 0; i < n; i++) {
+        if (sum < std::abs(inp[i]))
+          sum = std::abs(inp[i]);
+      }
+      sum /= 32760.0; // make an int16 range
+      break;
+    case 2: // euclidean
+      for (int i = 0; i < n; i++) {
+        sum += inp[i] * inp[i];
+      }
+      sum = std::sqrt(sum);
+      break;
+    default: // p-norm (euclidean is p-norm p=2)
+      for (int i = 0; i < n; i++) {
+        sum += std::pow(std::abs(inp[i]), embd_norm);
+      }
+      sum = std::pow(sum, 1.0 / embd_norm);
+      break;
+    }
+
+    const float norm = sum > 0.0 ? 1.0f / sum : 0.0f;
+
+    for (int i = 0; i < n; i++) {
+      out[i] = inp[i] * norm;
+    }
+  }
 
   void cleanup(SHContext *context) {
     PARAM_CLEANUP(context);
@@ -183,6 +223,7 @@ struct Embed {
     llama_batch_free(_batch);
     _batch = {};
     _prevModel = {};
+    _normalized_buffer = {};
   }
 
   void warmup(SHContext *context) { PARAM_WARMUP(context); }
@@ -194,6 +235,7 @@ struct Embed {
   }
 
   SeqVar _embeddings;
+  std::vector<float> _normalized_buffer;
 
   std::shared_ptr<llama_context> _ctx;
   int32_t _nEmbd = 0;
@@ -207,7 +249,7 @@ struct Embed {
       llama_batch_free(_batch);
       _batch = {};
       _prevModel = dataVar;
-      auto data = varAsObjectChecked<ModelData>(_model.get(), Model::Type);
+      auto data = varAsObjectChecked<ModelData>(dataVar, Model::Type);
       auto model = data.model.get();
 
       if (llama_model_has_decoder(model) && llama_model_has_encoder(model)) {
@@ -216,7 +258,7 @@ struct Embed {
 
       auto ctx_params = llama_context_default_params();
       ctx_params.embeddings = true;
-      _ctx = std::unique_ptr<llama_context, decltype(&llama_free)>(llama_new_context_with_model(model, ctx_params), llama_free);
+      _ctx = std::shared_ptr<llama_context>(llama_new_context_with_model(model, ctx_params), llama_free);
       if (!_ctx) {
         throw ActivationError("Failed to create context for embedding");
       }
@@ -229,11 +271,12 @@ struct Embed {
       tokens.push_back(token.payload.intValue);
     }
 
-    std::vector<float> embeddings(_nEmbd);
-
     for (size_t i = 0; i < tokens.size(); i++) {
       _batch.token[i] = tokens[i];
       _batch.pos[i] = i;
+      _batch.seq_id[i][0] = 0;
+      _batch.n_seq_id[i] = 1;
+      _batch.logits[i] = true; // Enable logits for all tokens to get embeddings
     }
     _batch.n_tokens = tokens.size();
 
@@ -241,16 +284,69 @@ struct Embed {
 
     auto model = llama_get_model(_ctx.get());
     if (llama_model_has_encoder(model)) {
-      llama_encode(_ctx.get(), _batch);
+      if (llama_encode(_ctx.get(), _batch) < 0) {
+        throw ActivationError("Failed to encode input");
+      }
     } else {
-      llama_decode(_ctx.get(), _batch);
+      if (llama_decode(_ctx.get(), _batch) < 0) {
+        throw ActivationError("Failed to decode input");
+      }
     }
 
-    auto results = llama_get_embeddings(_ctx.get());
-
     _embeddings.clear();
-    for (int i = 0; i < _nEmbd; i++) {
-      _embeddings.push_back(Var(results[i]));
+    _normalized_buffer.resize(_nEmbd);
+
+    auto pooling_type = llama_pooling_type(_ctx.get());
+    std::set<int> processed_seq_ids;
+
+    for (int i = 0; i < _batch.n_tokens; i++) {
+      if (!_batch.logits[i]) {
+        continue;
+      }
+
+      const float *embd = nullptr;
+
+      if (pooling_type == LLAMA_POOLING_TYPE_NONE) {
+        embd = llama_get_embeddings_ith(_ctx.get(), i);
+        if (!embd) {
+          throw ActivationError("Failed to get token embeddings for position " + std::to_string(i));
+        }
+
+        // Normalize and add token embedding
+        normalize_embeddings(embd, _normalized_buffer.data(), _nEmbd, _norm.get().payload.intValue);
+        for (int j = 0; j < _nEmbd; j++) {
+          _embeddings.push_back(Var(_normalized_buffer[j]));
+        }
+      } else {
+        // For sequence embeddings, only process each sequence ID once
+        int seq_id = _batch.seq_id[i][0];
+        if (processed_seq_ids.find(seq_id) != processed_seq_ids.end()) {
+          continue;
+        }
+
+        embd = llama_get_embeddings_seq(_ctx.get(), seq_id);
+        if (!embd) {
+          throw ActivationError("Failed to get sequence embeddings for seq_id " + std::to_string(seq_id));
+        }
+
+        // Normalize embeddings before adding them
+        normalize_embeddings(embd, _normalized_buffer.data(), pooling_type == LLAMA_POOLING_TYPE_RANK ? 1 : _nEmbd,
+                             _norm.get().payload.intValue);
+
+        if (pooling_type == LLAMA_POOLING_TYPE_RANK) {
+          _embeddings.push_back(Var(_normalized_buffer[0]));
+        } else {
+          for (int j = 0; j < _nEmbd; j++) {
+            _embeddings.push_back(Var(_normalized_buffer[j]));
+          }
+        }
+
+        processed_seq_ids.insert(seq_id);
+      }
+    }
+
+    if (_embeddings.empty()) {
+      throw ActivationError("No embeddings were generated");
     }
 
     return _embeddings;
