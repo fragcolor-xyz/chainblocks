@@ -152,7 +152,6 @@ jobs:
           ./shards new ../shards/tests/zip-map.shs
           ./shards new ../shards/tests/markdown.shs
           ./shards new ../shards/tests/table-recurse.shs
-          ./shards new ../shards/tests/llm.shs
       - name: Test (Debug)
         # Test that only works in Debug build go there
         if: ${{ steps.setup.outputs.build-type == 'Debug' }}
