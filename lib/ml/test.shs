@@ -5,14 +5,14 @@
   @ml/embeddings/prepare
 
   "Hello world!" | Do(ml/embed) | ForEach({
-    Tensor.ToString | Log
+    Log
   })
   @read("../../readme.md") | Do(ml/embed) | ForEach({
     {
-      Tensor.ToFloats = floats
+      = floats
       Count(floats) | Assert.Is(@ml/embeddings/size)
     }
-    Tensor.ToString | Log
+    Log
   })
 
   ; testing memory ref counting with take

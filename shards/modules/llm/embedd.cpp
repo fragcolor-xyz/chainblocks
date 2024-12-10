@@ -173,12 +173,11 @@ struct Embed {
   static SHTypesInfo inputTypes() { return shards::CoreInfo::IntSeqType; }
   static SHTypesInfo outputTypes() { return shards::CoreInfo::FloatSeqType; }
 
-  Embed() {
-    _norm = Var(0);
-  }
+  Embed() { _norm = Var(-1); }
 
   PARAM_PARAMVAR(_model, "Model", "The model to use", {Model::VarType});
-  PARAM_PARAMVAR(_norm, "Normalization", "Normalization type: -1=none, 0=max_abs, 2=euclidean, >2=p-norm", {shards::CoreInfo::IntType});
+  PARAM_PARAMVAR(_norm, "Normalization", "Normalization type: -1=none, 0=max_abs, 2=euclidean, >2=p-norm",
+                 {shards::CoreInfo::IntType});
   PARAM_IMPL(PARAM_IMPL_FOR(_model), PARAM_IMPL_FOR(_norm));
 
   static void normalize_embeddings(const float *inp, float *out, int n, int embd_norm) {
@@ -239,6 +238,7 @@ struct Embed {
 
   std::shared_ptr<llama_context> _ctx;
   int32_t _nEmbd = 0;
+  int32_t _nUBatch = 0;
   SHVar _prevModel{};
   llama_batch _batch;
 
@@ -263,7 +263,12 @@ struct Embed {
         throw ActivationError("Failed to create context for embedding");
       }
       _nEmbd = llama_n_embd(model);
-      _batch = llama_batch_init(_nEmbd, 0, 1);
+      _nUBatch = llama_n_ubatch(_ctx.get());
+      _batch = llama_batch_init(_nUBatch, 0, 1);
+    }
+
+    if (input.payload.seqValue.len > uint32_t(_nUBatch)) {
+      throw ActivationError(fmt::format("Input sequence is too long, maximum length is {}", _nUBatch));
     }
 
     std::vector<llama_token> tokens;
