@@ -343,12 +343,6 @@ pub struct DebugInfo {
   pub id_counter: u64,
 }
 
-impl Drop for DebugInfo {
-  fn drop(&mut self) {
-    shlog_debug!("Dropping DebugInfo");
-  }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Metadata {
   pub name: RcStrWrapper,
