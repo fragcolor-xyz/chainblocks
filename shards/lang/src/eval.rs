@@ -1381,12 +1381,12 @@ impl<'e> VariableResolver<'e> {
       },
       Value::String(ref s) => {
         let s = Var::ephemeral_string(s.as_str());
-        Ok(ResolvedVar::new_const(SVar::NotCloned(s)))
+        Ok(ResolvedVar::new_const(SVar::Cloned(s.into())))
       }
       Value::Bytes(ref b) => {
         let bytes = b.0.as_ref();
         let bytes = Var::ephemeral_slice(bytes);
-        Ok(ResolvedVar::new_const(SVar::NotCloned(bytes.into())))
+        Ok(ResolvedVar::new_const(SVar::Cloned(bytes.into())))
       }
       Value::Float2(ref val) => Ok(ResolvedVar::new_const(SVar::NotCloned(val.into()))),
       Value::Float3(ref val) => Ok(ResolvedVar::new_const(SVar::NotCloned(val.into()))),
@@ -1665,8 +1665,8 @@ impl<'e> VariableResolver<'e> {
             self.e,
           )
           .map(ResolvedVar::new_const),
-          ("platform", true) => Ok(ResolvedVar::new_const(SVar::NotCloned(
-            process_platform_built_in(),
+          ("platform", true) => Ok(ResolvedVar::new_const(SVar::Cloned(
+            process_platform_built_in().into(),
           ))),
           ("type", true) => process_type(func, line_info, self.e).map(ResolvedVar::new_const),
           ("ast", true) => process_ast(func, line_info, self.e).map(ResolvedVar::new_const),
