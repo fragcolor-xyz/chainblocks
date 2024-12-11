@@ -349,9 +349,14 @@ pub extern "C" fn shards_propagate_error(
 }
 
 #[no_mangle]
-pub extern "C" fn shards_free_wire(wire: *mut Wire) {
+pub extern "C" fn shards_free_wire(wire: SHLWire) {
   unsafe {
-    drop(Box::from_raw(wire));
+    if wire.wire != std::ptr::null_mut() {
+      drop(Box::from_raw(wire.wire));
+    }
+    if wire.error != std::ptr::null_mut() {
+      drop(Box::from_raw(wire.error));
+    }
   }
 }
 

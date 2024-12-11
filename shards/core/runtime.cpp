@@ -2574,11 +2574,12 @@ extern "C" {
 SHLAst shards_read(SHStringWithLen name, SHStringWithLen code, SHStringWithLen base_path, const SHStringWithLen *include_dirs,
                    uint32_t num_include_dirs);
 SHLAst shards_load_ast(const uint8_t *bytes, uint32_t size);
+void shards_free_error(SHLError *error);
 SHLEvalEnv *shards_create_env(SHStringWithLen namespace_);
 void shards_free_env(SHLEvalEnv *env);
 SHLError *shards_eval_env(SHLEvalEnv *env, const SHVar *ast);
 SHLWire shards_transform_env(SHLEvalEnv *env, SHStringWithLen name);
-void shards_free_wire(SHLWire *wire);
+void shards_free_wire(SHLWire wire);
 
 SHVar *getWireVariable(SHWireRef wireRef, const char *name, uint32_t nameLen) {
   auto &wire = SHWire::sharedFromRef(wireRef);
@@ -2916,6 +2917,10 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
     sc->removeShard(blk);
   };
 
+  result->referenceWire = [](SHWireRef wire) noexcept {
+    return SHWire::addRef(wire);
+  };
+
   result->destroyWire = [](SHWireRef wire) noexcept { SHWire::deleteRef(wire); };
 
   result->isWireRunning = [](SHWireRef wire) noexcept {
@@ -3113,6 +3118,8 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
 
   result->loadAst = [](const uint8_t *bytes, uint32_t size) { return shards_load_ast(bytes, size); };
 
+  result->freeError = [](SHLError *error) { shards_free_error(error); };
+
   result->createEvalEnv = [](SHStringWithLen namespace_) { return shards_create_env(namespace_); };
 
   result->freeEvalEnv = [](SHLEvalEnv *env) { shards_free_env(env); };
@@ -3121,7 +3128,7 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
 
   result->transformEnv = [](SHLEvalEnv *env, SHStringWithLen name) { return shards_transform_env(env, name); };
 
-  result->freeWire = [](SHLWire *wire) { shards_free_wire(wire); };
+  result->freeWire = [](SHLWire wire) { shards_free_wire(wire); };
 
   return result;
 }

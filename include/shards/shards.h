@@ -938,6 +938,7 @@ typedef void(__cdecl *SHSetWirePriority)(SHWireRef wire, int priority);
 typedef void(__cdecl *SHSetWireTraits)(SHWireRef wire, SHSeq traits);
 typedef void(__cdecl *SHAddShard)(SHWireRef wire, ShardPtr shard);
 typedef void(__cdecl *SHRemShard)(SHWireRef wire, ShardPtr shard);
+typedef SHWireRef(__cdecl *SHReferenceWire)(SHWireRef wire);
 typedef void(__cdecl *SHDestroyWire)(SHWireRef wire);
 typedef SHBool(__cdecl *SHIsWireRunning)(SHWireRef wire);
 typedef struct SHVar(__cdecl *SHStopWire)(SHWireRef wire);
@@ -1074,11 +1075,12 @@ typedef struct SHLAst(__cdecl *SHReadProc)(struct SHStringWithLen name, struct S
                                            struct SHStringWithLen basePath, const struct SHStringWithLen *includeDirs,
                                            uint32_t numIncludeDirs);
 typedef struct SHLAst(__cdecl *SHLoadAstProc)(const uint8_t *bytes, uint32_t size);
+typedef void(__cdecl *SHFreeError)(struct SHLError *error);
 typedef struct SHLEvalEnv *(__cdecl *SHCreateEvalEnv)(struct SHStringWithLen namespace_);
 typedef void(__cdecl *SHFreeEvalEnv)(struct SHLEvalEnv *env);
 typedef struct SHLError *(__cdecl *SHEvalProc)(struct SHLEvalEnv *env, const struct SHVar *ast);
 typedef struct SHLWire(__cdecl *SHTransformEnv)(struct SHLEvalEnv *env, struct SHStringWithLen name);
-typedef void(__cdecl *SHFreeWire)(struct SHLWire *wire);
+typedef void(__cdecl *SHFreeWire)(struct SHLWire wire);
 
 typedef struct _SHCore {
   // Aligned allocator
@@ -1121,6 +1123,7 @@ typedef struct _SHCore {
   SHSetWireTraits setWireTraits;
   SHAddShard addShard;
   SHRemShard removeShard;
+  SHReferenceWire referenceWire;
   SHDestroyWire destroyWire;
   SHIsWireRunning isWireRunning;
   SHStopWire stopWire; // must destroyVar once done
@@ -1217,6 +1220,7 @@ typedef struct _SHCore {
   // Language parsing and evaluation
   SHReadProc read;
   SHLoadAstProc loadAst;
+  SHFreeError freeError;
   SHCreateEvalEnv createEvalEnv;
   SHFreeEvalEnv freeEvalEnv;
   SHEvalProc eval;
