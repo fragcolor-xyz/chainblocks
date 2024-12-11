@@ -89,7 +89,7 @@ struct Tokenize {
   static SHTypesInfo inputTypes() { return shards::CoreInfo::StringType; }
   static SHTypesInfo outputTypes() { return shards::CoreInfo::IntSeqType; }
 
-  PARAM_PARAMVAR(_model, "Model", "The model to use", {Model::VarType});
+  PARAM_PARAMVAR(_context, "Context", "The LLM context to use", {Context::VarType});
   PARAM_IMPL(PARAM_IMPL_FOR(_model));
 
   void cleanup(SHContext *context) {
@@ -174,6 +174,72 @@ struct Detokenize {
   }
 };
 
+struct Context {
+  static SHTypesInfo inputTypes() { return Model::Type; }
+  static SHTypesInfo outputTypes() { return ::shards::Type::Object(CoreCC, 'llmc'); }
+
+  Context() { _embeddings = Var(true); }
+
+  static inline int32_t ObjectId = 'llmc';
+  static inline const char VariableName[] = "LLM.Context";
+  static inline ::shards::Type Type = ::shards::Type::Object(CoreCC, ObjectId);
+  static inline SHTypeInfo RawType = Type;
+  static inline ::shards::Type VarType = ::shards::Type::VariableOf(Type);
+
+  PARAM_PARAMVAR(_embeddings, "Embeddings", "Enable embeddings mode", {shards::CoreInfo::BoolType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_embeddings));
+
+  std::shared_ptr<llama_context> _ctx;
+  int32_t _nEmbd = 0;
+  int32_t _nUBatch = 0;
+  SHVar _prevModel{};
+  llama_batch _batch;
+
+  void cleanup(SHContext *context) {
+    PARAM_CLEANUP(context);
+    _ctx = {};
+    llama_batch_free(_batch);
+    _batch = {};
+    _prevModel = {};
+  }
+
+  void warmup(SHContext *context) { PARAM_WARMUP(context); }
+
+  PARAM_REQUIRED_VARIABLES();
+  SHTypeInfo compose(SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return outputTypes().elements[0];
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    if (input != _prevModel) {
+      _ctx = {};
+      llama_batch_free(_batch);
+      _batch = {};
+      _prevModel = input;
+      
+      auto &data = varAsObjectChecked<ModelData>(input, Model::Type);
+      auto model = data.model.get();
+
+      if (llama_model_has_decoder(model) && llama_model_has_encoder(model)) {
+        throw ActivationError("Model has both encoder and decoder, cannot embed");
+      }
+
+      auto ctx_params = llama_context_default_params();
+      ctx_params.embeddings = _embeddings.get().payload.boolValue;
+      _ctx = std::shared_ptr<llama_context>(llama_new_context_with_model(model, ctx_params), llama_free);
+      if (!_ctx) {
+        throw ActivationError("Failed to create context");
+      }
+      _nEmbd = llama_n_embd(model);
+      _nUBatch = llama_n_ubatch(_ctx.get());
+      _batch = llama_batch_init(_nUBatch, 0, 1);
+    }
+
+    return Var(this);
+  }
+};
+
 struct Embed {
   static SHTypesInfo inputTypes() { return shards::CoreInfo::IntSeqType; }
   static SHTypesInfo outputTypes() { return shards::CoreInfo::FloatSeqType; }
@@ -248,29 +314,11 @@ struct Embed {
   llama_batch _batch;
 
   SHVar activate(SHContext *context, const SHVar &input) {
-    auto dataVar = _model.get();
-    if (dataVar != _prevModel) {
-      _ctx = {};
-      llama_batch_free(_batch);
-      _batch = {};
-      _prevModel = dataVar;
-      auto &data = varAsObjectChecked<ModelData>(dataVar, Model::Type);
-      auto model = data.model.get();
-
-      if (llama_model_has_decoder(model) && llama_model_has_encoder(model)) {
-        throw ActivationError("Model has both encoder and decoder, cannot embed");
-      }
-
-      auto ctx_params = llama_context_default_params();
-      ctx_params.embeddings = true;
-      _ctx = std::shared_ptr<llama_context>(llama_new_context_with_model(model, ctx_params), llama_free);
-      if (!_ctx) {
-        throw ActivationError("Failed to create context for embedding");
-      }
-      _nEmbd = llama_n_embd(model);
-      _nUBatch = llama_n_ubatch(_ctx.get());
-      _batch = llama_batch_init(_nUBatch, 0, 1);
-    }
+    auto &context = varAsObjectChecked<Context>(_context.get(), Context::Type);
+    auto &_ctx = context._ctx;
+    auto &_batch = context._batch;
+    auto _nEmbd = context._nEmbd;
+    auto _nUBatch = context._nUBatch;
 
     if (input.payload.seqValue.len > uint32_t(_nUBatch)) {
       throw ActivationError(fmt::format("Input sequence is too long, maximum length is {}", _nUBatch));
@@ -366,6 +414,7 @@ struct Embed {
 
 SHARDS_REGISTER_FN(llm) {
   REGISTER_SHARD("LLM.Model", llm::Model);
+  REGISTER_SHARD("LLM.Context", llm::Context);
   REGISTER_SHARD("LLM.Tokenize", llm::Tokenize);
   REGISTER_SHARD("LLM.Detokenize", llm::Detokenize);
   REGISTER_SHARD("LLM.Embed", llm::Embed);
