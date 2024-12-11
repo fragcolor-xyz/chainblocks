@@ -31,7 +31,7 @@ use shards_lang::{
   custom_state::*,
   directory,
   read::{AST_TYPE, AST_VAR_TYPE},
-  ParamHelperMut, RcStrWrapper,
+  ParamHelperMut, StrWrapper,
 };
 
 use num_traits::{Float, FromPrimitive, PrimInt, Zero};
@@ -220,7 +220,7 @@ fn var_to_value(var: &Var) -> Result<Value, String> {
       let mut namespaces = string
         .split('/')
         .map(|x| x.into())
-        .collect::<Vec<RcStrWrapper>>();
+        .collect::<Vec<StrWrapper>>();
       // name is last part, we can just pop it and remove it from the namespaces without cloning in one go
       let name = namespaces.pop().unwrap();
       Ok(Value::Identifier(Identifier {
@@ -730,7 +730,7 @@ impl<'a> VisualAst<'a> {
             *val = (byte as f64) / 255.0;
           }
           Value::Number(Number::Hexadecimal(s)) if s.starts_with("0x") => {
-            let s = s.to_mut();
+            let s = s.as_mut_str();
             s.replace_range(2..4, &format!("{:02x}", byte));
           }
           _ => unreachable!(),
@@ -1773,7 +1773,7 @@ impl<'a> AstMutator<Option<Response>> for VisualAst<'a> {
             identifier.namespaces.push("default".into());
             self.context.has_changed = true;
           }
-          let x = identifier.name.to_mut();
+          let x = identifier.name.as_mut_str();
           egui::TextEdit::singleline(x)
             .clip_text(false)
             .desired_width(0.0)
@@ -1781,7 +1781,7 @@ impl<'a> AstMutator<Option<Response>> for VisualAst<'a> {
         } else {
           let first = &mut identifier.namespaces[0];
           let len = first.len();
-          let first = first.to_mut();
+          let first = first.as_mut_str();
           if ui
             .horizontal(|ui| {
               let remove = if ui
@@ -1810,7 +1810,7 @@ impl<'a> AstMutator<Option<Response>> for VisualAst<'a> {
           {
             identifier.namespaces.clear();
           }
-          let x = identifier.name.to_mut();
+          let x = identifier.name.as_mut_str();
           egui::TextEdit::singleline(x)
             .clip_text(false)
             .desired_width(0.0)
@@ -1881,7 +1881,7 @@ impl<'a> AstMutator<Option<Response>> for VisualAst<'a> {
             Number::Hexadecimal(x) => {
               // we need a mini embedded text editor
               let prev_value = x.clone();
-              let response = TextEdit::singleline(x.to_mut())
+              let response = TextEdit::singleline(x.as_mut_str())
                 .clip_text(false)
                 .desired_width(0.0)
                 .ui(ui);
@@ -1901,7 +1901,7 @@ impl<'a> AstMutator<Option<Response>> for VisualAst<'a> {
           Value::String(x) => {
             // if long we should use a multiline text editor
             // if short we should use a single line text editor
-            let x = x.to_mut();
+            let x = x.as_mut_str();
             Some(if x.len() > 32 {
               ui.text_edit_multiline(x)
             } else {
@@ -1914,7 +1914,7 @@ impl<'a> AstMutator<Option<Response>> for VisualAst<'a> {
             })
           }
           Value::Bytes(x) => {
-            let bytes = x.to_mut();
+            let bytes = x.as_mut_vec();
             let mut len = bytes.len();
             let response = ui.label(format!("Bytes (len: {})", len));
             if self.parent_selected {
@@ -2412,7 +2412,7 @@ where
   func_to_numbers(x)
 }
 
-fn transform_take_table(x: &mut Identifier, y: &mut Vec<RcStrWrapper>) -> Sequence {
+fn transform_take_table(x: &mut Identifier, y: &mut Vec<StrWrapper>) -> Sequence {
   // substitute with a Expr sequence
   let mut blocks = vec![Block {
     content: BlockContent::Shard(Function {

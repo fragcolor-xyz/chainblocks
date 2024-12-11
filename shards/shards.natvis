@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-	<Type Name="shards_lang::RcStrWrapper">
+	<Type Name="shards_lang::StrWrapper">
 		<DisplayString>{&amp;__0.ptr.pointer.data_ptr-&gt;value,[__0.ptr.pointer.length]s} (RcStr)</DisplayString>
 		<Expand>
 			<Item Name="[Size]">__0.ptr.pointer.length</Item>

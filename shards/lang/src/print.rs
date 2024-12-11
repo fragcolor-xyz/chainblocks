@@ -224,7 +224,7 @@ impl AstVisitor for PrintVisitor {
         self.write(&format!("\"{}\"", escaped));
       }
       Value::Bytes(b) => {
-        let bytes_slice = b.0.as_ref();
+        let bytes_slice = b.0.as_slice();
         let hex_string: String = bytes_slice
           .iter()
           .map(|byte| format!("{:02x}", byte))
@@ -450,7 +450,7 @@ fn test1() {
   // let code = include_str!("nested.shs");
   let code = include_str!("sample1.shs");
   let successful_parse = crate::ShardsParser::parse(Rule::Program, code).unwrap();
-  let mut env = crate::read::ReadEnv::new("", ".", ".");
+  let mut env = crate::read::ReadEnv::new("", ".".to_string(), ".");
   let seq =
     crate::read::process_program(successful_parse.into_iter().next().unwrap(), &mut env).unwrap();
   let seq = seq.sequence;

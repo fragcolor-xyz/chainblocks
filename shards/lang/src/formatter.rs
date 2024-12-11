@@ -797,7 +797,7 @@ fn format_file_validate(input_path: &Path) -> Result<(), crate::error::Error> {
     let mut f = f;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf)?;
-    let mut expected_str = String::from_utf8(buf)?;
+    let expected_str = String::from_utf8(buf)?;
 
     let formatted = format_str(&input_str)?;
     if !strequal(&formatted, &expected_str) {

@@ -1,6 +1,6 @@
 #![allow(non_upper_case_globals)]
 
-use crate::{custom_state::CustomStateContainer, RcBytesWrapper, RcStrWrapper};
+use crate::{custom_state::CustomStateContainer, BytesWrapper, StrWrapper};
 use core::{fmt, hash::Hash};
 use pest::Position;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
@@ -97,17 +97,17 @@ pub enum Number {
   #[serde(rename = "float")]
   Float(f64),
   #[serde(rename = "hex")]
-  Hexadecimal(RcStrWrapper),
+  Hexadecimal(StrWrapper),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename = "Iden")]
 pub struct Identifier {
-  pub name: RcStrWrapper,
+  pub name: StrWrapper,
   #[serde(default)]
   #[serde(rename = "ns")]
   #[serde(skip_serializing_if = "Vec::is_empty")]
-  pub namespaces: Vec<RcStrWrapper>,
+  pub namespaces: Vec<StrWrapper>,
 
   #[serde(skip)]
   pub custom_state: CustomStateContainer,
@@ -143,7 +143,7 @@ impl Hash for Identifier {
 }
 
 impl Identifier {
-  pub fn resolve(&self) -> RcStrWrapper {
+  pub fn resolve(&self) -> StrWrapper {
     if self.namespaces.is_empty() {
       return self.name.clone();
     } else {
@@ -168,13 +168,13 @@ pub enum Value {
   #[serde(rename = "bool")]
   Boolean(bool),
   #[serde(rename = "enum")]
-  Enum(RcStrWrapper, RcStrWrapper),
+  Enum(StrWrapper, StrWrapper),
   #[serde(rename = "num")]
   Number(Number),
   #[serde(rename = "str")]
-  String(RcStrWrapper),
+  String(StrWrapper),
   #[serde(rename = "bytes")]
-  Bytes(RcBytesWrapper),
+  Bytes(BytesWrapper),
   #[serde(rename = "i2")]
   Int2([i64; 2]),
   #[serde(rename = "i3")]
@@ -204,7 +204,7 @@ pub enum Value {
   #[serde(rename = "expr")]
   Expr(Sequence),
   #[serde(rename = "tt")]
-  TakeTable(Identifier, Vec<RcStrWrapper>),
+  TakeTable(Identifier, Vec<StrWrapper>),
   #[serde(rename = "ts")]
   TakeSeq(Identifier, Vec<u32>),
   #[serde(rename = "func")]
@@ -248,7 +248,7 @@ impl Value {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Param {
-  pub name: Option<RcStrWrapper>,
+  pub name: Option<StrWrapper>,
   pub value: Value,
 
   pub is_default: Option<bool>, // This is used to determine if the param is default or not, optional
@@ -278,7 +278,7 @@ pub enum BlockContent {
   #[serde(rename = "const")]
   Const(Value), // Rules: ConstValue, Vector
   #[serde(rename = "tt")]
-  TakeTable(Identifier, Vec<RcStrWrapper>), // Rule: TakeTable
+  TakeTable(Identifier, Vec<StrWrapper>), // Rule: TakeTable
   #[serde(rename = "ts")]
   TakeSeq(Identifier, Vec<u32>), // Rule: TakeSeq
   #[serde(rename = "eExpr")]
@@ -345,7 +345,7 @@ pub struct DebugInfo {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Metadata {
-  pub name: RcStrWrapper,
+  pub name: StrWrapper,
 
   #[serde(skip)]
   pub debug_info: RefCell<DebugInfo>,
@@ -621,7 +621,7 @@ impl<'de> Deserialize<'de> for Block {
               content = Some(BlockContent::Const(value));
             }
             Field::Tt => {
-              let (id, vec): (Identifier, Vec<RcStrWrapper>) = map.next_value()?;
+              let (id, vec): (Identifier, Vec<StrWrapper>) = map.next_value()?;
               content = Some(BlockContent::TakeTable(id, vec));
             }
             Field::Ts => {
@@ -824,7 +824,7 @@ impl<'de> Deserialize<'de> for Param {
             Field::Id => value = Some(Value::Identifier(map.next_value()?)),
             Field::Bool => value = Some(Value::Boolean(map.next_value()?)),
             Field::Enum => {
-              let (e1, e2): (RcStrWrapper, RcStrWrapper) = map.next_value()?;
+              let (e1, e2): (StrWrapper, StrWrapper) = map.next_value()?;
               value = Some(Value::Enum(e1, e2));
             }
             Field::Num => value = Some(Value::Number(map.next_value()?)),
@@ -845,7 +845,7 @@ impl<'de> Deserialize<'de> for Param {
             Field::EExpr => value = Some(Value::EvalExpr(map.next_value()?)),
             Field::Expr => value = Some(Value::Expr(map.next_value()?)),
             Field::Tt => {
-              let (id, vec): (Identifier, Vec<RcStrWrapper>) = map.next_value()?;
+              let (id, vec): (Identifier, Vec<StrWrapper>) = map.next_value()?;
               value = Some(Value::TakeTable(id, vec));
             }
             Field::Ts => {
