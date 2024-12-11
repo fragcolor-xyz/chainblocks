@@ -224,7 +224,7 @@ impl AstVisitor for PrintVisitor {
         self.write(&format!("\"{}\"", escaped));
       }
       Value::Bytes(b) => {
-        let bytes_slice = b.0.as_slice();
+        let bytes_slice = b.as_slice();
         let hex_string: String = bytes_slice
           .iter()
           .map(|byte| format!("{:02x}", byte))

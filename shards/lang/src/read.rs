@@ -1,5 +1,5 @@
 use crate::custom_state::CustomStateContainer;
-use crate::{ast::*, StrWrapper};
+use crate::{ast::*, RcStrWrapper};
 use core::convert::TryInto;
 use pest::iterators::Pair;
 use pest::Parser;
@@ -16,10 +16,10 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 pub struct ReadEnv {
-  name: StrWrapper,
+  name: RcStrWrapper,
   script_directory: String,
   include_directories: Vec<String>,
-  included: RefCell<HashSet<StrWrapper>>,
+  included: RefCell<HashSet<RcStrWrapper>>,
   dependencies: RefCell<Vec<String>>,
   parent: Option<*const ReadEnv>,
 }
@@ -89,7 +89,7 @@ pub fn get_root_env<'a>(env: &'a ReadEnv) -> &'a ReadEnv {
   }
 }
 
-fn check_included<'a>(name: &'a StrWrapper, env: &'a ReadEnv) -> bool {
+fn check_included<'a>(name: &'a RcStrWrapper, env: &'a ReadEnv) -> bool {
   if env.included.borrow().contains(name) {
     true
   } else if let Some(parent) = env.parent {
@@ -452,7 +452,7 @@ fn process_function(pair: Pair<Rule>, env: &mut ReadEnv) -> Result<FunctionValue
 fn process_take_table(
   pair: Pair<Rule>,
   _env: &mut ReadEnv,
-) -> Result<(Identifier, Vec<StrWrapper>), ShardsError> {
+) -> Result<(Identifier, Vec<RcStrWrapper>), ShardsError> {
   let pos = pair.as_span().start_pos();
   // first is the identifier which has to be VarName
   // followed by N Iden which are the keys

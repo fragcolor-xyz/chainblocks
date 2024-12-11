@@ -20,56 +20,19 @@ use crate::ast::*;
 
 use core::fmt;
 
+use std::borrow::Cow;
 use std::ops::Deref;
 
 use shards::types::{AutoShardRef, ClonedVar};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BytesWrapper(Vec<u8>);
+#[derive(Debug, Clone)]
+pub struct RcBytesWrapper(Rc<Cow<'static, [u8]>>);
 
-impl BytesWrapper {
-  /// Creates a new `BytesWrapper` from a `Vec<u8>`.
-  pub fn new(bytes: Vec<u8>) -> Self {
-    BytesWrapper(bytes)
-  }
-
-  /// Converts the `BytesWrapper` into the inner `Vec<u8>`.
-  pub fn into_inner(self) -> Vec<u8> {
-    self.0
-  }
-
-  /// Returns a reference to the inner byte slice.
-  pub fn as_slice(&self) -> &[u8] {
-    &self.0
-  }
-
-  /// Returns a mutable reference to the inner `Vec<u8>`.
-  pub fn as_mut_vec(&mut self) -> &mut Vec<u8> {
-    &mut self.0
-  }
-
-  /// Converts the `BytesWrapper` into a `Vec<u8>`.
-  pub fn to_vec(&self) -> Vec<u8> {
-    self.0.clone()
-  }
-}
-
-impl From<Vec<u8>> for BytesWrapper {
-  fn from(bytes: Vec<u8>) -> Self {
-    BytesWrapper::new(bytes)
-  }
-}
-
-impl From<&'static [u8]> for BytesWrapper {
-  fn from(bytes: &'static [u8]) -> Self {
-    BytesWrapper::new(bytes.to_vec())
-  }
-}
-
-impl Serialize for BytesWrapper {
+impl Serialize for RcBytesWrapper {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
     S: Serializer,
@@ -78,72 +41,84 @@ impl Serialize for BytesWrapper {
   }
 }
 
-impl<'de> Deserialize<'de> for BytesWrapper {
+impl<'de> Deserialize<'de> for RcBytesWrapper {
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
   where
     D: Deserializer<'de>,
   {
     let bytes: Vec<u8> = Deserialize::deserialize(deserializer)?;
-    Ok(BytesWrapper::new(bytes))
+    Ok(RcBytesWrapper(Rc::new(Cow::Owned(bytes))))
   }
 }
 
-impl fmt::Display for BytesWrapper {
+impl RcBytesWrapper {
+  pub fn new<S: Into<Cow<'static, [u8]>>>(s: S) -> Self {
+    RcBytesWrapper(Rc::new(s.into()))
+  }
+
+  pub fn to_vec(&self) -> Vec<u8> {
+    self.0.to_vec()
+  }
+
+  pub fn as_slice(&self) -> &[u8] {
+    &self.0
+  }
+
+  pub fn to_mut(&mut self) -> &mut Vec<u8> {
+    let cow = Rc::make_mut(&mut self.0);
+    cow.to_mut()
+  }
+}
+
+impl From<&'static [u8]> for RcBytesWrapper {
+  fn from(s: &'static [u8]) -> Self {
+    RcBytesWrapper::new(Cow::Borrowed(s))
+  }
+}
+
+impl From<Vec<u8>> for RcBytesWrapper {
+  fn from(s: Vec<u8>) -> Self {
+    RcBytesWrapper::new(Cow::Owned(s))
+  }
+}
+
+impl PartialEq for RcBytesWrapper {
+  fn eq(&self, other: &RcBytesWrapper) -> bool {
+    self.0 == other.0
+  }
+}
+
+impl Eq for RcBytesWrapper {}
+
+impl PartialEq<[u8]> for RcBytesWrapper {
+  fn eq(&self, other: &[u8]) -> bool {
+    *self.0 == other
+  }
+}
+
+impl Hash for RcBytesWrapper {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    self.0.hash(state)
+  }
+}
+
+impl fmt::Display for RcBytesWrapper {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    // Display the bytes in hexadecimal format for readability
-    for byte in &self.0 {
-      write!(f, "{:02x}", byte)?;
-    }
-    Ok(())
+    write!(f, "{:?}", self.0)
   }
 }
 
-impl Deref for BytesWrapper {
+impl Deref for RcBytesWrapper {
   type Target = [u8];
-
   fn deref(&self) -> &Self::Target {
     &self.0
   }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct StrWrapper(String);
+#[derive(Debug, Clone)]
+pub struct RcStrWrapper(Rc<Cow<'static, str>>);
 
-impl StrWrapper {
-  pub fn new(s: String) -> Self {
-    StrWrapper(s)
-  }
-
-  pub fn into_inner(self) -> String {
-    self.0
-  }
-
-  pub fn as_str(&self) -> &str {
-    &self.0
-  }
-
-  pub fn as_mut_str(&mut self) -> &mut String {
-    &mut self.0
-  }
-
-  pub fn to_string(&self) -> String {
-    self.0.clone()
-  }
-}
-
-impl From<String> for StrWrapper {
-  fn from(s: String) -> Self {
-    StrWrapper::new(s)
-  }
-}
-
-impl From<&str> for StrWrapper {
-  fn from(s: &str) -> Self {
-    StrWrapper::new(s.to_string())
-  }
-}
-
-impl Serialize for StrWrapper {
+impl Serialize for RcStrWrapper {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
     S: Serializer,
@@ -152,23 +127,74 @@ impl Serialize for StrWrapper {
   }
 }
 
-impl<'de> Deserialize<'de> for StrWrapper {
+impl<'de> Deserialize<'de> for RcStrWrapper {
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
   where
     D: Deserializer<'de>,
   {
     let s = String::deserialize(deserializer)?;
-    Ok(StrWrapper::new(s))
+    Ok(RcStrWrapper(Rc::new(Cow::Owned(s))))
   }
 }
 
-impl std::fmt::Display for StrWrapper {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl RcStrWrapper {
+  pub fn new<S: Into<Cow<'static, str>>>(s: S) -> Self {
+    RcStrWrapper(Rc::new(s.into()))
+  }
+
+  pub fn to_string(&self) -> String {
+    self.0.to_string()
+  }
+
+  pub fn as_str(&self) -> &str {
+    &self.0
+  }
+
+  pub fn to_mut(&mut self) -> &mut String {
+    let cow = Rc::make_mut(&mut self.0);
+    cow.to_mut()
+  }
+}
+
+impl From<&'static str> for RcStrWrapper {
+  fn from(s: &'static str) -> Self {
+    RcStrWrapper::new(Cow::Borrowed(s))
+  }
+}
+
+impl From<String> for RcStrWrapper {
+  fn from(s: String) -> Self {
+    RcStrWrapper::new(Cow::Owned(s))
+  }
+}
+
+impl Eq for RcStrWrapper {}
+
+impl PartialEq<RcStrWrapper> for RcStrWrapper {
+  fn eq(&self, other: &RcStrWrapper) -> bool {
+    self.0 == other.0
+  }
+}
+
+impl PartialEq<str> for RcStrWrapper {
+  fn eq(&self, other: &str) -> bool {
+    *self.0 == other
+  }
+}
+
+impl Hash for RcStrWrapper {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    self.0.hash(state)
+  }
+}
+
+impl fmt::Display for RcStrWrapper {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.0)
   }
 }
 
-impl std::ops::Deref for StrWrapper {
+impl Deref for RcStrWrapper {
   type Target = str;
 
   fn deref(&self) -> &Self::Target {

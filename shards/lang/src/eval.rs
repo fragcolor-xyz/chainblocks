@@ -3,7 +3,7 @@ use crate::custom_state::CustomStateContainer;
 use crate::read;
 use crate::read::AST_TYPE;
 use crate::ParamHelper;
-use crate::StrWrapper;
+use crate::RcStrWrapper;
 use crate::ShardsExtension;
 
 use core::convert::TryInto;
@@ -86,9 +86,9 @@ pub struct EvalEnv {
   pub program: Option<*const Program>,
   pub parent: Option<*const EvalEnv>,
 
-  namespace: StrWrapper,
-  full_namespace: StrWrapper,
-  qualified_cache: HashMap<Identifier, StrWrapper>,
+  namespace: RcStrWrapper,
+  full_namespace: RcStrWrapper,
+  qualified_cache: HashMap<Identifier, RcStrWrapper>,
 
   shards: Vec<AutoShardRef>,
 
@@ -100,13 +100,13 @@ pub struct EvalEnv {
   definitions: HashMap<Identifier, Definition>,
 
   // used during @template evaluations, to replace [x y z] arguments
-  replacements: HashMap<StrWrapper, *const Value>,
+  replacements: HashMap<RcStrWrapper, *const Value>,
 
   traits: HashMap<Identifier, ClonedVar>,
 
   // used during @template evaluation
-  suffix: Option<StrWrapper>,
-  suffix_assigned: HashMap<StrWrapper, StrWrapper>, // maps var names to their suffix
+  suffix: Option<RcStrWrapper>,
+  suffix_assigned: HashMap<RcStrWrapper, RcStrWrapper>, // maps var names to their suffix
 
   // Shards and functions that are forbidden to be used
   pub forbidden_funcs: HashSet<Identifier>,
@@ -136,15 +136,15 @@ impl Drop for EvalEnv {
 
 impl EvalEnv {
   pub fn new(
-    namespace: Option<StrWrapper>,
+    namespace: Option<RcStrWrapper>,
     parent: Option<*const EvalEnv>,
     program: Option<*const Program>,
   ) -> Self {
     let mut env = EvalEnv {
       program,
       parent: None,
-      namespace: StrWrapper::from(""),
-      full_namespace: StrWrapper::from(""),
+      namespace: RcStrWrapper::from(""),
+      full_namespace: RcStrWrapper::from(""),
       qualified_cache: HashMap::new(),
       shards: Vec::new(),
       deferred_wires: HashMap::new(),
@@ -177,7 +177,7 @@ impl EvalEnv {
       env.namespace = namespace.clone();
       if !env.full_namespace.is_empty() {
         let s = format!("{}/{}", env.full_namespace, namespace);
-        env.full_namespace = StrWrapper::from(s);
+        env.full_namespace = RcStrWrapper::from(s);
       } else {
         env.full_namespace = namespace;
       }
@@ -1082,7 +1082,7 @@ pub(crate) fn eval_sequence(
 
 fn create_take_table_chain(
   var_name: &Identifier,
-  path: &Vec<StrWrapper>,
+  path: &Vec<RcStrWrapper>,
   line: LineInfo,
   e: &mut EvalEnv,
 ) -> Result<(), ShardsError> {
@@ -1139,7 +1139,7 @@ fn get_rewrite_func<'a>(name: &Identifier, e: &'a EvalEnv) -> Option<&'a Box<dyn
 }
 
 /// Recurse into environment and find the suffix
-fn find_current_suffix<'a>(e: &'a EvalEnv) -> Option<&'a StrWrapper> {
+fn find_current_suffix<'a>(e: &'a EvalEnv) -> Option<&'a RcStrWrapper> {
   let mut env = e;
   loop {
     if let Some(suffix) = &env.suffix {
@@ -1154,7 +1154,7 @@ fn find_current_suffix<'a>(e: &'a EvalEnv) -> Option<&'a StrWrapper> {
 }
 
 /// Recurse into environment and find the suffix for a given variable name if it exists
-fn find_suffix<'a>(name: &'a StrWrapper, e: &'a EvalEnv) -> Option<&'a StrWrapper> {
+fn find_suffix<'a>(name: &'a RcStrWrapper, e: &'a EvalEnv) -> Option<&'a RcStrWrapper> {
   let mut env = e;
   loop {
     if let Some(suffix) = env.suffix_assigned.get(name) {
@@ -1207,7 +1207,7 @@ fn find_replacement_identifier<'a>(
   }
 }
 
-fn combine_namespaces(partial: &StrWrapper, fully_qualified: &StrWrapper) -> StrWrapper {
+fn combine_namespaces(partial: &RcStrWrapper, fully_qualified: &RcStrWrapper) -> RcStrWrapper {
   if fully_qualified.is_empty() || partial.starts_with("$") {
     return partial.clone();
   }
@@ -1818,7 +1818,7 @@ fn get_full_name<'a>(
   e: &'a mut EvalEnv,
   line_info: LineInfo,
   should_find_replacement: bool,
-) -> Result<(StrWrapper, bool), ShardsError> {
+) -> Result<(RcStrWrapper, bool), ShardsError> {
   let (name, is_replacement) = if should_find_replacement {
     if let Some(replacement) = find_replacement_identifier(name, line_info, e)? {
       (replacement, true)
@@ -4083,7 +4083,7 @@ pub fn eval(
 
   let mut parent = EvalEnv::new(None, None, Some(prog as *const Program));
   // add defines
-  let defines: Vec<(StrWrapper, Value)> = defines
+  let defines: Vec<(RcStrWrapper, Value)> = defines
     .iter()
     .map(|(k, v)| {
       (
@@ -4355,50 +4355,50 @@ fn test_combine_namespaces() {
   let partial = "b/var";
   let fully_qualified = "a/b";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("a/b/var"));
+  assert_eq!(result, RcStrWrapper::from("a/b/var"));
 
   let partial = "c/d/e/f";
   let fully_qualified = "a/b";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("a/b/c/d/e/f"));
+  assert_eq!(result, RcStrWrapper::from("a/b/c/d/e/f"));
 
   let partial = "b";
   let fully_qualified = "a";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("a/b"));
+  assert_eq!(result, RcStrWrapper::from("a/b"));
 
   let partial = "x/b";
   let fully_qualified = "a";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("a/x/b"));
+  assert_eq!(result, RcStrWrapper::from("a/x/b"));
 
   let partial = "b";
   let fully_qualified = "a/b";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("a/b/b"));
+  assert_eq!(result, RcStrWrapper::from("a/b/b"));
 
   let partial = "b/b";
   let fully_qualified = "a/b";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("a/b/b"));
+  assert_eq!(result, RcStrWrapper::from("a/b/b"));
 
   let partial = "b";
   let fully_qualified = "";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("b"));
+  assert_eq!(result, RcStrWrapper::from("b"));
 
   let partial = "d/g/p";
   let fully_qualified = "a/b";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("a/b/d/g/p"));
+  assert_eq!(result, RcStrWrapper::from("a/b/d/g/p"));
 
   let partial = "b/f/g";
   let fully_qualified = "a/b/c/d";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("a/b/f/g"));
+  assert_eq!(result, RcStrWrapper::from("a/b/f/g"));
 
   let partial = "b/f/c";
   let fully_qualified = "a/b/c/d";
   let result = combine_namespaces(&partial.into(), &fully_qualified.into());
-  assert_eq!(result, StrWrapper::from("a/b/f/c"));
+  assert_eq!(result, RcStrWrapper::from("a/b/f/c"));
 }

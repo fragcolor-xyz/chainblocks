@@ -6,7 +6,7 @@ use shards_lang::cli::process_args;
 use shards_lang::custom_state::CustomStateContainer;
 use shards_lang::eval::{self, *};
 use shards_lang::read::AST_TYPE;
-use shards_lang::{ast::*, StrWrapper};
+use shards_lang::{ast::*, RcStrWrapper};
 use shards_lang::{print, read};
 use std::collections::HashMap;
 use std::ffi::{c_char, CString};
@@ -136,7 +136,7 @@ pub extern "C" fn shards_forbid_shard(env: *mut EvalEnv, name: SHStringWithLen) 
   let env = unsafe { &mut *env };
   let name: &str = name.into();
   env.forbidden_funcs.insert(Identifier {
-    name: StrWrapper::from(name),
+    name: RcStrWrapper::from(name),
     namespaces: Vec::new(),
     custom_state: CustomStateContainer::new(),
   });
