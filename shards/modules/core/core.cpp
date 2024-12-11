@@ -1569,6 +1569,7 @@ struct Replace {
       } else {
         // not a variable derive type and check input type
         auto derived = deriveTypeInfo(_patterns, data);
+        DEFER(freeTypeInfo(derived));
         if (derived.basicType != SHType::String &&             // must be a string
             !isSequenceOf(CoreInfo::StringType, derived, true) // or a sequence of strings
         ) {
@@ -1588,6 +1589,7 @@ struct Replace {
         }
       } else {
         auto derived = deriveTypeInfo(_replacements, data);
+        DEFER(freeTypeInfo(derived));
         if (derived.basicType != SHType::String && !isSequenceOf(CoreInfo::StringType, derived, true)) {
           throw ComposeError("Replace: Replacements must be a string or a sequence of strings.");
         }

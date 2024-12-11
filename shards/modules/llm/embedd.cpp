@@ -37,6 +37,8 @@ struct ModelData {
 };
 
 struct Model {
+  Model() { _useMmap = Var(true); }
+
   static inline int32_t ObjectId = 'llam';
   static inline const char VariableName[] = "LLM.Model";
   static inline ::shards::Type Type = ::shards::Type::Object(CoreCC, ObjectId);
@@ -49,11 +51,11 @@ struct Model {
   static SHTypesInfo inputTypes() { return shards::CoreInfo::StringType; }
   static SHTypesInfo outputTypes() { return Type; }
 
-  // PARAM_PARAMVAR(_param1, "Param1", "The first parameter", {shards::CoreInfo::IntType, shards::CoreInfo::IntVarType});
-  // PARAM_IMPL(PARAM_IMPL_FOR(_param1));
+  PARAM_PARAMVAR(_useMmap, "UseMmap", "Use mmap to load the model", {shards::CoreInfo::BoolType, shards::CoreInfo::BoolVarType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_useMmap));
 
   void cleanup(SHContext *context) {
-    // PARAM_CLEANUP(context);
+    PARAM_CLEANUP(context);
     if (_data) {
       ObjectVar.Release(_data);
       _data = nullptr;
@@ -61,13 +63,13 @@ struct Model {
   }
 
   void warmup(SHContext *context) {
-    // PARAM_WARMUP(context);
+    PARAM_WARMUP(context);
     _data = ObjectVar.New();
   }
 
   PARAM_REQUIRED_VARIABLES();
   SHTypeInfo compose(SHInstanceData &data) {
-    // PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
     return outputTypes().elements[0];
   }
 
@@ -75,6 +77,7 @@ struct Model {
     auto path = SHSTRING_PREFER_SHSTRVIEW(input);
 
     auto params = llama_model_default_params();
+    params.use_mmap = _useMmap.get().payload.boolValue;
 
     _data->model = std::shared_ptr<llama_model>(llama_load_model_from_file(path.c_str(), params), llama_free_model);
 
