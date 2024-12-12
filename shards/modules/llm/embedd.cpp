@@ -177,6 +177,7 @@ struct Detokenize {
 struct ContextData {
   std::shared_ptr<llama_context> ctx;
   OwnedVar _modelData; // we need to keep a reference to the model data alive
+  std::shared_ptr<std::mutex> _mutex;
 };
 
 struct Context {
@@ -229,7 +230,7 @@ struct Context {
       throw ActivationError("Failed to create context");
     }
     _data->_modelData = input;
-
+    _data->_mutex = std::make_shared<std::mutex>();
     return ObjectVar.Get(_data);
   }
 };
@@ -299,6 +300,8 @@ struct Embed {
 
   SHVar activate(SHContext *context, const SHVar &input) {
     auto &llmContext = varAsObjectChecked<ContextData>(_context.get(), Context::Type);
+
+    std::lock_guard<std::mutex> lock(*llmContext._mutex);
 
     auto nUBatch = llama_n_ubatch(llmContext.ctx.get());
     auto model = llama_get_model(llmContext.ctx.get());

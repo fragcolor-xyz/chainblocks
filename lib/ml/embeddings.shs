@@ -43,28 +43,30 @@
 })
 
 @wire(ml/embed {
-  LLM.Tokenize(ml/embeddings/model) = tokens
-  Count(tokens)
-  If(IsMore(@ml/embeddings/max-tokens) {
-      = num-tokens
-      0 >= processed
-      Sequence(chunks Type: @type([[Type::Float]]))
-      Repeat({
-        ; compute the end index for the current chunk
-        processed | Add(@ml/embeddings/max-tokens) | Min(num-tokens) = slice-end
-        slice-end | WhenNot(IsMore(processed) Return) ; early exit if we've processed all tokens here
-        tokens | Slice(From: processed To: slice-end) = tokens-chunk
-        ; notice we advance by chunk-size, not max-tokens, to leave an overlap
-        processed | Add(@ml/embeddings/chunk-size) > processed
-        
-        tokens-chunk | Do(ml/embed/activate) >> chunks
-      } Until: {processed | IsMoreEqual(num-tokens)})
-      chunks
-    } {
-      tokens | Do(ml/embed/activate) = embeddings
-      [embeddings]
-    }
-  )
+  Await({
+    LLM.Tokenize(ml/embeddings/model) = tokens
+    Count(tokens)
+    If(IsMore(@ml/embeddings/max-tokens) {
+        = num-tokens
+        0 >= processed
+        Sequence(chunks Type: @type([[Type::Float]]))
+        Repeat({
+          ; compute the end index for the current chunk
+          processed | Add(@ml/embeddings/max-tokens) | Min(num-tokens) = slice-end
+          slice-end | WhenNot(IsMore(processed) Return) ; early exit if we've processed all tokens here
+          tokens | Slice(From: processed To: slice-end) = tokens-chunk
+          ; notice we advance by chunk-size, not max-tokens, to leave an overlap
+          processed | Add(@ml/embeddings/chunk-size) > processed
+          
+          tokens-chunk | Do(ml/embed/activate) >> chunks
+        } Until: {processed | IsMoreEqual(num-tokens)})
+        chunks
+      } {
+        tokens | Do(ml/embed/activate) = embeddings
+        [embeddings]
+      }
+    )
+  })
 })
 
 @wire(ml/cosine-similarity {
