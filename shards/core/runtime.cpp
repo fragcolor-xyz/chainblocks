@@ -726,8 +726,17 @@ ALWAYS_INLINE SHWireState shardsActivation(T &shards, SHContext *context, const 
     }
 
     {
-      ZoneScopedNS("activateShard", 0);
+#ifdef TRACY_ENABLE
+#define ZoneNoCallstack(varname, name, active)                                                                               \
+  static constexpr tracy::SourceLocationData TracyConcat(__tracy_source_location, TracyLine){name, TracyFunction, TracyFile, \
+                                                                                             (uint32_t)TracyLine, 0};        \
+  tracy::ScopedZone varname(&TracyConcat(__tracy_source_location, TracyLine), active)
+
+      ZoneNoCallstack(___tracy_scoped_zone, "activateShard", true);
       ZoneName(blk->name(blk), blk->nameLength);
+
+#undef ZoneNoCallstack
+#endif
 
       if (blk->inlineShardId != InlineShard::NotInline) {
         output = activateShardInline(blk, context, *input);
@@ -1768,7 +1777,7 @@ EventDispatcher &getEventDispatcher(const std::string &name) {
 void EventDispatcher::assignType(SHTypeInfo type) {
   if (this->type.basicType != SHType::None) {
     bool matching = matchTypes(type, this->type, false, true, true);
-    if(!matching)
+    if (!matching)
       throw std::runtime_error(fmt::format("Event type mismatch, expected {} got {}", this->type, type));
   } else {
     this->type = type;
@@ -2930,9 +2939,7 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
     sc->removeShard(blk);
   };
 
-  result->referenceWire = [](SHWireRef wire) noexcept {
-    return SHWire::addRef(wire);
-  };
+  result->referenceWire = [](SHWireRef wire) noexcept { return SHWire::addRef(wire); };
 
   result->destroyWire = [](SHWireRef wire) noexcept { SHWire::deleteRef(wire); };
 
