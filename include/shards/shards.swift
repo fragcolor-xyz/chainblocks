@@ -408,6 +408,19 @@ extension SHVar: CustomStringConvertible {
         let buffer = UnsafeBufferPointer(start: stringPtr, count: length).map { UInt8(bitPattern: $0) }
         return String(decoding: buffer, as: UTF8.self)
     }
+    
+    public var bytes: ContiguousArray<UInt8> {
+        assert(type == .Bytes, "Bytes variable expected!")
+        guard let bytesPtr = payload.bytesValue else {
+            return ContiguousArray()
+        }
+        let length = Int(payload.bytesSize)
+        guard length > 0 else {
+            return ContiguousArray()
+        }
+        let buffer = UnsafeBufferPointer(start: bytesPtr, count: length)
+        return ContiguousArray(buffer)
+    }
 
     init(value: ShardPtr) {
         var v = SHVar()
@@ -497,6 +510,11 @@ class OwnedVar {
         v = SHVar()
         set(string: string)
     }
+    
+    init(bytes: ContiguousArray<UInt8>) {
+        v = SHVar()
+        set(bytes: bytes)
+    }
 
     deinit {
         withUnsafeMutablePointer(to: &v) { ptr in
@@ -517,6 +535,17 @@ class OwnedVar {
             tmp.payload.stringValue = cString
             let length = string.lengthOfBytes(using: .utf8)
             tmp.payload.stringLen = UInt32(length)
+            G.Core.pointee.cloneVar(&v, &tmp)
+        }
+    }
+    
+    func set(bytes: ContiguousArray<UInt8>) {
+        bytes.withUnsafeBufferPointer { buffer in
+            let length = buffer.count
+            var tmp = SHVar()
+            tmp.valueType = VarType.Bytes.asSHType()
+            tmp.payload.bytesValue = UnsafeMutablePointer(mutating: buffer.baseAddress)
+            tmp.payload.bytesSize = UInt32(length)
             G.Core.pointee.cloneVar(&v, &tmp)
         }
     }
