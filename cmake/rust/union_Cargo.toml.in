@@ -4,13 +4,9 @@
 name = "${CARGO_CRATE_NAME}"
 version = "${CARGO_CRATE_VERSION}"
 edition = "2021"
-
-[features]
-tracy = ["tracy-client"]
  
 [dependencies]
 ${CARGO_CRATE_DEPS} 
-tracy-client = { version = "0.17.4", optional = true }
 
 [patch.crates-io]
 chrono = { git = "https://github.com/shards-lang/chrono", rev = "5aaf74235778120b5984b46ced47478c1431d9a0" }

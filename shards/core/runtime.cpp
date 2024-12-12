@@ -218,6 +218,7 @@ std::vector<SHWire *> &getCoroWireStack2() {
 
 extern void registerModuleShards(SHCore *core);
 void registerShards() {
+  ZoneScoped;
   SHLOG_DEBUG("Registering shards");
 
   // at this point we might have some auto magical static linked shard already
@@ -725,8 +726,17 @@ ALWAYS_INLINE SHWireState shardsActivation(T &shards, SHContext *context, const 
     }
 
     {
-      ZoneScopedN("activateShard");
+#ifdef TRACY_ENABLE
+#define ZoneNoCallstack(varname, name, active)                                                                               \
+  static constexpr tracy::SourceLocationData TracyConcat(__tracy_source_location, TracyLine){name, TracyFunction, TracyFile, \
+                                                                                             (uint32_t)TracyLine, 0};        \
+  tracy::ScopedZone varname(&TracyConcat(__tracy_source_location, TracyLine), active)
+
+      ZoneNoCallstack(___tracy_scoped_zone, "activateShard", true);
       ZoneName(blk->name(blk), blk->nameLength);
+
+#undef ZoneNoCallstack
+#endif
 
       if (blk->inlineShardId != InlineShard::NotInline) {
         output = activateShardInline(blk, context, *input);
@@ -1764,6 +1774,16 @@ EventDispatcher &getEventDispatcher(const std::string &name) {
   }
 }
 
+void EventDispatcher::assignType(SHTypeInfo type) {
+  if (this->type.basicType != SHType::None) {
+    bool matching = matchTypes(type, this->type, false, true, true);
+    if (!matching)
+      throw std::runtime_error(fmt::format("Event type mismatch, expected {} got {}", this->type, type));
+  } else {
+    this->type = type;
+  }
+}
+
 NO_INLINE void _destroyVarSlow(SHVar &var) {
   switch (var.valueType) {
   case SHType::String:
@@ -2487,6 +2507,8 @@ void shInit() {
     return;
   globalInitDone = true;
 
+  ZoneScopedN("shInit");
+
   // read env var for log file
   auto logFile = std::getenv("SHARDS_LOG_FILE");
   if (logFile) {
@@ -2917,9 +2939,7 @@ SHCore *__cdecl shardsInterface(uint32_t abi_version) {
     sc->removeShard(blk);
   };
 
-  result->referenceWire = [](SHWireRef wire) noexcept {
-    return SHWire::addRef(wire);
-  };
+  result->referenceWire = [](SHWireRef wire) noexcept { return SHWire::addRef(wire); };
 
   result->destroyWire = [](SHWireRef wire) noexcept { SHWire::deleteRef(wire); };
 

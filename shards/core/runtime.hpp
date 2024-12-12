@@ -67,7 +67,7 @@ const unsigned __tsan_switch_to_fiber_no_sync = 1 << 0;
     if (!getCoroWireStack2().empty()) {  \
       TracyFiberLeave;                   \
     }                                    \
-    TracyFiberEnter(wire->name.c_str()); \
+    TracyFiberEnter(wire->getTracyFiberName()); \
     getCoroWireStack2().push_back(wire); \
   }
 #define TSANCoroExit(wire)                                       \
@@ -75,7 +75,7 @@ const unsigned __tsan_switch_to_fiber_no_sync = 1 << 0;
     getCoroWireStack2().pop_back();                              \
     TracyFiberLeave;                                             \
     if (!getCoroWireStack2().empty()) {                          \
-      TracyFiberEnter(getCoroWireStack2().back()->name.c_str()); \
+      TracyFiberEnter(getCoroWireStack2().back()->getTracyFiberName()); \
     }                                                            \
   }
 #else

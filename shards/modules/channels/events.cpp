@@ -38,16 +38,8 @@ struct Send : Base {
     Base::compose(data);
 
     // when we send we store the type of the event
-    auto currentType = (*_dispatcher).get().type;
-    if (currentType.basicType != SHType::None) {
-      if (!matchTypes(data.inputType, currentType, false, true, true)) {
-        SHLOG_ERROR("Event type mismatch, expected {} got {}", currentType, data.inputType);
-        throw ComposeError("Event type mismatch");
-      }
-    } else {
-      // we store the type of the event
-      (*_dispatcher).get().type = data.inputType;
-    }
+    // we store the type of the event
+    (*_dispatcher).get().assignType(data.inputType);
 
     return data.inputType;
   }
@@ -104,7 +96,7 @@ struct Receive : Base {
     Base::compose(data);
 
     // prevent none
-    auto currentType = (*_dispatcher).get().type;
+    auto currentType = (*_dispatcher).get().getType();
     if (currentType.basicType == SHType::None) {
       SHLOG_ERROR("Event type not set for event: {}, use Events.Send first", _eventName);
       throw ComposeError("Event type not set");
