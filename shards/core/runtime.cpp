@@ -662,11 +662,17 @@ ALWAYS_INLINE bool is_stack_within_limit(volatile void *stack_start_address, siz
   uintptr_t start_address = reinterpret_cast<uintptr_t>(stack_start_address);
 
   // Calculate the approximate stack size
-  size_t stack_size =
-      (start_address > local_var_address) ? (start_address - local_var_address) : (local_var_address - start_address);
+  size_t stack_size;
+#ifdef EMSCRIPTEN
+  // Emscripten stack grows upward
+  stack_size = local_var_address - start_address;
+#else
+  // Normal stack grows downward
+  stack_size = start_address - local_var_address;
+#endif
 
   // Adjust hard max to accommodate recursion buffer
-  size_t adjusted_max = (hard_max > recursion_buffer) ? (hard_max - recursion_buffer) : 0;
+  size_t adjusted_max = hard_max - recursion_buffer;
 
   return stack_size <= adjusted_max;
 }

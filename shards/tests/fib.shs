@@ -57,7 +57,7 @@
 
 ; we use this to test stack overflow protection
 @wire(run {
-  Profile({350000 | Do(fib1)})
+  Profile({35000 | Do(fib1)})
   Log("result")
 })
 

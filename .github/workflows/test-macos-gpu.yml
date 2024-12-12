@@ -125,7 +125,7 @@ jobs:
           build/shards new shards/tests/ml.shs
 
           echo "Running Stack overflow test"
-          build/shards new shards/tests/fib.shs
+          LOG_shards=trace build/shards new shards/tests/fib.shs
 
           echo "Running ML embeddings test"
           build/shards new lib/ml/test.shs
