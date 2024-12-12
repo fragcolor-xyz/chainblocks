@@ -11,7 +11,7 @@
   {Tensor.ToString | Log}
 
   [1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0]
-  Tensor(Shape: [2 2 2] Type: TensorType::F32 GPU: true) | Tensor.ToString | Log("GPU")
+  Tensor(Shape: [2 2 2] Type: TensorType::F32) | Tensor.ToString | Log("GPU")
 
   [2 2 2] = shape
   Maybe({; this one will fail
