@@ -408,6 +408,19 @@ extension SHVar: CustomStringConvertible {
         let buffer = UnsafeBufferPointer(start: stringPtr, count: length).map { UInt8(bitPattern: $0) }
         return String(decoding: buffer, as: UTF8.self)
     }
+    
+    public var bytes: ContiguousArray<UInt8> {
+        assert(type == .Bytes, "Bytes variable expected!")
+        guard let bytesPtr = payload.bytesValue else {
+            return ContiguousArray()
+        }
+        let length = Int(payload.bytesSize)
+        guard length > 0 else {
+            return ContiguousArray()
+        }
+        let buffer = UnsafeBufferPointer(start: bytesPtr, count: length)
+        return ContiguousArray(buffer)
+    }
 
     init(value: ShardPtr) {
         var v = SHVar()
@@ -497,6 +510,11 @@ class OwnedVar {
         v = SHVar()
         set(string: string)
     }
+    
+    init(bytes: ContiguousArray<UInt8>) {
+        v = SHVar()
+        set(bytes: bytes)
+    }
 
     deinit {
         withUnsafeMutablePointer(to: &v) { ptr in
@@ -517,6 +535,17 @@ class OwnedVar {
             tmp.payload.stringValue = cString
             let length = string.lengthOfBytes(using: .utf8)
             tmp.payload.stringLen = UInt32(length)
+            G.Core.pointee.cloneVar(&v, &tmp)
+        }
+    }
+    
+    func set(bytes: ContiguousArray<UInt8>) {
+        bytes.withUnsafeBufferPointer { buffer in
+            let length = buffer.count
+            var tmp = SHVar()
+            tmp.valueType = VarType.Bytes.asSHType()
+            tmp.payload.bytesValue = UnsafeMutablePointer(mutating: buffer.baseAddress)
+            tmp.payload.bytesSize = UInt32(length)
             G.Core.pointee.cloneVar(&v, &tmp)
         }
     }
@@ -1191,7 +1220,7 @@ class WireController {
     }
 
     init(native: SHWireRef) {
-        nativeRef = native
+        nativeRef = G.Core.pointee.referenceWire(native)
     }
 
     convenience init(shards: [ShardController]) {
@@ -1378,31 +1407,35 @@ class Shards {
         let basePathStr = SwiftSWL(basePath)
 
         // Read the AST
-        var ast = G.Core.pointee.read(nameStr.asSHStringWithLen(), codeStr.asSHStringWithLen(), basePathStr.asSHStringWithLen(), nil, 0)
+        let ast = G.Core.pointee.read(nameStr.asSHStringWithLen(), codeStr.asSHStringWithLen(), basePathStr.asSHStringWithLen(), nil, 0)
         guard ast.error == nil else {
+            G.Core.pointee.freeError(ast.error)
             return nil
         }
+        // ast will have refcount of 0, need to bump it with a clone
+        let astOwned = OwnedVar(cloning: ast.ast)
 
         // Create evaluation environment
         let emptyStr = SHStringWithLen.fromStatic("")
         let env = G.Core.pointee.createEvalEnv(emptyStr)
 
         // Evaluate the AST
-        let error = G.Core.pointee.eval(env, &ast.ast) // consumes ast
+        let error = G.Core.pointee.eval(env, &astOwned.v) // consumes ast
         guard error == nil else {
             G.Core.pointee.freeEvalEnv(env)
             return nil
         }
 
         // Transform environment into a wire
-        var wire = G.Core.pointee.transformEnv(env, nameStr.asSHStringWithLen()) // consumes env
+        let wire = G.Core.pointee.transformEnv(env, nameStr.asSHStringWithLen()) // consumes env
         guard wire.error == nil else {
-            G.Core.pointee.freeWire(&wire)
+            G.Core.pointee.freeWire(wire)
             return nil
         }
 
         // Create WireController from the resulting wire
         let wireController = WireController(native: wire.wire.pointee!)
+        G.Core.pointee.freeWire(wire)
         return wireController
     }
 
@@ -1411,33 +1444,37 @@ class Shards {
         let nameStr = SwiftSWL(name)
 
         // Read the AST
-        var ast = ast.withUnsafeBufferPointer { buffer in
+        let ast = ast.withUnsafeBufferPointer { buffer in
             G.Core.pointee.loadAst(buffer.baseAddress!, UInt32(buffer.count))
         }
         guard ast.error == nil else {
+            G.Core.pointee.freeError(ast.error)
             return nil
         }
+        // ast will have refcount of 0, need to bump it with a clone
+        let astOwned = OwnedVar(cloning: ast.ast)
 
         // Create evaluation environment
         let emptyStr = SHStringWithLen.fromStatic("")
         let env = G.Core.pointee.createEvalEnv(emptyStr)
 
         // Evaluate the AST
-        let error = G.Core.pointee.eval(env, &ast.ast) // consumes ast
+        let error = G.Core.pointee.eval(env, &astOwned.v) // consumes ast
         guard error == nil else {
             G.Core.pointee.freeEvalEnv(env)
             return nil
         }
 
         // Transform environment into a wire
-        var wire = G.Core.pointee.transformEnv(env, nameStr.asSHStringWithLen()) // consumes env
+        let wire = G.Core.pointee.transformEnv(env, nameStr.asSHStringWithLen()) // consumes env
         guard wire.error == nil else {
-            G.Core.pointee.freeWire(&wire)
+            G.Core.pointee.freeWire(wire)
             return nil
         }
 
         // Create WireController from the resulting wire
         let wireController = WireController(native: wire.wire.pointee!)
+        G.Core.pointee.freeWire(wire)
         return wireController
     }
     

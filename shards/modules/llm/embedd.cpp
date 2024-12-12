@@ -174,16 +174,76 @@ struct Detokenize {
   }
 };
 
+struct ContextData {
+  std::shared_ptr<llama_context> ctx;
+  OwnedVar _modelData; // we need to keep a reference to the model data alive
+};
+
+struct Context {
+  static inline int32_t ObjectId = 'llmc';
+  static inline const char VariableName[] = "LLM.Context";
+  static inline ::shards::Type Type = ::shards::Type::Object(CoreCC, ObjectId);
+  static inline SHTypeInfo RawType = Type;
+  static inline ::shards::Type VarType = ::shards::Type::VariableOf(Type);
+  static inline shards::ObjectVar<ContextData> ObjectVar{VariableName, RawType.object.vendorId, RawType.object.typeId};
+
+  static SHTypesInfo inputTypes() { return Model::Type; }
+  static SHTypesInfo outputTypes() { return Type; }
+
+  Context() { _embeddings = Var(false); }
+
+  PARAM_PARAMVAR(_embeddings, "Embeddings", "Enable embeddings mode",
+                 {shards::CoreInfo::BoolType, shards::CoreInfo::BoolVarType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_embeddings));
+
+  ContextData *_data{};
+
+  void cleanup(SHContext *context) {
+    PARAM_CLEANUP(context);
+    if (_data) {
+      ObjectVar.Release(_data);
+      _data = nullptr;
+    }
+  }
+
+  void warmup(SHContext *context) {
+    PARAM_WARMUP(context);
+    _data = ObjectVar.New();
+  }
+
+  PARAM_REQUIRED_VARIABLES();
+  SHTypeInfo compose(SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return outputTypes().elements[0];
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    auto &data = varAsObjectChecked<ModelData>(input, Model::Type);
+    auto model = data.model.get();
+
+    auto ctx_params = llama_context_default_params();
+    ctx_params.embeddings = _embeddings.get().payload.boolValue;
+
+    _data->ctx = std::shared_ptr<llama_context>(llama_new_context_with_model(model, ctx_params), llama_free);
+    if (!_data->ctx) {
+      throw ActivationError("Failed to create context");
+    }
+    _data->_modelData = input;
+
+    return ObjectVar.Get(_data);
+  }
+};
+
 struct Embed {
   static SHTypesInfo inputTypes() { return shards::CoreInfo::IntSeqType; }
   static SHTypesInfo outputTypes() { return shards::CoreInfo::FloatSeqType; }
 
   Embed() { _norm = Var(-1); }
 
-  PARAM_PARAMVAR(_model, "Model", "The model to use", {Model::VarType});
+  PARAM_PARAMVAR(_context, "Context", "The LLM context to use", {Context::VarType});
   PARAM_PARAMVAR(_norm, "Normalization", "Normalization type: -1=none, 0=max_abs, 2=euclidean, >2=p-norm",
                  {shards::CoreInfo::IntType});
-  PARAM_IMPL(PARAM_IMPL_FOR(_model), PARAM_IMPL_FOR(_norm));
+  PARAM_IMPL(PARAM_IMPL_FOR(_context), PARAM_IMPL_FOR(_norm));
 
   static void normalize_embeddings(const float *inp, float *out, int n, int embd_norm) {
     double sum = 0.0;
@@ -223,10 +283,6 @@ struct Embed {
   void cleanup(SHContext *context) {
     PARAM_CLEANUP(context);
     _embeddings = {};
-    _ctx = {};
-    llama_batch_free(_batch);
-    _batch = {};
-    _prevModel = {};
     _normalized_buffer = {};
   }
 
@@ -241,39 +297,17 @@ struct Embed {
   SeqVar _embeddings;
   std::vector<float> _normalized_buffer;
 
-  std::shared_ptr<llama_context> _ctx;
-  int32_t _nEmbd = 0;
-  int32_t _nUBatch = 0;
-  SHVar _prevModel{};
-  llama_batch _batch;
-
   SHVar activate(SHContext *context, const SHVar &input) {
-    auto dataVar = _model.get();
-    if (dataVar != _prevModel) {
-      _ctx = {};
-      llama_batch_free(_batch);
-      _batch = {};
-      _prevModel = dataVar;
-      auto &data = varAsObjectChecked<ModelData>(dataVar, Model::Type);
-      auto model = data.model.get();
+    auto &llmContext = varAsObjectChecked<ContextData>(_context.get(), Context::Type);
 
-      if (llama_model_has_decoder(model) && llama_model_has_encoder(model)) {
-        throw ActivationError("Model has both encoder and decoder, cannot embed");
-      }
+    auto nUBatch = llama_n_ubatch(llmContext.ctx.get());
+    auto model = llama_get_model(llmContext.ctx.get());
+    auto nEmbd = llama_n_embd(model);
+    auto batch = llama_batch_init(nUBatch, 0, 1);
+    DEFER(llama_batch_free(batch));
 
-      auto ctx_params = llama_context_default_params();
-      ctx_params.embeddings = true;
-      _ctx = std::shared_ptr<llama_context>(llama_new_context_with_model(model, ctx_params), llama_free);
-      if (!_ctx) {
-        throw ActivationError("Failed to create context for embedding");
-      }
-      _nEmbd = llama_n_embd(model);
-      _nUBatch = llama_n_ubatch(_ctx.get());
-      _batch = llama_batch_init(_nUBatch, 0, 1);
-    }
-
-    if (input.payload.seqValue.len > uint32_t(_nUBatch)) {
-      throw ActivationError(fmt::format("Input sequence is too long, maximum length is {}", _nUBatch));
+    if (input.payload.seqValue.len > uint32_t(nUBatch)) {
+      throw ActivationError(fmt::format("Input sequence is too long, maximum length is {}", nUBatch));
     }
 
     std::vector<llama_token> tokens;
@@ -282,71 +316,70 @@ struct Embed {
     }
 
     for (size_t i = 0; i < tokens.size(); i++) {
-      _batch.token[i] = tokens[i];
-      _batch.pos[i] = i;
-      _batch.seq_id[i][0] = 0;
-      _batch.n_seq_id[i] = 1;
-      _batch.logits[i] = true; // Enable logits for all tokens to get embeddings
+      batch.token[i] = tokens[i];
+      batch.pos[i] = i;
+      batch.seq_id[i][0] = 0;
+      batch.n_seq_id[i] = 1;
+      batch.logits[i] = true; // Enable logits for all tokens to get embeddings
     }
-    _batch.n_tokens = tokens.size();
+    batch.n_tokens = tokens.size();
 
-    llama_kv_cache_clear(_ctx.get());
+    llama_kv_cache_clear(llmContext.ctx.get());
 
-    auto model = llama_get_model(_ctx.get());
     if (llama_model_has_encoder(model)) {
-      if (llama_encode(_ctx.get(), _batch) < 0) {
+      if (llama_encode(llmContext.ctx.get(), batch) < 0) {
         throw ActivationError("Failed to encode input");
       }
     } else {
-      if (llama_decode(_ctx.get(), _batch) < 0) {
+      if (llama_decode(llmContext.ctx.get(), batch) < 0) {
         throw ActivationError("Failed to decode input");
       }
     }
 
     _embeddings.clear();
-    _normalized_buffer.resize(_nEmbd);
+    _normalized_buffer.resize(nEmbd);
 
-    auto pooling_type = llama_pooling_type(_ctx.get());
+    auto pooling_type = llama_pooling_type(llmContext.ctx.get());
     std::set<int> processed_seq_ids;
 
-    for (int i = 0; i < _batch.n_tokens; i++) {
-      if (!_batch.logits[i]) {
+    for (int i = 0; i < batch.n_tokens; i++) {
+      if (!batch.logits[i]) {
         continue;
       }
 
       const float *embd = nullptr;
 
       if (pooling_type == LLAMA_POOLING_TYPE_NONE) {
-        embd = llama_get_embeddings_ith(_ctx.get(), i);
+        embd = llama_get_embeddings_ith(llmContext.ctx.get(), i);
         if (!embd) {
           throw ActivationError("Failed to get token embeddings for position " + std::to_string(i));
         }
 
         // Normalize and add token embedding
-        normalize_embeddings(embd, _normalized_buffer.data(), _nEmbd, _norm.get().payload.intValue);
-        for (int j = 0; j < _nEmbd; j++) {
+        normalize_embeddings(embd, _normalized_buffer.data(), nEmbd, _norm.get().payload.intValue);
+        for (int j = 0; j < nEmbd; j++) {
           _embeddings.push_back(Var(_normalized_buffer[j]));
         }
       } else {
         // For sequence embeddings, only process each sequence ID once
-        int seq_id = _batch.seq_id[i][0];
+        int seq_id = batch.seq_id[i][0];
         if (processed_seq_ids.find(seq_id) != processed_seq_ids.end()) {
           continue;
         }
 
-        embd = llama_get_embeddings_seq(_ctx.get(), seq_id);
+        embd = llama_get_embeddings_seq(llmContext.ctx.get(), seq_id);
         if (!embd) {
           throw ActivationError("Failed to get sequence embeddings for seq_id " + std::to_string(seq_id));
         }
 
         // Normalize embeddings before adding them
-        normalize_embeddings(embd, _normalized_buffer.data(), pooling_type == LLAMA_POOLING_TYPE_RANK ? 1 : _nEmbd,
+        normalize_embeddings(embd, _normalized_buffer.data(), pooling_type == LLAMA_POOLING_TYPE_RANK ? 1 : nEmbd,
                              _norm.get().payload.intValue);
 
         if (pooling_type == LLAMA_POOLING_TYPE_RANK) {
           _embeddings.push_back(Var(_normalized_buffer[0]));
         } else {
-          for (int j = 0; j < _nEmbd; j++) {
+          for (int j = 0; j < nEmbd; j++) {
             _embeddings.push_back(Var(_normalized_buffer[j]));
           }
         }
@@ -366,6 +399,7 @@ struct Embed {
 
 SHARDS_REGISTER_FN(llm) {
   REGISTER_SHARD("LLM.Model", llm::Model);
+  REGISTER_SHARD("LLM.Context", llm::Context);
   REGISTER_SHARD("LLM.Tokenize", llm::Tokenize);
   REGISTER_SHARD("LLM.Detokenize", llm::Detokenize);
   REGISTER_SHARD("LLM.Embed", llm::Embed);

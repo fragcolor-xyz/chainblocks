@@ -16,20 +16,30 @@
 })
 
 @wire(ml/embeddings/load {
-  Do(ml/embeddings/download-deps) | Await(LLM.Model(UseMmap: false)) ; small model, keep in RAM
+  Do(ml/embeddings/download-deps)
+  Await({
+    LLM.Model(UseMmap: false) = model ; small model, keep in RAM
+    LLM.Context(Embeddings: true) = context
+  })
+  {
+    model: model
+    context: context
+  }
 } Pure: true)
 
 @define(ml/embeddings/prepare {
   Once({
     Msg("Loading embeddings model...")
     Detach(ml/embeddings/load) ; this allows us to Stop/Cleanup md/load once everything is loaded
-    Wait(ml/embeddings/load) = ml/embeddings/model
+    Wait(ml/embeddings/load)
+    {Take("model") = ml/embeddings/model}
+    {Take("context") = ml/embeddings/context}
   })
 })
 
 @wire(ml/embed/activate {
   ; share a wire, to allocate just one context
-  LLM.Embed(ml/embeddings/model 2)
+  LLM.Embed(ml/embeddings/context 2)
 })
 
 @wire(ml/embed {

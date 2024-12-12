@@ -5,7 +5,7 @@ use core::{fmt, hash::Hash};
 use pest::Position;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use shards::{
-  types::Var, SHType_Bool, SHType_Bytes, SHType_Float, SHType_Int, SHType_None, SHType_String,
+  shlog_debug, types::Var, SHType_Bool, SHType_Bytes, SHType_Float, SHType_Int, SHType_None, SHType_String
 };
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hasher};
 

@@ -1338,7 +1338,7 @@ impl<'e> VariableResolver<'e> {
             .ok_or((format!("Enum {} not found", prefix), line_info).into())?; // should be valid enum
           for i in 0..info.labels.len {
             let c_str = unsafe { CStr::from_ptr(*info.labels.elements.offset(i as isize)) };
-            if value == c_str.to_str().unwrap() {
+            if value.as_str() == c_str.to_str().unwrap() {
               // should be valid utf8
               // we found the enum value
               let mut enum_var = Var::default();
@@ -1381,12 +1381,12 @@ impl<'e> VariableResolver<'e> {
       },
       Value::String(ref s) => {
         let s = Var::ephemeral_string(s.as_str());
-        Ok(ResolvedVar::new_const(SVar::NotCloned(s)))
+        Ok(ResolvedVar::new_const(SVar::Cloned(s.into())))
       }
       Value::Bytes(ref b) => {
         let bytes = b.0.as_ref();
         let bytes = Var::ephemeral_slice(bytes);
-        Ok(ResolvedVar::new_const(SVar::NotCloned(bytes.into())))
+        Ok(ResolvedVar::new_const(SVar::Cloned(bytes.into())))
       }
       Value::Float2(ref val) => Ok(ResolvedVar::new_const(SVar::NotCloned(val.into()))),
       Value::Float3(ref val) => Ok(ResolvedVar::new_const(SVar::NotCloned(val.into()))),
@@ -1665,8 +1665,8 @@ impl<'e> VariableResolver<'e> {
             self.e,
           )
           .map(ResolvedVar::new_const),
-          ("platform", true) => Ok(ResolvedVar::new_const(SVar::NotCloned(
-            process_platform_built_in(),
+          ("platform", true) => Ok(ResolvedVar::new_const(SVar::Cloned(
+            process_platform_built_in().into(),
           ))),
           ("type", true) => process_type(func, line_info, self.e).map(ResolvedVar::new_const),
           ("ast", true) => process_ast(func, line_info, self.e).map(ResolvedVar::new_const),
@@ -1789,7 +1789,7 @@ fn qualify_variable(
   } else {
     let mut s = Var::ephemeral_string(full_name.as_str());
     s.valueType = SHType_ContextVar;
-    Ok(SVar::NotCloned(s))
+    Ok(SVar::Cloned(s.into()))
   }
 }
 
@@ -2140,7 +2140,7 @@ fn process_type_enum(value: &Value, line_info: LineInfo) -> Result<SVar, ShardsE
     Value::Enum(prefix, value) => (prefix, value),
     _ => return Err(("Type Enum parameter must be an Enum", line_info).into()),
   };
-  if prefix == "Type" {
+  if prefix.as_str() == "Type" {
     match value.as_str() {
       "None" => Ok(SVar::Cloned(ClonedVar::from(common_type::none))),
       "Any" => Ok(SVar::Cloned(ClonedVar::from(common_type::any))),
