@@ -726,7 +726,7 @@ ALWAYS_INLINE SHWireState shardsActivation(T &shards, SHContext *context, const 
     }
 
     {
-      ZoneScopedN("activateShard");
+      ZoneScopedNS("activateShard", 0);
       ZoneName(blk->name(blk), blk->nameLength);
 
       if (blk->inlineShardId != InlineShard::NotInline) {
@@ -1762,6 +1762,16 @@ EventDispatcher &getEventDispatcher(const std::string &name) {
     return result;
   } else {
     return it->second;
+  }
+}
+
+void EventDispatcher::assignType(SHTypeInfo type) {
+  if (this->type.basicType != SHType::None) {
+    bool matching = matchTypes(type, this->type, false, true, true);
+    if(!matching)
+      throw std::runtime_error(fmt::format("Event type mismatch, expected {} got {}", this->type, type));
+  } else {
+    this->type = type;
   }
 }
 

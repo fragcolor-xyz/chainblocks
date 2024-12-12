@@ -709,9 +709,13 @@ using SHMapIt = SHMap::iterator;
 struct EventDispatcher {
   entt::dispatcher dispatcher;
   std::string name;
-  SHTypeInfo type;
 
   entt::dispatcher *operator->() { return &dispatcher; }
+  SHTypeInfo getType() const { return type; }
+  void assignType(SHTypeInfo type);
+
+private:
+  SHTypeInfo type;
 };
 
 struct CrashHandlerBase {
