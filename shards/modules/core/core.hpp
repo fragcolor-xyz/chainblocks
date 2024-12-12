@@ -1280,7 +1280,11 @@ struct Set : public SetUpdateBase {
   }
 
   void warmup(SHContext *context) {
-    SetBase::warmup(context);
+    if (_global)
+      _target = referenceGlobalVariable(context, _name.c_str());
+    else
+      _target = referenceWireVariable(context->currentWire(), _name.c_str());
+    _key.warmup(context);
 
     shassert_extended(context, _self && "Self should be valid at this point");
 
