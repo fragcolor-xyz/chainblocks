@@ -1159,7 +1159,7 @@ TEST_CASE("Number Types") {
     float float2v0[2] = {1.f, 2.f};
     float float2v1[2] = {0};
 
-    std::vector<Var> vec{Var(3) };
+    std::vector<Var> vec{Var(3)};
     Var seq = Var(vec);
 
     // Should return false
@@ -1359,7 +1359,7 @@ TEST_CASE("Function") {
     auto mesh = SHMesh::make();                                             \
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));                    \
     mesh->tick();                                                           \
-    shards_free_wire(wire.wire);                                            \
+    shards_free_wire(wire);                                                 \
   }
 
 #define TEST_EVAL_ERROR_CASE(testName, code, expectedErrorMessage)          \
@@ -1405,7 +1405,7 @@ TEST_CASE("shards-lang") {
     REQUIRE(ast.valueType == SHType::Object);
     auto wire = shards_eval(&ast, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1419,7 +1419,7 @@ TEST_CASE("shards-lang") {
     REQUIRE(ast.valueType == SHType::Object);
     auto wire = shards_eval(&ast, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1445,7 +1445,7 @@ TEST_CASE("shards-lang") {
     REQUIRE(ast.valueType == SHType::Object);
     auto wire = shards_eval(&ast, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1458,7 +1458,7 @@ TEST_CASE("shards-lang") {
     REQUIRE(ast.valueType == SHType::Object);
     auto wire = shards_eval(&ast, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1489,7 +1489,7 @@ TEST_CASE("shards-lang") {
 
     auto wire = shards_transform_envs(&envs[0], 2, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1536,7 +1536,7 @@ TEST_CASE("shards-lang") {
 
     auto wire = shards_transform_envs(&envs[0], 4, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1554,7 +1554,7 @@ TEST_CASE("shards-lang") {
     REQUIRE(ast.valueType == SHType::Object);
     auto wire = shards_eval(&ast, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     auto pWire = SHWire::sharedFromRef(*(wire.wire));
     mesh->schedule(pWire);
@@ -1575,7 +1575,7 @@ TEST_CASE("shards-lang") {
     REQUIRE(ast.valueType == SHType::Object);
     auto wire = shards_eval(&ast, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1595,7 +1595,7 @@ TEST_CASE("shards-lang") {
     REQUIRE(ast.valueType == SHType::Object);
     auto wire = shards_eval(&ast, SHStringWithLen{"root", strlen("root")});
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1620,7 +1620,7 @@ TEST_CASE("shards-lang") {
     auto wire = shards_eval(&ast, SHStringWithLen{"root", strlen("root")});
 
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1641,7 +1641,7 @@ TEST_CASE("shards-lang") {
     auto wire = shards_eval(&ast, SHStringWithLen{"root", strlen("root")});
 
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1674,7 +1674,7 @@ TEST_CASE("shards-lang") {
 
     auto wire = shards_transform_env(env, "x"_swl);
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -1706,7 +1706,7 @@ TEST_CASE("shards-lang") {
 
     auto wire = shards_transform_env(env, "x"_swl);
     REQUIRE(wire.wire);
-    DEFER(shards_free_wire(wire.wire));
+    DEFER(shards_free_wire(wire));
     auto mesh = SHMesh::make();
     mesh->schedule(SHWire::sharedFromRef(*(wire.wire)));
     mesh->tick();
@@ -2066,10 +2066,7 @@ TEST_CASE("WireDoppelgangerPool acquire and release", "[WireDoppelgangerPool]") 
 
 TEST_CASE("Mesh-schedule-wire-running") {
   auto mesh = SHMesh::make();
-  std::shared_ptr<SHWire> wire = Wire("main")
-                                     .looped(false)
-                                     .let(Var("Hello"))
-                                     .shard("Log");
+  std::shared_ptr<SHWire> wire = Wire("main").looped(false).let(Var("Hello")).shard("Log");
 
   mesh->schedule(wire);
   REQUIRE(shards::isRunning(wire.get()));
@@ -2116,7 +2113,6 @@ TEST_CASE("Mesh restart wire") {
   REQUIRE(v.payload.intValue == 3);
   REQUIRE(mesh->scheduledSetCount() == 1);
   REQUIRE(mesh->scheduledCount() == 1);
-
 
   mesh->tick();
   REQUIRE(v.payload.intValue == 4);
