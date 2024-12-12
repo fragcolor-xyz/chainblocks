@@ -19,6 +19,7 @@
 #include "type_matcher.hpp"
 #include "type_info.hpp"
 #include "trait.hpp"
+#include <shards/fast_string/fast_string.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -470,6 +471,17 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
     return wire;
   }
 
+  const char *getTracyFiberName() {
+#if TRACY_FIBERS
+    if (tracyFiberName.empty()) {
+      tracyFiberName = shards::fast_string::FastString(name);
+    }
+    return tracyFiberName.c_str();
+#else
+    return name.c_str();
+#endif
+  }
+
   // regenerate the id, SHMesh uses flat_set which is sorted by id
   // this allows us to regenerate when acquiring from pools in order to keep adding new wires at the end of the list
   uint64_t regenerateId() { return uniqueId = idCounter.fetch_add(1); }
@@ -495,6 +507,10 @@ private:
 
   uint64_t uniqueId;
   static inline std::atomic_uint64_t idCounter{0};
+
+#if TRACY_FIBERS
+  shards::fast_string::FastString tracyFiberName;
+#endif
 };
 
 namespace shards {

@@ -218,6 +218,7 @@ std::vector<SHWire *> &getCoroWireStack2() {
 
 extern void registerModuleShards(SHCore *core);
 void registerShards() {
+  ZoneScoped;
   SHLOG_DEBUG("Registering shards");
 
   // at this point we might have some auto magical static linked shard already
@@ -2486,6 +2487,8 @@ void shInit() {
   if (globalInitDone)
     return;
   globalInitDone = true;
+
+  ZoneScopedN("shInit");
 
   // read env var for log file
   auto logFile = std::getenv("SHARDS_LOG_FILE");

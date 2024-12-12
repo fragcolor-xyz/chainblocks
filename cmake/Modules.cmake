@@ -257,10 +257,6 @@ function(shards_generate_rust_union TARGET_NAME)
 
     unset(ENABLED_FEATURES)
 
-    if(TRACY_ENABLE)
-      list(APPEND ENABLED_FEATURES "tracy")
-    endif()
-
     # Add the rust library
     add_rust_library(NAME ${TARGET_NAME}
       PROJECT_PATH ${GEN_RUST_PATH}

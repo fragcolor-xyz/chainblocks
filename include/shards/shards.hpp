@@ -15,7 +15,7 @@
 #include <optional>
 #include <cstdint>
 
-//entt\meta\meta.hpp:768:10: note: 'meta_prop' has been explicitly marked deprecated here
+// entt\meta\meta.hpp:768:10: note: 'meta_prop' has been explicitly marked deprecated here
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #define ENTT_ID_TYPE std::uint64_t
@@ -28,27 +28,27 @@
 // profiler, will be empty macros if not enabled but valgrind build complains so we do it this way
 #include <tracy/Wrapper.hpp>
 #ifdef TRACY_FIBERS
-#define TracyCoroEnter(wire)             \
-  {                                      \
-    if (!getCoroWireStack().empty()) {   \
-      TracyFiberLeave;                   \
-    }                                    \
-    TracyFiberEnter(wire->name.c_str()); \
-    getCoroWireStack().push_back(wire);  \
+#define TracyCoroEnter(wire)                    \
+  {                                             \
+    if (!getCoroWireStack().empty()) {          \
+      TracyFiberLeave;                          \
+    }                                           \
+    TracyFiberEnter(wire->getTracyFiberName()); \
+    getCoroWireStack().push_back(wire);         \
   }
-#define TracyCoroExit(wire)                                     \
-  {                                                             \
-    getCoroWireStack().pop_back();                              \
-    TracyFiberLeave;                                            \
-    if (!getCoroWireStack().empty()) {                          \
-      TracyFiberEnter(getCoroWireStack().back()->name.c_str()); \
-    }                                                           \
+#define TracyCoroExit(wire)                                            \
+  {                                                                    \
+    getCoroWireStack().pop_back();                                     \
+    TracyFiberLeave;                                                   \
+    if (!getCoroWireStack().empty()) {                                 \
+      TracyFiberEnter(getCoroWireStack().back()->getTracyFiberName()); \
+    }                                                                  \
   }
 #else // TRACY_FIBERS
 #define TracyCoroEnter(wire)
 #define TracyCoroExit(wire)
 #endif // TRACY_FIBERS
-#else // TRACY_ENABLE
+#else  // TRACY_ENABLE
 #define TracyCoroEnter(wire)
 #define TracyCoroExit(wire)
 #endif

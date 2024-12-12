@@ -6,10 +6,14 @@ edition = "2021"
 [lib]
 crate-type = ["rlib", "staticlib"]
 
+[features]
+tracy = ["shards-lang/tracy", "profiling/profile-with-tracy"]
+
 [dependencies] 
-shards = { path = "../rust" }
-shards-lang = { path = "../lang" }
+shards = { path = "../../rust" }
+shards-lang = { path = "../../lang" }
 flexbuffers = "2.0.0"
+profiling = { version = "1", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.155"

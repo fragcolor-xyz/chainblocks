@@ -67,7 +67,7 @@ set_source_files_properties(
   texture_file/texture_file.cpp
   pipeline_hashes.cpp
   PROPERTIES
-  COMPILE_FLAGS -O3
+  COMPILE_FLAGS -O0
   SKIP_PRECOMPILE_HEADERS ON)
 
 target_compile_features(gfx-core-obj PUBLIC cxx_std_20)
