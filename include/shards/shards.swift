@@ -347,7 +347,7 @@ extension SHVar: CustomStringConvertible {
         v.payload.floatValue = SHFloat(value)
         self = v
     }
-    
+
     public init(value: Double) {
         var v = SHVar()
         v.valueType = Float
@@ -363,7 +363,7 @@ extension SHVar: CustomStringConvertible {
             self = .init(value: newValue)
         }
     }
-    
+
     public var double: Double {
         get {
             assert(type == .Float, "Double variable expected!")
@@ -383,7 +383,19 @@ extension SHVar: CustomStringConvertible {
         }
         self = v
     }
-    
+
+    init(value: inout ContiguousArray<UInt8>) {
+        var v = SHVar()
+        v.valueType = VarType.Bytes.asSHType()
+        let size = value.count
+        value.withUnsafeMutableBufferPointer {
+            v.payload.bytesValue = $0.baseAddress
+            v.payload.bytesSize = UInt32(size)
+            v.payload.bytesCapacity = UInt32(size)
+        }
+        self = v
+    }
+
     init(string: StaticString) {
         var v = SHVar()
         v.valueType = String
@@ -408,7 +420,7 @@ extension SHVar: CustomStringConvertible {
         let buffer = UnsafeBufferPointer(start: stringPtr, count: length).map { UInt8(bitPattern: $0) }
         return String(decoding: buffer, as: UTF8.self)
     }
-    
+
     public var bytes: ContiguousArray<UInt8> {
         assert(type == .Bytes, "Bytes variable expected!")
         guard let bytesPtr = payload.bytesValue else {
@@ -465,16 +477,16 @@ extension SHVar: CustomStringConvertible {
         v.payload.objectValue = pointer
         self = v
     }
-    
+
     func isNone() -> Bool {
         return type == .NoValue
     }
-    
+
     mutating func addRef() {
-        self.refcount += 1
-        self.flags |= UInt16(SHVAR_FLAGS_REF_COUNTED)
+        refcount += 1
+        flags |= UInt16(SHVAR_FLAGS_REF_COUNTED)
     }
-    
+
     mutating func releaseRef() {
         assert(refcount > 0, "Refcount must be positive!")
         refcount -= 1
@@ -510,7 +522,7 @@ class OwnedVar {
         v = SHVar()
         set(string: string)
     }
-    
+
     init(bytes: ContiguousArray<UInt8>) {
         v = SHVar()
         set(bytes: bytes)
@@ -538,7 +550,7 @@ class OwnedVar {
             G.Core.pointee.cloneVar(&v, &tmp)
         }
     }
-    
+
     func set(bytes: ContiguousArray<UInt8>) {
         bytes.withUnsafeBufferPointer { buffer in
             let length = buffer.count
@@ -586,7 +598,7 @@ class TableVar {
         let vPtr = containerVar.payload.tableValue.api.pointee.tableAt(containerVar.payload.tableValue, key)
         return vPtr!.pointee
     }
-    
+
     func get(key: StaticString) -> SHVar {
         return get(key: SHVar(string: key))
     }
@@ -1285,7 +1297,7 @@ class WireController {
     func isRunning() -> Bool {
         G.Core.pointee.isWireRunning(nativeRef)
     }
-    
+
     func setPriority(_ priority: Int) {
         G.Core.pointee.setWirePriority(nativeRef, Int32(priority))
     }
@@ -1296,7 +1308,7 @@ class WireController {
             G.Core.pointee.destroyVar(resultPtr)
         }
     }
-    
+
     var nativeRef = SHWireRef(bitPattern: 0)
 }
 
@@ -1324,7 +1336,7 @@ class MeshController {
     func isEmpty() -> Bool {
         G.Core.pointee.isEmpty(nativeRef)
     }
-    
+
     func getVariable(name: String) -> UnsafeMutablePointer<SHVar> {
         return name.withCString { cString in
             var cname = SHStringWithLen()
@@ -1477,7 +1489,7 @@ class Shards {
         G.Core.pointee.freeWire(wire)
         return wireController
     }
-    
+
     static func suspend(_ context: Context, _ duration: Double) -> SHWireState {
         G.Core.pointee.suspend(context.context, duration)
     }
@@ -1509,6 +1521,53 @@ class Shards {
             while isRunning() {
                 try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
             }
+        }
+    }
+
+    extension OwnedVar {
+        public static func from(image: UIImage) -> OwnedVar? {
+            let result = OwnedVar()
+            result.v.valueType = VarType.Image.asSHType()
+
+            guard let cgImage = image.cgImage else {
+                print("Unable to get CGImage.")
+                return nil
+            }
+
+            let width = cgImage.width
+            let height = cgImage.height
+            let bytesPerPixel = 4 // RGBA, 8 bits per channel
+            let bytesPerRow = bytesPerPixel * width
+            let totalBytes = height * bytesPerRow
+
+            result.v.payload.imageValue = G.Core.pointee.imageNew(UInt32(totalBytes))
+
+            result.v.payload.imageValue.pointee.width = UInt16(width)
+            result.v.payload.imageValue.pointee.height = UInt16(height)
+            result.v.payload.imageValue.pointee.channels = UInt8(bytesPerPixel)
+            result.v.payload.imageValue.pointee.rowStride = UInt16(width * bytesPerPixel)
+
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+
+            guard let context = CGContext(
+                data: result.v.payload.imageValue.pointee.data,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: bytesPerRow,
+                space: colorSpace,
+                bitmapInfo: bitmapInfo.rawValue
+            ) else {
+                print("Unable to create CGContext.")
+                return nil
+            }
+
+            // Draw the image into the context
+            let rect = CGRect(x: 0, y: 0, width: width, height: height)
+            context.draw(cgImage, in: rect)
+
+            return result
         }
     }
 #endif
