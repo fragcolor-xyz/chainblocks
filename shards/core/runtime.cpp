@@ -500,6 +500,36 @@ SHVar *referenceWireVariable(SHWire *wire, std::string_view name) {
   return &v;
 }
 
+SHVar *referenceWireVariableGlobalsAware(SHWire *wire, std::string_view name) {
+  // try using mesh
+  {
+    auto mesh = wire->mesh.lock();
+    if (mesh) {
+      auto ov = mesh->getVariableIfExists(toSWL(name));
+      if (ov) {
+        // found, lets get out here
+        SHVar &cv = (*ov).get();
+        cv.refcount++;
+        cv.flags |= SHVAR_FLAGS_REF_COUNTED;
+        return &cv;
+      }
+      auto rv = mesh->getRefIfExists(toSWL(name));
+      if (rv) {
+        SHLOG_TRACE("Referencing a parent node variable, wire: {} name: {}", wire->name, name);
+        // found, lets get out here
+        rv->refcount++;
+        rv->flags |= SHVAR_FLAGS_REF_COUNTED;
+        return rv;
+      }
+    }
+  }
+
+  SHVar &v = wire->getVariable(toSWL(name));
+  v.refcount++;
+  v.flags |= SHVAR_FLAGS_REF_COUNTED;
+  return &v;
+}
+
 SHVar *referenceWireVariable(SHWireRef wire, std::string_view name) {
   auto swire = SHWire::sharedFromRef(wire);
   return referenceWireVariable(swire.get(), name);

@@ -99,6 +99,7 @@ SHVar *findVariable(SHContext *ctx, std::string_view name);
 SHVar *referenceGlobalVariable(SHContext *ctx, std::string_view name);
 SHVar *referenceVariable(SHContext *ctx, std::string_view name);
 SHVar *referenceWireVariable(SHWire *wire, std::string_view name);
+SHVar *referenceWireVariableGlobalsAware(SHWire *wire, std::string_view name);
 void releaseVariable(SHVar *variable);
 void setSharedVariable(std::string_view name, const SHVar &value);
 void unsetSharedVariable(std::string_view name);
