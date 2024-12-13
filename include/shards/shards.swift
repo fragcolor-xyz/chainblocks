@@ -1526,44 +1526,70 @@ class Shards {
 
     extension OwnedVar {
         public static func from(image: UIImage) -> OwnedVar? {
-            let result = OwnedVar()
-            result.v.valueType = VarType.Image.asSHType()
-
             guard let cgImage = image.cgImage else {
                 print("Unable to get CGImage.")
                 return nil
             }
 
+            // Base width/height from the cgImage
             let width = cgImage.width
             let height = cgImage.height
-            let bytesPerPixel = 4 // RGBA, 8 bits per channel
-            let bytesPerRow = bytesPerPixel * width
-            let totalBytes = height * bytesPerRow
+            let bytesPerPixel = 4 // RGBA
+            var drawWidth = width
+            var drawHeight = height
 
+            // Adjust width/height if orientation is rotated 90 or 270 degrees
+            var transform = CGAffineTransform.identity
+            switch image.imageOrientation {
+            case .down, .downMirrored:
+                transform = transform
+                    .translatedBy(x: CGFloat(width), y: CGFloat(height))
+                    .rotated(by: .pi)
+            case .left, .leftMirrored:
+                swap(&drawWidth, &drawHeight)
+                transform = transform
+                    .translatedBy(x: CGFloat(drawWidth), y: 0)
+                    .rotated(by: .pi / 2)
+            case .right, .rightMirrored:
+                swap(&drawWidth, &drawHeight)
+                transform = transform
+                    .translatedBy(x: 0, y: CGFloat(drawHeight))
+                    .rotated(by: -.pi / 2)
+            default:
+                break
+            }
+
+            let rowStride = drawWidth * bytesPerPixel
+            let totalBytes = drawHeight * rowStride
+
+            let result = OwnedVar()
+            result.v.valueType = VarType.Image.asSHType()
             result.v.payload.imageValue = G.Core.pointee.imageNew(UInt32(totalBytes))
 
-            result.v.payload.imageValue.pointee.width = UInt16(width)
-            result.v.payload.imageValue.pointee.height = UInt16(height)
+            // Update final image dimensions after orientation adjustments
+            result.v.payload.imageValue.pointee.width = UInt16(drawWidth)
+            result.v.payload.imageValue.pointee.height = UInt16(drawHeight)
             result.v.payload.imageValue.pointee.channels = UInt8(bytesPerPixel)
-            result.v.payload.imageValue.pointee.rowStride = UInt16(width * bytesPerPixel)
+            result.v.payload.imageValue.pointee.rowStride = UInt16(rowStride)
+            result.v.payload.imageValue.pointee.flags = UInt8(SHIMAGE_FLAGS_PREMULTIPLIED_ALPHA)
 
             let colorSpace = CGColorSpaceCreateDeviceRGB()
-            let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+            let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
 
             guard let context = CGContext(
                 data: result.v.payload.imageValue.pointee.data,
-                width: width,
-                height: height,
+                width: drawWidth,
+                height: drawHeight,
                 bitsPerComponent: 8,
-                bytesPerRow: bytesPerRow,
+                bytesPerRow: rowStride,
                 space: colorSpace,
-                bitmapInfo: bitmapInfo.rawValue
+                bitmapInfo: bitmapInfo
             ) else {
                 print("Unable to create CGContext.")
                 return nil
             }
 
-            // Draw the image into the context
+            context.concatenate(transform)
             let rect = CGRect(x: 0, y: 0, width: width, height: height)
             context.draw(cgImage, in: rect)
 
