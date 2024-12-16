@@ -536,8 +536,13 @@ struct XPendBase {
         if (cons.exposedType.basicType == SHType::Seq &&
             (cons.exposedType.seqTypes.len != 1 ||
              !matchTypes(data.inputType, cons.exposedType.seqTypes.elements[0], true, true, true))) {
-          throw ComposeError(fmt::format("AppendTo/PrependTo input type is not compatible (in: {}, expected: {})", data.inputType,
-                                         cons.exposedType.seqTypes.elements[0]));
+          if (cons.exposedType.seqTypes.len == 0) {
+            throw ComposeError(fmt::format("AppendTo/PrependTo input type is not compatible (in: {}, expected: {})",
+                                           data.inputType, "<unknown/empty>"));
+          } else {
+            throw ComposeError(fmt::format("AppendTo/PrependTo input type is not compatible (in: {}, expected: {})",
+                                           data.inputType, cons.exposedType.seqTypes.elements[0]));
+          }
         }
         if (cons.tracked) {
           SHLOG_ERROR("AppendTo/PrependTo: Variable {} cannot be tracked.", _collection.variableName());
