@@ -307,7 +307,8 @@ extension SHVar: CustomStringConvertible {
             return Bool(payload.boolValue)
         }
         set {
-            self = .init(value: newValue)
+            assert(type == .Bool, "Bool variable expected!")
+            payload.boolValue = SHBool(newValue)
         }
     }
 
@@ -322,8 +323,10 @@ extension SHVar: CustomStringConvertible {
         get {
             assert(type == .Int, "Int variable expected!")
             return Int(payload.intValue)
-        } set {
-            self = .init(value: newValue)
+        }
+        set {
+            assert(type == .Int, "Int variable expected!")
+            payload.intValue = SHInt(newValue)
         }
     }
 
@@ -359,8 +362,10 @@ extension SHVar: CustomStringConvertible {
         get {
             assert(type == .Float, "Float variable expected!")
             return Float(payload.floatValue)
-        } set {
-            self = .init(value: newValue)
+        }
+        set {
+            assert(type == .Float, "Float variable expected!")
+            payload.floatValue = SHFloat(newValue)
         }
     }
 
@@ -368,8 +373,10 @@ extension SHVar: CustomStringConvertible {
         get {
             assert(type == .Float, "Double variable expected!")
             return Double(payload.floatValue)
-        } set {
-            self = .init(value: newValue)
+        }
+        set {
+            assert(type == .Float, "Double variable expected!")
+            payload.floatValue = SHFloat(newValue)
         }
     }
 
@@ -409,6 +416,23 @@ extension SHVar: CustomStringConvertible {
 
     public var string: String {
         assert(type == .String, "String variable expected!")
+        guard let stringPtr = payload.stringValue else {
+            return ""
+        }
+        let length = Int(payload.stringLen)
+        guard length > 0 else {
+            return ""
+        }
+        // Cast `CChar` (Int8) to `UInt8` for decoding
+        let buffer = UnsafeBufferPointer(start: stringPtr, count: length).map { UInt8(bitPattern: $0) }
+        return String(decoding: buffer, as: UTF8.self)
+    }
+    
+    public var maybeString: String? {
+        if type != .String {
+            return nil
+        }
+        
         guard let stringPtr = payload.stringValue else {
             return ""
         }
@@ -691,6 +715,13 @@ class SeqVar {
     func at(index: Int) -> SHVar {
         assert(index >= 0 && index < size())
         return containerVar.payload.seqValue.elements[index]
+    }
+
+    func set(index: Int, value: SHVar) {
+        assert(index >= 0 && index < size())
+        withUnsafePointer(to: value) { ptr in
+            G.Core.pointee.cloneVar(&containerVar.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
+        }
     }
 }
 
