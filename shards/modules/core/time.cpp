@@ -109,6 +109,77 @@ struct Epoch {
   }
 };
 
+struct EpochLocal {
+  static SHOptionalString help() {
+    return SHCCSTR("This shard outputs the amount of time that has elapsed from the Unix epoch to the current local system time "
+                   "in seconds.");
+  }
+  static SHOptionalString inputHelp() { return DefaultHelpText::InputHelpIgnored; }
+  static SHOptionalString outputHelp() { return SHCCSTR("Amount of time since the Unix epoch in local time seconds."); }
+  static SHTypesInfo inputTypes() { return CoreInfo::NoneType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::IntType; }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    time_t tt = system_clock::to_time_t(now);
+
+    // Get local time
+    tm local_tm;
+#ifdef _WIN32
+    localtime_s(&local_tm, &tt);
+    // Get UTC time
+    tm utc_tm;
+    gmtime_s(&utc_tm, &tt);
+    // Calculate offset
+    time_t local = mktime(&local_tm);
+    time_t utc = mktime(&utc_tm);
+    long offset = local - utc;
+#else
+    localtime_r(&tt, &local_tm);
+    long offset = local_tm.tm_gmtoff;
+#endif
+
+    return Var(int64_t(tt + offset));
+  }
+};
+
+struct EpochLocalMs {
+  static SHOptionalString help() {
+    return SHCCSTR("This shard outputs the amount of time that has elapsed from the Unix epoch to the current local system time "
+                   "in milliseconds.");
+  }
+  static SHOptionalString inputHelp() { return DefaultHelpText::InputHelpIgnored; }
+  static SHOptionalString outputHelp() { return SHCCSTR("Amount of time since the Unix epoch in local time milliseconds."); }
+  static SHTypesInfo inputTypes() { return CoreInfo::NoneType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::IntType; }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    time_t tt = system_clock::to_time_t(now);
+
+    // Get local time
+    tm local_tm;
+#ifdef _WIN32
+    localtime_s(&local_tm, &tt);
+    // Get UTC time
+    tm utc_tm;
+    gmtime_s(&utc_tm, &tt);
+    // Calculate offset
+    time_t local = mktime(&local_tm);
+    time_t utc = mktime(&utc_tm);
+    long offset = local - utc;
+#else
+    localtime_r(&tt, &local_tm);
+    long offset = local_tm.tm_gmtoff;
+#endif
+
+    auto ms = duration_cast<milliseconds>(now.time_since_epoch());
+    return Var(int64_t(ms.count() + (offset * 1000)));
+  }
+};
+
 struct ToString {
   static SHOptionalString help() { return SHCCSTR("This shard converts time into a human readable string."); }
   static SHTypesInfo inputTypes() { return _inputTypes; }
@@ -246,6 +317,8 @@ SHARDS_REGISTER_FN(time) {
   REGISTER_SHARD("Time.DeltaMs", Time::DeltaMs);
   REGISTER_SHARD("Time.EpochMs", Time::EpochMs);
   REGISTER_SHARD("Time.Epoch", Time::Epoch);
+  REGISTER_SHARD("Time.EpochLocal", Time::EpochLocal);
+  REGISTER_SHARD("Time.EpochLocalMs", Time::EpochLocalMs);
   REGISTER_SHARD("Time.ToString", Time::ToString);
   REGISTER_SHARD("Time.MovingAverage", Time::MovingAverage);
 }
