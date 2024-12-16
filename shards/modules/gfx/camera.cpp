@@ -194,12 +194,12 @@ inline CameraInputs getCameraInputs(const InputState &inputState, ParamVar &look
     float2 slideDelta = inputState.slideGesture->delta;
     inputs.translation.x += slideDelta.x * panSpeed * 2.0f;
     inputs.translation.y += -slideDelta.y * panSpeed * 2.0f;
-    SPDLOG_INFO("Sliding {} ({})", slideDelta, inputState.slideGesture->slideOffset);
+    SPDLOG_TRACE("Sliding {} ({})", slideDelta, inputState.slideGesture->slideOffset);
   } else if (inputState.gestures.activeGesture == inputState.rotateGesture.get()) {
     float2 rotateDelta = inputState.rotateGesture->delta;
     inputs.lookRotation.y -= rotateDelta.x * lookSpeed * 2.0f;
     inputs.lookRotation.x -= rotateDelta.y * lookSpeed * 2.0f;
-    SPDLOG_INFO("Rotating {} ({})", rotateDelta, inputState.rotateGesture->slideOffset);
+    SPDLOG_TRACE("Rotating {} ({})", rotateDelta, inputState.rotateGesture->slideOffset);
   }
 
   if (inputState.zoom != 0.0f) {
