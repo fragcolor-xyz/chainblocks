@@ -260,6 +260,7 @@ private:
     void cleanup() {
       viewGeneratorBranch.cleanup();
       drawableGeneratorBranch.cleanup();
+      warmedUp = false;
     }
   };
   std::shared_ptr<SharedData> _sharedData;
@@ -276,7 +277,6 @@ public:
     // This makes sure all branchers are cleaned up on the correct thread
     if (_sharedData)
       _sharedData->cleanup();
-    _sharedData.reset();
     _drawableGeneratorRefs.clear();
     _viewGeneratorRefs.clear();
 
@@ -288,6 +288,15 @@ public:
     }
   }
 
+  void destroy() { _sharedData.reset(); }
+
+  void restartBrancher(Brancher &brancher) {
+    for (auto &wire : _sharedData->drawableGeneratorBranch.brancher.wires) {
+      if (!wire->mesh.lock()) {
+      }
+    }
+  }
+
   void warmup(SHContext *context) {
     PARAM_WARMUP(context);
 
@@ -295,13 +304,7 @@ public:
     _featurePtr = ShardsTypes::FeatureObjectVar.New();
     *_featurePtr = std::make_shared<Feature>();
 
-    if (!_sharedData) {
-      _sharedData = std::make_shared<SharedData>();
-      SHInstanceData data{
-          .shared = SHExposedTypesInfo(_instanceDataCopy),
-      };
-      composeGeneratorWires(data);
-    }
+    shassert(_sharedData);
     _sharedData->drawableGeneratorBranch.intializeCaptures(_drawableGeneratorRefs, context, IgnoredVariables);
     _sharedData->viewGeneratorBranch.intializeCaptures(_viewGeneratorRefs, context, IgnoredVariables);
   }

@@ -143,6 +143,7 @@ public:
     }
     variableStorage.clear();
     variableState.clear();
+    _variablesApplied = false;
   }
 
   void activate() { brancher.activate(); }
