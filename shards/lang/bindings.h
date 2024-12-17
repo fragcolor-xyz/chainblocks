@@ -11,22 +11,6 @@ struct EvalEnv;
 
 struct Sequence;
 
-struct SHLError {
-  char *message;
-  uint32_t line;
-  uint32_t column;
-};
-
-struct SHLAst {
-  Sequence *ast;
-  SHLError *error;
-};
-
-struct SHLWire {
-  SHWireRef *wire;
-  SHLError *error;
-};
-
 extern "C" {
 
 void shards_init(SHCore *core);
