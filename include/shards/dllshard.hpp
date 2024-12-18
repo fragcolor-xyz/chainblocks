@@ -22,6 +22,9 @@ At runtime just dlopen the dll, that's it!
 #include "shardwrapper.hpp"
 #include "common_types.hpp"
 
+#define SH_NO_INTERNAL_CORE
+#include "../shards/core/object_type.hpp"
+
 namespace shards {
 // this must be defined in the external
 extern void registerExternalShards();
@@ -145,6 +148,120 @@ public:
         });
   }
 
+  static SHVar *referenceWireVariable(SHWireRef wire, struct SHStringWithLen name) {
+    return sCore._core->referenceWireVariable(wire, name);
+  }
+
+  static void setExternalVariable(SHWireRef wire, struct SHStringWithLen name, struct SHExternalVariable *pVar) {
+    sCore._core->setExternalVariable(wire, name, pVar);
+  }
+
+  static void removeExternalVariable(SHWireRef wire, struct SHStringWithLen name) {
+    sCore._core->removeExternalVariable(wire, name);
+  }
+
+  static SHVar *allocExternalVariable(SHWireRef wire, struct SHStringWithLen name, const struct SHTypeInfo *type) {
+    return sCore._core->allocExternalVariable(wire, name, type);
+  }
+
+  static void freeExternalVariable(SHWireRef wire, struct SHStringWithLen name) { sCore._core->freeExternalVariable(wire, name); }
+
+  static SHVar *getMeshVariable(SHMeshRef mesh, struct SHStringWithLen name) { return sCore._core->getMeshVariable(mesh, name); }
+
+  static void setMeshVariableType(SHMeshRef mesh, struct SHStringWithLen name, const struct SHExposedTypeInfo *type) {
+    sCore._core->setMeshVariableType(mesh, name, type);
+  }
+
+  static SHWireState getState(SHContext *context) { return sCore._core->getState(context); }
+
+  static SHVar hashVar(const SHVar &var) { return sCore._core->hashVar(&var); }
+
+  static bool isEqualVar(const SHVar &v1, const SHVar &v2) { return sCore._core->isEqualVar(&v1, &v2); }
+
+  static int compareVar(const SHVar &v1, const SHVar &v2) { return sCore._core->compareVar(&v1, &v2); }
+
+  static bool isEqualType(const SHTypeInfo &t1, const SHTypeInfo &t2) { return sCore._core->isEqualType(&t1, &t2); }
+
+  static SHTypeInfo deriveTypeInfo(const SHVar &v, const SHInstanceData *data, bool mutable_) {
+    return sCore._core->deriveTypeInfo(&v, data, mutable_);
+  }
+
+  static void freeDerivedTypeInfo(SHTypeInfo &t) { sCore._core->freeDerivedTypeInfo(&t); }
+
+  static const SHEnumInfo *findEnumInfo(int32_t vendorId, int32_t typeId) { return sCore._core->findEnumInfo(vendorId, typeId); }
+
+  static int64_t findEnumId(SHStringWithLen name) { return sCore._core->findEnumId(name); }
+
+  static const SHObjectInfo *findObjectInfo(int32_t vendorId, int32_t typeId) {
+    return sCore._core->findObjectInfo(vendorId, typeId);
+  }
+
+  static int64_t findObjectTypeId(SHStringWithLen name) { return sCore._core->findObjectTypeId(name); }
+
+  static SHString type2Name(SHType type) { return sCore._core->type2Name(type); }
+
+  // Additional array interfaces
+  SH_ARRAY_INTERFACE(SHEnums, SHEnum, enums);
+  SH_ARRAY_INTERFACE(SHTraitVariables, SHTraitVariable, traitVariables);
+  SH_ARRAY_INTERFACE(SHTraits, SHTrait, traits);
+
+  // Image manipulation
+  static void imageIncRef(struct SHImage *image) { sCore._core->imageIncRef(image); }
+
+  static void imageDecRef(struct SHImage *image) { sCore._core->imageDecRef(image); }
+
+  static struct SHImage *imageNew(uint32_t dataLen) { return sCore._core->imageNew(dataLen); }
+
+  static struct SHImage *imageClone(struct SHImage *image) { return sCore._core->imageClone(image); }
+
+  static uint32_t imageDeriveDataLength(struct SHImage *image) { return sCore._core->imageDeriveDataLength(image); }
+
+  // Wire manipulation
+  static void setWireLooped(SHWireRef wire, SHBool looped) { sCore._core->setWireLooped(wire, looped); }
+
+  static void setWireUnsafe(SHWireRef wire, SHBool unsafe) { sCore._core->setWireUnsafe(wire, unsafe); }
+
+  static void setWirePure(SHWireRef wire, SHBool pure) { sCore._core->setWirePure(wire, pure); }
+
+  static void setWireStackSize(SHWireRef wire, uint64_t stackSize) { sCore._core->setWireStackSize(wire, stackSize); }
+
+  static void setWirePriority(SHWireRef wire, int priority) { sCore._core->setWirePriority(wire, priority); }
+
+  static void setWireTraits(SHWireRef wire, SHSeq traits) { sCore._core->setWireTraits(wire, traits); }
+
+  static void addShard(SHWireRef wire, ShardPtr shard) { sCore._core->addShard(wire, shard); }
+
+  static void removeShard(SHWireRef wire, ShardPtr shard) { sCore._core->removeShard(wire, shard); }
+
+  static bool isWireRunning(SHWireRef wire) { return sCore._core->isWireRunning(wire); }
+
+  static SHVar stopWire(SHWireRef wire) { return sCore._core->stopWire(wire); }
+
+  // Mesh operations
+  static SHMeshRef createMesh() { return sCore._core->createMesh(); }
+
+  static void destroyMesh(SHMeshRef mesh) { sCore._core->destroyMesh(mesh); }
+
+  static SHVar createMeshVar() { return sCore._core->createMeshVar(); }
+
+  static void setMeshLabel(SHMeshRef mesh, SHStringWithLen label) { sCore._core->setMeshLabel(mesh, label); }
+
+  static bool compose(SHMeshRef mesh, SHWireRef wire) { return sCore._core->compose(mesh, wire); }
+
+  static void schedule(SHMeshRef mesh, SHWireRef wire, SHBool compose) { sCore._core->schedule(mesh, wire, compose); }
+
+  static void unschedule(SHMeshRef mesh, SHWireRef wire) { sCore._core->unschedule(mesh, wire); }
+
+  static bool tick(SHMeshRef mesh) { return sCore._core->tick(mesh); }
+
+  static bool isEmpty(SHMeshRef mesh) { return sCore._core->isEmpty(mesh); }
+
+  static void terminate(SHMeshRef mesh) { sCore._core->terminate(mesh); }
+
+  static void sleep(double seconds) { sCore._core->sleep(seconds); }
+
+  static uint64_t getStepCount(SHContext *context) { return sCore._core->getStepCount(context); }
+
 private:
   static inline CoreLoader sCore{};
 };
@@ -154,6 +271,15 @@ using ShardsVar = TShardsVar<Core>;
 using OwnedVar = TOwnedVar<Core>;
 using SeqVar = TSeqVar<Core>;
 using TableVar = TTableVar<Core>;
+
+template <typename E, std::vector<uint8_t> (*Serializer)(const E &) = nullptr,
+          E (*Deserializer)(const std::string_view &) = nullptr, void (*BeforeDelete)(const E &) = nullptr,
+          bool ThreadSafe = false>
+class ObjectVar : public TObjectVar<Core, E, Serializer, Deserializer, BeforeDelete, ThreadSafe> {
+public:
+  ObjectVar(const char *name, int32_t vendorId, int32_t objectId)
+      : TObjectVar<Core, E, Serializer, Deserializer, BeforeDelete, ThreadSafe>(name, vendorId, objectId) {}
+};
 
 template <typename T> class PtrIterator {
 public:
