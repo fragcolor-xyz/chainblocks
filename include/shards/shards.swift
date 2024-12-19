@@ -723,6 +723,20 @@ class SeqVar {
             G.Core.pointee.cloneVar(&containerVar.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
         }
     }
+
+    func remove(index: Int) {
+        assert(index >= 0 && index < size())
+        withUnsafeMutablePointer(to: &containerVar.payload.seqValue) { ptr in
+            G.Core.pointee.seqSlowDelete(ptr, UInt32(index))
+        }
+    }
+
+    func removeFast(index: Int) {
+        assert(index >= 0 && index < size())
+        withUnsafeMutablePointer(to: &containerVar.payload.seqValue) { ptr in
+            G.Core.pointee.seqFastDelete(ptr, UInt32(index))
+        }
+    }
 }
 
 public struct Context {
