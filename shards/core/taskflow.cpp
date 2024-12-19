@@ -5,10 +5,16 @@ namespace shards {
 
 struct TaskFlowDebugInterface : tf::WorkerInterface {
   std::string debugName;
+#if SH_DEBUG_THREAD_NAMES
+  std::list<std::string> debugThreadNameStack;
+#endif
 
   TaskFlowDebugInterface(std::string debugName) : debugName(debugName) {}
   void scheduler_prologue(tf::Worker &worker) {
-    pushThreadName(fmt::format("<idle> tf::Executor ({}, {})", debugName, worker.id()));
+#if SH_DEBUG_THREAD_NAMES
+    auto& v = debugThreadNameStack.emplace_back(fmt::format("<idle> tf::Executor ({}, {})", debugName, worker.id()));
+    pushThreadName(v);
+#endif
     SHLOG_TRACE("TaskFlow: \"{}\" Worker {} starting", debugName, worker.id());
   }
   virtual void scheduler_epilogue(tf::Worker &worker, std::exception_ptr ptr) {

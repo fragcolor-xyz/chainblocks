@@ -1,8 +1,8 @@
 #include "utils.hpp"
 namespace shards {
-thread_local std::list<std::string> *_debugThreadStack;
-std::list<std::string> &getThreadNameStack() {
-  thread_local std::list<std::string> stack;
+thread_local std::list<const char*> *_debugThreadStack;
+std::list<const char*> &getThreadNameStack() {
+  thread_local std::list<const char*> stack;
   return stack;
 }
 } // namespace shards
