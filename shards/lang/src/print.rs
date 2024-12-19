@@ -104,22 +104,18 @@ impl AstVisitor for PrintVisitor {
   }
 
   fn visit_assignment(&mut self, assignment: &Assignment) {
-    match assignment {
-      Assignment::AssignRef(pipeline, identifier) => {
-        pipeline.accept(self);
-        self.write(&format!(" = {}", identifier.to_string()));
+    match assignment.kind {
+      AssignmentKind::AssignRef => {
+        self.write(&format!(" = {}", assignment.identifier.to_string()));
       }
-      Assignment::AssignSet(pipeline, identifier) => {
-        pipeline.accept(self);
-        self.write(&format!(" >= {}", identifier.to_string()));
+      AssignmentKind::AssignSet => {
+        self.write(&format!(" >= {}", assignment.identifier.to_string()));
       }
-      Assignment::AssignUpd(pipeline, identifier) => {
-        pipeline.accept(self);
-        self.write(&format!(" > {}", identifier.to_string()));
+      AssignmentKind::AssignUpd => {
+        self.write(&format!(" > {}", assignment.identifier.to_string()));
       }
-      Assignment::AssignPush(pipeline, identifier) => {
-        pipeline.accept(self);
-        self.write(&format!(" >> {}", identifier.to_string()));
+      AssignmentKind::AssignPush => {
+        self.write(&format!(" >> {}", assignment.identifier.to_string()));
       }
     }
   }
@@ -450,7 +446,7 @@ fn test1() {
   // let code = include_str!("nested.shs");
   let code = include_str!("sample1.shs");
   let successful_parse = crate::ShardsParser::parse(Rule::Program, code).unwrap();
-  let mut env = crate::read::ReadEnv::new("", ".".to_string(), ".");
+  let mut env = crate::read::ReadEnv::new("", ".".to_string(), vec![".".to_string()]);
   let seq =
     crate::read::process_program(successful_parse.into_iter().next().unwrap(), &mut env).unwrap();
   let seq = seq.sequence;

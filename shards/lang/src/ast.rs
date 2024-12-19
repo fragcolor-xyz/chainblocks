@@ -5,7 +5,8 @@ use core::{fmt, hash::Hash};
 use pest::Position;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use shards::{
-  shlog_debug, types::Var, SHType_Bool, SHType_Bytes, SHType_Float, SHType_Int, SHType_None, SHType_String
+  shlog_debug, types::Var, SHType_Bool, SHType_Bytes, SHType_Float, SHType_Int, SHType_None,
+  SHType_String,
 };
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hasher};
 
@@ -305,15 +306,22 @@ pub struct Pipeline {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum Assignment {
+pub enum AssignmentKind {
   #[serde(rename = "ref")]
-  AssignRef(Pipeline, Identifier),
+  AssignRef,
   #[serde(rename = "set")]
-  AssignSet(Pipeline, Identifier),
+  AssignSet,
   #[serde(rename = "upd")]
-  AssignUpd(Pipeline, Identifier),
+  AssignUpd,
   #[serde(rename = "push")]
-  AssignPush(Pipeline, Identifier),
+  AssignPush,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct Assignment {
+  pub kind: AssignmentKind,
+  pub identifier: Identifier,
+  pub line_info: Option<LineInfo>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

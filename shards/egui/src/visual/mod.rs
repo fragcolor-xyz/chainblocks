@@ -351,18 +351,12 @@ fn chars(s: &str) -> egui::RichText {
 fn get_first_shard_ref<'a>(ast: &'a mut Sequence) -> Option<&'a mut Function> {
   for statement in &mut ast.statements {
     match statement {
-      Statement::Assignment(assignment) => {
-        if let Assignment::AssignRef(pipeline, _) = assignment {
-          if let BlockContent::Shard(shard) = &mut pipeline.blocks[0].content {
-            return Some(shard);
-          }
-        }
-      }
       Statement::Pipeline(pipeline) => {
         if let BlockContent::Shard(shard) = &mut pipeline.blocks[0].content {
           return Some(shard);
         }
-      }
+      },
+      _ => (),
     }
   }
   None
@@ -373,18 +367,12 @@ fn get_last_shard_ref<'a>(ast: &'a mut Sequence) -> Option<&'a mut Function> {
   }
   for statement in ast.statements.iter_mut().rev() {
     match statement {
-      Statement::Assignment(assignment) => {
-        if let Assignment::AssignRef(pipeline, _) = assignment {
-          if let BlockContent::Shard(shard) = &mut pipeline.blocks.last_mut()?.content {
-            return Some(shard);
-          }
-        }
-      }
       Statement::Pipeline(pipeline) => {
         if let BlockContent::Shard(shard) = &mut pipeline.blocks.last_mut()?.content {
           return Some(shard);
         }
       }
+      _ => (),
     }
   }
   None
@@ -1433,33 +1421,25 @@ impl<'a> AstMutator<Option<Response>> for VisualAst<'a> {
   }
 
   fn visit_assignment(&mut self, assignment: &mut Assignment) -> Option<Response> {
-    let mut combined_response = None;
-    let (r_a, r_b) = match assignment {
-      Assignment::AssignRef(pipeline, identifier) => (pipeline.accept_mut(self), {
+    let resp = match assignment.kind {
+      AssignmentKind::AssignRef => ({
         self.ui.label(chars("="));
-        identifier.accept_mut(self)
+        assignment.identifier.accept_mut(self)
       }),
-      Assignment::AssignSet(pipeline, identifier) => (pipeline.accept_mut(self), {
+      AssignmentKind::AssignSet => ( {
         self.ui.label(chars(">="));
-        identifier.accept_mut(self)
+        assignment.identifier.accept_mut(self)
       }),
-      Assignment::AssignUpd(pipeline, identifier) => (pipeline.accept_mut(self), {
+      AssignmentKind::AssignUpd => ( {
         self.ui.label(chars(">"));
-        identifier.accept_mut(self)
+        assignment.identifier.accept_mut(self)
       }),
-      Assignment::AssignPush(pipeline, identifier) => (pipeline.accept_mut(self), {
+      AssignmentKind::AssignPush => ( {
         self.ui.label(chars(">>"));
-        identifier.accept_mut(self)
+        assignment.identifier.accept_mut(self)
       }),
     };
-    if let Some(a) = r_a {
-      if let Some(b) = r_b {
-        combined_response = Some(a.union(b));
-      } else {
-        combined_response = Some(a);
-      }
-    }
-    combined_response.map(|x| {
+    resp.map(|x| {
       if x.clicked() {
         self.context.has_changed = true;
       }

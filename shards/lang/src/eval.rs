@@ -3967,17 +3967,15 @@ fn eval_assignment(
   e: &mut EvalEnv,
   cancellation_token: Arc<AtomicBool>,
 ) -> Result<(), ShardsError> {
-  let (pipe, op, name) = match assignment {
-    Assignment::AssignRef(pipe, name) => (pipe, "Ref", name),
-    Assignment::AssignSet(pipe, name) => (pipe, "Set", name),
-    Assignment::AssignUpd(pipe, name) => (pipe, "Update", name),
-    Assignment::AssignPush(pipe, name) => (pipe, "Push", name),
+  let op = match assignment.kind {
+    AssignmentKind::AssignRef => "Ref",
+    AssignmentKind::AssignSet => "Set",
+    AssignmentKind::AssignUpd => "Update",
+    AssignmentKind::AssignPush => "Push",
   };
-  eval_pipeline(pipe, e, cancellation_token)?;
   // should always have first and always have line info here! (We put Empty type if nothing is there)
-  let line_info = pipe.blocks.first().unwrap().line_info.unwrap();
-  add_assignment_shard(op, &name, line_info, e)
-    .map_err(|e| (format!("{:?}", e), line_info).into())?;
+  add_assignment_shard(op, &assignment.identifier, assignment.line_info.unwrap(), e)
+    .map_err(|e| (format!("{:?}", e), assignment.line_info.unwrap()).into())?;
   Ok(())
 }
 
