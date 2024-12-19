@@ -589,6 +589,7 @@ class OwnedVar {
 
 class TableVar {
     var containerVar: SHVar
+    private var borrowed = false
 
     init() {
         containerVar = SHVar()
@@ -604,10 +605,19 @@ class TableVar {
             G.Core.pointee.cloneVar(&containerVar, UnsafeMutablePointer(mutating: ptr))
         }
     }
+    
+    init(borrowing: SHVar) {
+        assert(borrowing.valueType == VarType.Table.asSHType())
+        
+        containerVar = borrowing
+        self.borrowed = true
+    }
 
     deinit {
-        withUnsafeMutablePointer(to: &containerVar) { ptr in
-            G.Core.pointee.destroyVar(ptr)
+        if !borrowed {
+            withUnsafeMutablePointer(to: &containerVar) { ptr in
+                G.Core.pointee.destroyVar(ptr)
+            }
         }
     }
 
@@ -634,6 +644,7 @@ class TableVar {
 
 class SeqVar {
     var containerVar: SHVar
+    private var borrowed = false
 
     init() {
         containerVar = SHVar()
@@ -648,10 +659,19 @@ class SeqVar {
             G.Core.pointee.cloneVar(&containerVar, UnsafeMutablePointer(mutating: ptr))
         }
     }
+    
+    init(borrowing: SHVar) {
+        assert(borrowing.valueType == VarType.Seq.asSHType())
+        
+        containerVar = borrowing
+        borrowed = true
+    }
 
     deinit {
-        withUnsafeMutablePointer(to: &containerVar) { ptr in
-            G.Core.pointee.destroyVar(ptr)
+        if !borrowed {
+            withUnsafeMutablePointer(to: &containerVar) { ptr in
+                G.Core.pointee.destroyVar(ptr)
+            }
         }
     }
 
