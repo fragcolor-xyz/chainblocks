@@ -998,6 +998,11 @@ static const SHTypeInfo &updateTableType(SHTypeInfo &typeInfoStorage, const SHVa
 
   if (existingType) {
     auto &keys = existingType->table.keys;
+    auto &types = existingType->table.types;
+
+    if (keys.len == 0 && types.len > 0) {
+      keyToAdd = nullptr; // DON'T add key when this is a {none: Types...} table
+    }
 
     // Add keys, or leave empty
     // empty key means it's a variable
@@ -1498,13 +1503,19 @@ struct Update : public SetUpdateBase {
 
   static SHOptionalString help() { return SHCCSTR("Modifies the value of an existing mutable variable."); }
 
-  static SHTypeInfo *findTableNoneEntry(const SHTypeInfo *ti) {
+  SHTypesInfo findTableNoneEntry(const SHTypeInfo *ti) {
+    if (ti->table.keys.len == 0) {
+      return ti->table.types;
+    }
+
+    SHTypesInfo r{};
     for (size_t i = 0; i < ti->table.keys.len; i++) {
       if (ti->table.keys.elements[i].valueType == SHType::None) {
-        return &ti->table.types.elements[i];
+        r.elements = &ti->table.types.elements[i];
+        r.len = 1;
       }
     }
-    return nullptr;
+    return r;
   }
 
   SHTypeInfo composeV2(const SHInstanceData &data) {
@@ -1515,7 +1526,9 @@ struct Update : public SetUpdateBase {
     setBaseCompose(data, false, false, false);
 
     SHTypeInfo *originalTableType{};
-    SHTypeInfo *tableInnerValueType{};
+
+    // Either of these, none=>type, or none->[types]
+    SHTypesInfo tableInnerValueTypes{};
 
     // make sure we update to the same type
     if (_isTable) {
@@ -1528,18 +1541,19 @@ struct Update : public SetUpdateBase {
         auto &tableKeys = type->exposedType.table.keys;
         auto &tableTypes = type->exposedType.table.types;
         if (_key.isVariable()) {
-          tableInnerValueType = findTableNoneEntry(originalTableType);
+          tableInnerValueTypes = findTableNoneEntry(originalTableType);
         } else {
           for (uint32_t y = 0; y < tableKeys.len; y++) {
             // if keys are populated they are not variables
             auto &key = tableKeys.elements[y];
             if (key == *_key) {
-              tableInnerValueType = &tableTypes.elements[y];
+              tableInnerValueTypes.elements = &tableTypes.elements[y];
+              tableInnerValueTypes.len = 1;
             }
           }
           // Fallback to none type
-          if (!tableInnerValueType) {
-            tableInnerValueType = findTableNoneEntry(originalTableType);
+          if (tableInnerValueTypes.len == 0) {
+            tableInnerValueTypes = findTableNoneEntry(originalTableType);
           }
         }
         _isGlobal = type->global;
@@ -1549,7 +1563,7 @@ struct Update : public SetUpdateBase {
         throw ComposeError("Update: error, original table type not found.");
       }
 
-      if (!tableInnerValueType) {
+      if (tableInnerValueTypes.len == 0) {
         if (_key.isVariable()) {
           throw ComposeError(fmt::format(
               "Update: can not update table with variable key \"{}\" because it has no \"none\" type field information ({}).",
@@ -1561,9 +1575,24 @@ struct Update : public SetUpdateBase {
         }
       }
 
-      if (!matchTypes(data.inputType, *tableInnerValueType, true, true, true, true)) {
+      bool matched = false;
+      for (int i = 0; i < tableInnerValueTypes.len; i++) {
+        if (matchTypes(data.inputType, tableInnerValueTypes.elements[i], true, true, true, true)) {
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched) {
+        std::string possibleTypes;
+        for (int i = 0; i < tableInnerValueTypes.len; i++) {
+          if (i > 0) {
+            possibleTypes += ", ";
+          }
+          possibleTypes += fmt::format("{}", tableInnerValueTypes.elements[i]);
+        }
         throw ComposeError(fmt::format("Update: error, update is changing table field for key {} from {} => {}", *_key,
-                                       *tableInnerValueType, data.inputType));
+                                       possibleTypes, data.inputType));
       }
 
       const_cast<Shard *>(data.shard)->inlineShardId = InlineShard::CoreSetUpdateTable;

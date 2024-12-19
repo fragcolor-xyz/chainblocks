@@ -18,17 +18,17 @@
 
 @wire(document-shard {
   = name
-  Shards.Help = help
-  name | Hash.XXH-64 | BytesToInts | Slice(0 3) | ToInt3 | Do(process-color) | Update(help "color")
-  [name help]
+  Shards.Help >= help-1
+  name | Hash.XXH-64 | BytesToInts | Slice(0 3) | ToInt3 | Do(process-color) | Set(help-1 "color")
+  [name help-1]
 })
 
 @wire(document-enum {
   = enum-id
-  Shards.EnumTypeHelp = help
-  help:name | ExpectString = name
-  name | Hash.XXH-64 | BytesToInts | Slice(0 4) | ToInt3 | Do(process-color) | Update(help "color")
-  [name help enum-id]
+  Shards.EnumTypeHelp >= help-2 
+  help-2:name | ExpectString = name
+  name | Hash.XXH-64 | BytesToInts | Slice(0 4) | ToInt3 | Do(process-color) | Set(help-2 "color")
+  [name help-2 enum-id]
 })
 
 ; process documentation in parallel
