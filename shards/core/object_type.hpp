@@ -2,8 +2,6 @@
 #define C599F883_4CF5_416C_AC0D_AF07729F5C2B
 
 #include <shards/shards.hpp>
-#include <boost/tti/has_static_member_function.hpp>
-#include <boost/tti/has_member_function.hpp>
 
 #ifndef SH_NO_INTERNAL_CORE
 #include "foundation.hpp"
@@ -11,8 +9,25 @@
 
 namespace shards {
 namespace detail {
-BOOST_TTI_TRAIT_HAS_STATIC_MEMBER_FUNCTION(HasStaticMember_match, match);
-BOOST_TTI_TRAIT_HAS_STATIC_MEMBER_FUNCTION(HasStaticMember_hash, hash);
+
+template <typename T, typename = void>
+struct has_static_match : std::false_type {};
+
+template <typename T>
+struct has_static_match<T, 
+    std::void_t<decltype(T::match(std::declval<const T&>(), std::declval<const T&>()))>> 
+    : std::true_type {};
+
+template <typename T, typename = void>
+struct has_static_hash : std::false_type {};
+
+template <typename T>
+struct has_static_hash<T,
+    std::void_t<decltype(T::hash(std::declval<const T&>(), 
+                                std::declval<void*>(), 
+                                std::declval<size_t>()))>>
+    : std::true_type {};
+
 } // namespace detail
 
 template <bool Atomic> struct RefCount {
@@ -166,14 +181,14 @@ public:
                 }
               },
       };
-      if constexpr (detail::HasStaticMember_match<T, bool(const T &, const T &)>::value) {
+      if constexpr (detail::has_static_match<T>::value) {
         info.match = [](const void *self, const void *other) {
           auto tself = reinterpret_cast<const T *>(self);
           auto tother = reinterpret_cast<const T *>(other);
           return T::match(*tself, *tother);
         };
       }
-      if constexpr (detail::HasStaticMember_hash<T, void(const T &, void *outDigest, size_t digestSize)>::value) {
+      if constexpr (detail::has_static_hash<T>::value) {
         info.hash = [](const void *self, void *outDigest, uint32_t digestSize) {
           auto tself = reinterpret_cast<const T *>(self);
           return T::hash(*tself, outDigest, size_t(digestSize));
@@ -184,6 +199,7 @@ public:
     return info;
   }
 
+#ifndef SH_NO_INTERNAL_CORE
   // Create a new extended type into the target TypeInfo
   // returns the extened type info created, if one was already set,
   //  the new extended type is constructed from the old one using the copy constructor
@@ -192,6 +208,7 @@ public:
     std::swap(old, dst);
     return makeExtended(dst, &(SHTypeInfo&)old);
   }
+
   static inline T &makeExtended(TypeInfo &dst, const SHTypeInfo *original) {
     if (dst->basicType != SHType::Object) {
       dst = SHTypeInfo{};
@@ -212,6 +229,7 @@ public:
 
     return e->data;
   }
+#endif
 
   static T &fromTypeInfo(const SHTypeInfo &ti) {
     shassert(ti.basicType == SHType::Object && ti.object.extInfo == &getTypeInfo());

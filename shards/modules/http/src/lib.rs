@@ -147,6 +147,12 @@ lazy_static! {
       BOOL_TYPES_SLICE
     )
       .into(),
+    (
+      cstr!("Backoff"),
+      shccstr!("How many seconds to wait between retries. Defaults to 1 second."),
+      INT_TYPES_SLICE
+    )
+      .into(),
   ];
 }
 
@@ -169,6 +175,7 @@ struct RequestBase {
   output: ClonedVar,
   timeout: u64,
   retry: u64,
+  backoff: u64,
   as_bytes: bool,
   full_response: bool,
   invalid_certs: bool,
@@ -186,6 +193,7 @@ impl Default for RequestBase {
       output: ClonedVar::default(),
       timeout: 10,
       retry: 0,
+      backoff: 1,
       as_bytes: false,
       full_response: false,
       invalid_certs: false,
@@ -224,6 +232,7 @@ impl RequestBase {
       6 => Ok(self.retry = value.try_into().map_err(|_x| "Failed to set retry")?),
       7 => Ok(self.keep_alive = value.try_into().map_err(|_x| "Failed to set keep_alive")?),
       8 => Ok(self.streaming = value.try_into().map_err(|_x| "Failed to set streaming")?),
+      9 => Ok(self.backoff = value.try_into().map_err(|_x| "Failed to set backoff")?),
       _ => unreachable!(),
     }
   }
@@ -239,6 +248,7 @@ impl RequestBase {
       6 => self.retry.try_into().expect("A valid integer in range"),
       7 => self.keep_alive.into(),
       8 => self.streaming.into(),
+      9 => self.backoff.try_into().expect("A valid integer in range"),
       _ => unreachable!(),
     }
   }
@@ -579,6 +589,7 @@ macro_rules! get_like {
             } else {
               shards::core::cancel_abort(context);
               shlog_debug!("Retrying request, {} tries left", retries);
+              shards::core::suspend(context, self.rb.backoff as f64); // use backoff instead of hardcoded 1.0
               retries -= 1;
             }
           }
@@ -784,6 +795,7 @@ macro_rules! post_like {
             } else {
               shards::core::cancel_abort(context);
               shlog_debug!("Retrying request, {} tries left", retries);
+              shards::core::suspend(context, self.rb.backoff as f64); // use backoff instead of hardcoded 1.0
               retries -= 1;
             }
           }

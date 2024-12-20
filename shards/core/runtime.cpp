@@ -162,6 +162,11 @@ extern "C" void __sanitizer_set_report_path(const char *path);
 #endif
 
 void loadExternalShards(std::string from) {
+  static std::unordered_set<std::string> loaded;
+  static std::mutex loadedMutex;
+
+  std::unique_lock<std::mutex> lock(loadedMutex);
+
   namespace fs = boost::filesystem;
   auto root = fs::path(from);
   auto pluginPath = root / "externals";
@@ -172,8 +177,18 @@ void loadExternalShards(std::string from) {
     if (p.status().type() == fs::file_type::regular_file) {
       auto ext = p.path().extension();
       if (ext == ".dll" || ext == ".so" || ext == ".dylib") {
-        auto filename = p.path().filename();
+        auto filename = p.path().filename().string();
+        if (loaded.find(filename) != loaded.end()) {
+          continue;
+        }
+
+        // Skip files starting with "lib"
+        if (filename.rfind("lib", 0) == 0) {
+          continue;
+        }
+
         auto dllstr = p.path().string();
+
         SHLOG_INFO("Loading external dll: {} path: {}", filename, dllstr);
 #if SH_WINDOWS
         auto handle = LoadLibraryExA(dllstr.c_str(), NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
@@ -185,6 +200,7 @@ void loadExternalShards(std::string from) {
         if (!handle) {
           SHLOG_ERROR("LoadLibrary failed, error: {}", dlerror());
         }
+        loaded.insert(filename);
 #endif
       }
     }
@@ -252,8 +268,10 @@ void registerShards() {
   }
 
   // finally iterate shard directory and load external dlls
+  SHLOG_DEBUG("Loading external shards from exe path: {}", GetGlobals().ExePath);
   loadExternalShards(std::string(GetGlobals().ExePath.c_str()));
   if (GetGlobals().RootPath != GetGlobals().ExePath) {
+    SHLOG_DEBUG("Loading external shards from root path: {}", GetGlobals().RootPath);
     loadExternalShards(std::string(GetGlobals().RootPath.c_str()));
   }
 }
