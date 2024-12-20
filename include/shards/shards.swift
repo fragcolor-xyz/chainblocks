@@ -1286,6 +1286,11 @@ class WireController {
         }
     }
 
+    var failed: Bool {
+        let info = G.Core.pointee.getWireInfo(nativeRef)
+        return info.failed
+    }
+
     private func addExternalVar(name: String, varPtr: UnsafeMutablePointer<SHVar>) {
         varPtr.pointee.flags |= UInt16(SHVAR_FLAGS_EXTERNAL)
         var ev = SHExternalVariable()
