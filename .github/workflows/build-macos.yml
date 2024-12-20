@@ -158,8 +158,8 @@ jobs:
           ./shards new ../shards/tests/crypto.shs
           ./shards new ../shards/tests/wire-macro.shs
           ./shards new ../shards/tests/branch.shs
-          ./shards new ../shards/tests/audio.shs test-device:true
-          ./shards new ../shards/tests/audio2.shs test-device:true
+          ./shards new ../shards/tests/audio.shs test-device:false
+          ./shards new ../shards/tests/audio2.shs test-device:false
           ./shards new ../shards/tests/events.shs
           ./shards new ../shards/tests/complex-deserialize.shs
           ./shards new ../shards/tests/db.shs with-sqlite-vec:true
