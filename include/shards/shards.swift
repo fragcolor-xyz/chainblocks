@@ -312,6 +312,13 @@ extension SHVar: CustomStringConvertible {
         }
     }
 
+    public var maybeBool: Bool? {
+        if type != .Bool {
+            return nil
+        }
+        return Bool(payload.boolValue)
+    }
+
     public init(value: Int) {
         var v = SHVar()
         v.valueType = Int
@@ -427,12 +434,12 @@ extension SHVar: CustomStringConvertible {
         let buffer = UnsafeBufferPointer(start: stringPtr, count: length).map { UInt8(bitPattern: $0) }
         return String(decoding: buffer, as: UTF8.self)
     }
-    
+
     public var maybeString: String? {
         if type != .String {
             return nil
         }
-        
+
         guard let stringPtr = payload.stringValue else {
             return ""
         }
@@ -605,12 +612,12 @@ class TableVar {
             G.Core.pointee.cloneVar(&containerVar, UnsafeMutablePointer(mutating: ptr))
         }
     }
-    
+
     init(borrowing: SHVar) {
         assert(borrowing.valueType == VarType.Table.asSHType())
-        
+
         containerVar = borrowing
-        self.borrowed = true
+        borrowed = true
     }
 
     deinit {
@@ -659,10 +666,10 @@ class SeqVar {
             G.Core.pointee.cloneVar(&containerVar, UnsafeMutablePointer(mutating: ptr))
         }
     }
-    
+
     init(borrowing: SHVar) {
         assert(borrowing.valueType == VarType.Seq.asSHType())
-        
+
         containerVar = borrowing
         borrowed = true
     }
