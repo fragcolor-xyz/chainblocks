@@ -594,49 +594,27 @@ class OwnedVar {
     }
 }
 
-class TableVar {
-    var containerVar: SHVar
-    private var borrowed = false
-
-    init() {
-        containerVar = SHVar()
-        containerVar.valueType = VarType.Table.asSHType()
-        containerVar.payload.tableValue = G.Core.pointee.tableNew()
+class TableVar: OwnedVar {
+    override init() {
+        super.init()
+        v.valueType = VarType.Table.asSHType()
+        v.payload.tableValue = G.Core.pointee.tableNew()
     }
 
-    init(cloning: SHVar) {
+    override init(cloning: SHVar) {
+        super.init(cloning: cloning)
         assert(cloning.valueType == VarType.Table.asSHType())
-
-        containerVar = SHVar()
-        withUnsafePointer(to: cloning) { ptr in
-            G.Core.pointee.cloneVar(&containerVar, UnsafeMutablePointer(mutating: ptr))
-        }
-    }
-
-    init(borrowing: SHVar) {
-        assert(borrowing.valueType == VarType.Table.asSHType())
-
-        containerVar = borrowing
-        borrowed = true
-    }
-
-    deinit {
-        if !borrowed {
-            withUnsafeMutablePointer(to: &containerVar) { ptr in
-                G.Core.pointee.destroyVar(ptr)
-            }
-        }
     }
 
     func insertOrUpdate(key: SHVar, cloning: SHVar) {
-        let vPtr = containerVar.payload.tableValue.api.pointee.tableAt(containerVar.payload.tableValue, key)
+        let vPtr = v.payload.tableValue.api.pointee.tableAt(v.payload.tableValue, key)
         withUnsafePointer(to: cloning) { ptr in
             G.Core.pointee.cloneVar(vPtr, UnsafeMutablePointer(mutating: ptr))
         }
     }
 
     func get(key: SHVar) -> SHVar {
-        let vPtr = containerVar.payload.tableValue.api.pointee.tableAt(containerVar.payload.tableValue, key)
+        let vPtr = v.payload.tableValue.api.pointee.tableAt(v.payload.tableValue, key)
         return vPtr!.pointee
     }
 
@@ -645,55 +623,23 @@ class TableVar {
     }
 
     func clear() {
-        containerVar.payload.tableValue.api.pointee.tableClear(containerVar.payload.tableValue)
+        v.payload.tableValue.api.pointee.tableClear(v.payload.tableValue)
     }
 }
 
-class SeqVar {
-    var containerVar: SHVar
-    private var borrowed = false
-
-    init() {
-        containerVar = SHVar()
-        containerVar.valueType = VarType.Seq.asSHType()
+class SeqVar: OwnedVar {
+    override init() {
+        super.init()
+        v.valueType = VarType.Seq.asSHType()
     }
 
-    init(cloning: SHVar) {
+    override init(cloning: SHVar) {
+        super.init(cloning: cloning)
         assert(cloning.valueType == VarType.Seq.asSHType())
-
-        containerVar = SHVar()
-        withUnsafePointer(to: cloning) { ptr in
-            G.Core.pointee.cloneVar(&containerVar, UnsafeMutablePointer(mutating: ptr))
-        }
-    }
-
-    init(borrowing: SHVar) {
-        assert(borrowing.valueType == VarType.Seq.asSHType())
-
-        containerVar = borrowing
-        borrowed = true
-    }
-
-    deinit {
-        if !borrowed {
-            withUnsafeMutablePointer(to: &containerVar) { ptr in
-                G.Core.pointee.destroyVar(ptr)
-            }
-        }
-    }
-
-    func get() -> SHVar {
-        return containerVar
-    }
-
-    func ptr() -> UnsafeMutablePointer<SHVar> {
-        return withUnsafeMutablePointer(to: &containerVar) { ptr in
-            ptr
-        }
     }
 
     func resize(size: Int) {
-        withUnsafeMutablePointer(to: &containerVar.payload.seqValue) { ptr in
+        withUnsafeMutablePointer(to: &v.payload.seqValue) { ptr in
             G.Core.pointee.seqResize(ptr, UInt32(size))
         }
     }
@@ -703,20 +649,20 @@ class SeqVar {
     }
 
     func size() -> Int {
-        return Int(containerVar.payload.seqValue.len)
+        return Int(v.payload.seqValue.len)
     }
 
     func pushRaw(value: SHVar) {
         let index = size()
         resize(size: index + 1)
-        containerVar.payload.seqValue.elements[index] = value
+        v.payload.seqValue.elements[index] = value
     }
 
     func pushCloning(value: SHVar) {
         let index = size()
         resize(size: index + 1)
         withUnsafePointer(to: value) { ptr in
-            G.Core.pointee.cloneVar(&containerVar.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
+            G.Core.pointee.cloneVar(&v.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
         }
     }
 
@@ -736,31 +682,31 @@ class SeqVar {
         assert(size() > 0)
         let index = size() - 1
         resize(size: index)
-        return containerVar.payload.seqValue.elements[index]
+        return v.payload.seqValue.elements[index]
     }
 
     func at(index: Int) -> SHVar {
         assert(index >= 0 && index < size())
-        return containerVar.payload.seqValue.elements[index]
+        return v.payload.seqValue.elements[index]
     }
 
     func set(index: Int, value: SHVar) {
         assert(index >= 0 && index < size())
         withUnsafePointer(to: value) { ptr in
-            G.Core.pointee.cloneVar(&containerVar.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
+            G.Core.pointee.cloneVar(&v.payload.seqValue.elements[index], UnsafeMutablePointer(mutating: ptr))
         }
     }
 
     func remove(index: Int) {
         assert(index >= 0 && index < size())
-        withUnsafeMutablePointer(to: &containerVar.payload.seqValue) { ptr in
+        withUnsafeMutablePointer(to: &v.payload.seqValue) { ptr in
             G.Core.pointee.seqSlowDelete(ptr, UInt32(index))
         }
     }
 
     func removeFast(index: Int) {
         assert(index >= 0 && index < size())
-        withUnsafeMutablePointer(to: &containerVar.payload.seqValue) { ptr in
+        withUnsafeMutablePointer(to: &v.payload.seqValue) { ptr in
             G.Core.pointee.seqFastDelete(ptr, UInt32(index))
         }
     }
