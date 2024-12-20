@@ -384,7 +384,7 @@ inline void prepare(SHWire *wire) {
   shassert(!coroutineValid(wire->coro) && "Wire already prepared!");
 
   auto runner = [wire]() {
-#if SH_USE_THREAD_FIBER
+#if SH_DEBUG_THREAD_NAMES
     pushThreadName(wire->threadNameStrings.init(wire).suspendedStr);
 #endif
     run(wire, &wire->coro);
