@@ -875,7 +875,10 @@ impl Shard for HttpStreamShard {
           let bytes = response
             .chunk()
             .await
-            .map_err(|_| "Failed to read from stream")?;
+            .map_err(|e| {
+              shlog_error!("Failed to read from stream: {}", e);
+              "Failed to read from stream"
+            })?;
           if let Some(bytes) = bytes {
             Ok(ClonedVar::new_bytes(&bytes))
           } else {
