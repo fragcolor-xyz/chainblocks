@@ -26,8 +26,8 @@ metal = { git = "https://github.com/shards-lang/metal-rs.git", version = "=0.29.
 tiny-skia = { opt-level = 3 } 
 resvg = { opt-level = 3 }
 usvg = { opt-level = 3 }
-shards-lang = { opt-level = 3, debug-assertions = false }
-shards-langffi = { opt-level = 3, debug-assertions = false }
+shards-lang = { opt-level = 3 }
+shards-langffi = { opt-level = 3 }
 pest = { opt-level = 3, debug-assertions = false }  # This will apply to all profiles
 pest_derive = { opt-level = 3, debug-assertions = false }  # This will apply to all profiles
 syntect = { opt-level = 3 }
