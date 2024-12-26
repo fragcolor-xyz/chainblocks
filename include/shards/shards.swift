@@ -621,6 +621,15 @@ class TableVar: OwnedVar {
     func get(key: StaticString) -> SHVar {
         return get(key: SHVar(string: key))
     }
+    
+    func maybeGet(key: StaticString) -> SHVar? {
+        let result = get(key: SHVar(string: key))
+        if result.valueType != VarType.NoValue.asSHType() {
+            return result
+        } else {
+            return nil
+        }
+    }
 
     func clear() {
         v.payload.tableValue.api.pointee.tableClear(v.payload.tableValue)
