@@ -613,6 +613,10 @@ class TableVar: OwnedVar {
         }
     }
 
+    func insertOrUpdate(string: StaticString, cloning: SHVar) {
+        insertOrUpdate(key: SHVar(string: string), cloning: cloning)
+    }
+
     func get(key: SHVar) -> SHVar {
         let vPtr = v.payload.tableValue.api.pointee.tableAt(v.payload.tableValue, key)
         return vPtr!.pointee
@@ -633,6 +637,14 @@ class TableVar: OwnedVar {
 
     func clear() {
         v.payload.tableValue.api.pointee.tableClear(v.payload.tableValue)
+    }
+
+    func contains(key: SHVar) -> Bool {
+        return v.payload.tableValue.api.pointee.tableContains(v.payload.tableValue, key)
+    }
+
+    func contains(string: StaticString) -> Bool {
+        return contains(key: SHVar(string: string))
     }
 }
 
