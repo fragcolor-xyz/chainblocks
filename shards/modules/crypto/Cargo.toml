@@ -28,6 +28,15 @@ digest = "0.10.7"
 blake2b_simd = "1.0.2"
 argon2 = "0.5"
 rand_core = { version = "0.6", features = ["std"] }
-jsonwebtoken = "9"
-serde = {version = "1", features = ["derive"] }
+jsonwebtoken = { version = "9", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+
+[features]
+default = ["jwt"]
+jwt = ["jsonwebtoken", "serde", "serde_json"]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+jsonwebtoken = { version = "9" }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
