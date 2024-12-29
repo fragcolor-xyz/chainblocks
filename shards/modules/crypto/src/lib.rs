@@ -2,6 +2,8 @@
 /* Copyright © 2020 Fragcolor Pte. Ltd. */
 
 use hmac::Hmac;
+use jsonwebtoken::jwk::Jwk;
+use jsonwebtoken::jwk::KeyAlgorithm;
 use pbkdf2::pbkdf2;
 use sha2::Sha512;
 use shards::core::register_shard;
@@ -9,12 +11,16 @@ use shards::shard::Shard;
 use shards::types::common_type;
 use shards::types::ClonedVar;
 use shards::types::Context;
+use shards::types::ParamVar;
 use shards::types::Type;
 use shards::types::Types;
 use shards::types::Var;
 use shards::types::BYTES_TYPES;
 use shards::types::STRING_TYPES;
 use std::convert::TryInto;
+
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use serde::{Deserialize, Serialize};
 
 #[macro_use]
 extern crate shards;
@@ -152,6 +158,87 @@ impl Shard for MnemonicToSeed {
   }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+  aud: String, // Optional. Audience
+  exp: usize, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
+  sub: String, // Optional. Subject (whom token refers to)
+}
+
+#[derive(shards::shard)]
+#[shard_info("Jwt.Decode", "Decodes a JWT token")]
+struct JwtDecode {
+  output: ClonedVar,
+
+  #[shard_param("Jwk", "The Key in JWK format to use for decoding the token.", [common_type::string, common_type::string_var])]
+  jwk: ParamVar,
+
+  #[shard_param("Audience", "The audience to use for decoding the token.", [common_type::string, common_type::string_var])]
+  audience: ParamVar,
+}
+
+impl Default for JwtDecode {
+  fn default() -> Self {
+    Self {
+      output: ClonedVar::default(),
+      jwk: ParamVar::default(),
+      audience: ParamVar::default(),
+    }
+  }
+}
+
+#[shards::shard_impl]
+impl Shard for JwtDecode {
+  fn input_types(&mut self) -> &Types {
+    &STRING_TYPES
+  }
+
+  fn output_types(&mut self) -> &Types {
+    &STRING_TYPES
+  }
+
+  fn warmup(&mut self, ctx: &Context) -> Result<(), &str> {
+    self.warmup_helper(ctx)?;
+    Ok(())
+  }
+
+  fn cleanup(&mut self, ctx: Option<&Context>) -> Result<(), &str> {
+    self.cleanup_helper(ctx)?;
+    Ok(())
+  }
+
+  fn activate(&mut self, _context: &Context, input: &Var) -> Result<Option<Var>, &str> {
+    let jwk: &str = self.jwk.get().try_into().unwrap();
+    let jwk = serde_json::from_str::<Jwk>(jwk).unwrap();
+    let decoding_key = DecodingKey::from_jwk(&jwk).map_err(|e| {
+      shlog_error!("Invalid JWK: {}", e);
+      "Invalid JWK"
+    })?;
+
+    // Set up validation
+    let algo = jwk.common.key_algorithm.ok_or("Unsupported key type")?;
+    let mut validation = Validation::new(match algo {
+      KeyAlgorithm::ES256 => Algorithm::ES256,
+      KeyAlgorithm::ES384 => Algorithm::ES384,
+      KeyAlgorithm::RS256 => Algorithm::RS256,
+      KeyAlgorithm::RS384 => Algorithm::RS384,
+      _ => return Err("Unsupported key type"),
+    });
+    let audience: &str = self.audience.get().try_into().unwrap();
+    validation.set_audience(&[audience]);
+
+    // Decode and verify the token
+    let token: &str = input.try_into().unwrap();
+    let token_data = decode::<Claims>(token, &decoding_key, &validation).map_err(|e| {
+      shlog_error!("Invalid token: {}", e);
+      "Invalid token"
+    })?;
+
+    self.output = Var::ephemeral_string(token_data.claims.sub.as_str()).into();
+    Ok(Some(self.output.0))
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn shardsRegister_crypto_crypto(core: *mut shards::shardsc::SHCore) {
   unsafe {
@@ -165,4 +252,5 @@ pub extern "C" fn shardsRegister_crypto_crypto(core: *mut shards::shardsc::SHCor
   register_shard::<MnemonicGenerate>();
   register_shard::<MnemonicToSeed>();
   argon::register_shards();
+  register_shard::<JwtDecode>();
 }
