@@ -17,6 +17,7 @@ getrandom = { git = "https://github.com/shards-lang/getrandom.git", version = "=
 socket2 = { git = "https://github.com/shards-lang/socket2.git", version = "=0.5.7", rev = "17a4d72eb2f3b2311bc724cfb4a43a28cc6c70de" }
 security-framework = { git = "https://github.com/shards-lang/rust-security-framework.git", version = "=2.11.0", rev = "ea683f291bb8dff51d3239e556c3236e09274c16" }
 sysctl = { git = "https://github.com/shards-lang/sysctl-rs.git", version = "=0.5.5", rev = "859c91707dfaa11d8adff35b65b1b88bb98680bd" }
+ring = { git = "https://github.com/shards-lang/ring.git", version = "=0.17.8", rev = "0a00284cd6de51d78bd687a93352369a3f4374be" }
 
 # Graphics patches
 objc = { git = "https://github.com/shards-lang/rust-objc.git", version = "=0.2.7", branch = "shards-0.2.7" }
