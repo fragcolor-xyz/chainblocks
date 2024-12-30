@@ -581,6 +581,11 @@ class OwnedVar {
             G.Core.pointee.cloneVar(&v, &tmp)
         }
     }
+    
+    func set(bool: Bool) {
+        v.valueType = VarType.Bool.asSHType()
+        v.payload.boolValue = bool
+    }
 
     func set(bytes: ContiguousArray<UInt8>) {
         bytes.withUnsafeBufferPointer { buffer in
