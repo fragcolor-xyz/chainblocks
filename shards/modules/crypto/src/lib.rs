@@ -17,7 +17,7 @@ use shards::types::BYTES_TYPES;
 use shards::types::STRING_TYPES;
 use std::convert::TryInto;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "windows")))]
 use {
     jsonwebtoken::{decode, Algorithm, DecodingKey, Validation},
     jsonwebtoken::jwk::Jwk,
@@ -161,7 +161,7 @@ impl Shard for MnemonicToSeed {
   }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "windows")))]
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
   aud: String, // Optional. Audience
@@ -169,7 +169,7 @@ struct Claims {
   sub: String, // Optional. Subject (whom token refers to)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "windows")))]
 #[derive(shards::shard)]
 #[shard_info("Jwt.Decode", "Decodes a JWT token")]
 struct JwtDecode {
@@ -182,7 +182,7 @@ struct JwtDecode {
   audience: ParamVar,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "windows")))]
 impl Default for JwtDecode {
   fn default() -> Self {
     Self {
@@ -193,7 +193,7 @@ impl Default for JwtDecode {
   }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "windows")))]
 #[shards::shard_impl]
 impl Shard for JwtDecode {
   fn input_types(&mut self) -> &Types {
@@ -259,6 +259,6 @@ pub extern "C" fn shardsRegister_crypto_crypto(core: *mut shards::shardsc::SHCor
   register_shard::<MnemonicGenerate>();
   register_shard::<MnemonicToSeed>();
   argon::register_shards();
-  #[cfg(not(target_arch = "wasm32"))]
+  #[cfg(not(any(target_arch = "wasm32", target_os = "windows")))]
   register_shard::<JwtDecode>();
 }

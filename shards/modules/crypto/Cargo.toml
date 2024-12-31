@@ -29,7 +29,7 @@ blake2b_simd = "1.0.2"
 argon2 = "0.5"
 rand_core = { version = "0.6", features = ["std"] }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "windows")))'.dependencies]
 jsonwebtoken = { version = "9" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
