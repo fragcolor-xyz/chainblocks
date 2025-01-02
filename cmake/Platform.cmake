@@ -15,19 +15,18 @@ if(APPLE)
 
   # Remember to set proper linker to your final targets if you use swift files!
   # set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)
-endif()
 
-if(APPLE AND NOT IOS AND NOT VISIONOS)
-  set(MACOSX TRUE)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3" CACHE STRING "Minimum macOS deployment version")
-endif()
+  if(IOS)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "16.3" CACHE STRING "Minimum iOS deployment version" FORCE)
+  elseif(VISIONOS)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "2.0" CACHE STRING "Minimum visionOS deployment version" FORCE)
+  else()
+    set(MACOSX TRUE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3" CACHE STRING "Minimum macOS deployment version" FORCE)
+  endif()
 
-if(IOS)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET "16.3" CACHE STRING "Minimum iOS deployment version")
-endif()
-
-if(VISIONOS)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET "2.0" CACHE STRING "Minimum visionOS deployment version")
+  message(STATUS "MACOSX: ${MACOSX}")
+  message(STATUS "CMAKE_OSX_DEPLOYMENT_TARGET: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
 endif()
 
 if(NOT EMSCRIPTEN AND(WIN32 OR MACOSX OR DESKTOP_LINUX))
