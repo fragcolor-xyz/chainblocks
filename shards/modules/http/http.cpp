@@ -627,10 +627,9 @@ struct Server {
   std::unordered_map<const SHWire *, Peer *> _wireContainers;
 
   void wireOnStop(const SHWire::OnStopEvent &e) {
-    SHLOG_TRACE("Wire {} stopped", e.wire->name);
-
     auto it = _wireContainers.find(e.wire);
     if (it != _wireContainers.end()) {
+      SHLOG_DEBUG("Releasing peer for wire {}", e.wire->name);
       _pool->release(it->second);
       _wireContainers.erase(it);
     }
@@ -735,7 +734,8 @@ struct Read {
   static SHOptionalString help() {
     return SHCCSTR(
         "This shard reads incoming HTTP requests from a client connection, parses its components, and outputs them as a table. "
-        "This shard should be used in conjunction with the Http.Server shard to handle incoming requests.");
+        "This shard should be used in conjunction with the Http.Server shard to handle incoming requests. "
+        "It properly handles both regular and chunked transfer encoding.");
   }
 
   static SHOptionalString inputHelp() { return DefaultHelpText::InputHelpIgnored; }
@@ -748,6 +748,8 @@ struct Read {
   static SHTypesInfo outputTypes() { return OutputType; }
 
   TableVar _headers;
+  beast::error_code _last_error;
+  std::string _error_source;
 
   void warmup(SHContext *context) {
     _peerVar = referenceVariable(context, "Http.Server.Socket");
@@ -767,21 +769,77 @@ struct Read {
     auto peer = reinterpret_cast<Peer *>(_peerVar->payload.objectValue);
 
     bool done = false;
+    bool has_error = false;
     request.body().clear();
     request.clear();
     buffer.clear();
-    http::async_read(*peer->socket, buffer, request, [&, peer](beast::error_code ec, std::size_t nbytes) {
+
+    // First read just the header
+    http::request_parser<http::string_body> parser;
+    parser.header_limit(32 * 1024);                               // 32KB header limit
+    parser.body_limit(std::numeric_limits<std::uint64_t>::max()); // No body limit
+
+    http::async_read_header(*peer->socket, buffer, parser, [&](beast::error_code ec, std::size_t nbytes) {
       if (ec) {
-        // notice there is likelihood of done not being valid anymore here
-        throw PeerError{"Read", ec, peer};
-      } else {
-        done = true;
+        if (ec == beast::error::timeout) {
+          _last_error = ec;
+          _error_source = "Read header timeout";
+          has_error = true;
+        } else if (ec == beast::http::error::end_of_stream || 
+                  ec == net::error::eof ||
+                  ec == net::error::connection_reset) {
+          // Client disconnected - trigger normal peer cleanup
+          throw PeerError{"Client disconnected", ec, peer};
+        } else {
+          _last_error = ec;
+          _error_source = "Read header";
+          has_error = true;
+        }
       }
+      done = true;
     });
 
-    // we suspend here, that's why we captured & above!!
     while (!done) {
       SH_SUSPEND(context, 0.0);
+    }
+
+    if (has_error) {
+      throw ActivationError(fmt::format("Error reading header: {}", _last_error.message()));
+    }
+
+    // Now read the body
+    done = false;
+    has_error = false;
+
+    // Continue with the same parser for the body
+    http::async_read(*peer->socket, buffer, parser, [&](beast::error_code ec, std::size_t nbytes) {
+      if (ec) {
+        if (ec == beast::error::timeout) {
+          _last_error = ec;
+          _error_source = "Read body timeout";
+          has_error = true;
+        } else if (ec == beast::http::error::end_of_stream || 
+                  ec == net::error::eof ||
+                  ec == net::error::connection_reset) {
+          // Client disconnected - trigger normal peer cleanup
+          throw PeerError{"Client disconnected", ec, peer};
+        } else {
+          _last_error = ec;
+          _error_source = "Read body";
+          has_error = true;
+        }
+      } else {
+        request = parser.release();
+      }
+      done = true;
+    });
+
+    while (!done) {
+      SH_SUSPEND(context, 0.0);
+    }
+
+    if (has_error) {
+      throw ActivationError(fmt::format("Error reading body: {}", _last_error.message()));
     }
 
     switch (request.method()) {
@@ -825,7 +883,7 @@ struct Read {
 
   SHVar *_peerVar{nullptr};
   TableVar _output;
-  beast::multi_buffer buffer{8192};
+  beast::flat_buffer buffer{8192}; // Changed to flat_buffer for better performance
   http::request<http::string_body> request;
 };
 
@@ -846,8 +904,10 @@ struct Response {
   static SHTypesInfo outputTypes() { return PostInTypes; }
 
   PARAM_PARAMVAR(_status, "Status", "The HTTP status code to return.", {CoreInfo::IntType, CoreInfo::IntVarType})
-  PARAM_PARAMVAR(_headers, "Headers", "The headers to attach to this response.", {CoreInfo::StringTableType, CoreInfo::StringVarTableType, CoreInfo::NoneType})
-  PARAM_PARAMVAR(_contentType, "ContentType", "The content type of the response.", {CoreInfo::StringType, CoreInfo::StringVarType})
+  PARAM_PARAMVAR(_headers, "Headers", "The headers to attach to this response.",
+                 {CoreInfo::StringTableType, CoreInfo::StringVarTableType, CoreInfo::NoneType})
+  PARAM_PARAMVAR(_contentType, "ContentType", "The content type of the response.",
+                 {CoreInfo::StringType, CoreInfo::StringVarType})
   PARAM_IMPL(PARAM_IMPL_FOR(_status), PARAM_IMPL_FOR(_headers), PARAM_IMPL_FOR(_contentType))
 
   Response() {
@@ -1083,7 +1143,8 @@ struct SendFile {
   static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
   static SHTypesInfo outputTypes() { return CoreInfo::StringType; }
 
-  PARAM_PARAMVAR(_headers, "Headers", "The headers to attach to this response.", {CoreInfo::StringTableType, CoreInfo::StringVarTableType, CoreInfo::NoneType})
+  PARAM_PARAMVAR(_headers, "Headers", "The headers to attach to this response.",
+                 {CoreInfo::StringTableType, CoreInfo::StringVarTableType, CoreInfo::NoneType})
   PARAM_IMPL(PARAM_IMPL_FOR(_headers))
 
   void warmup(SHContext *context) {

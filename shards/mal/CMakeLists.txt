@@ -59,3 +59,55 @@ if(EMSCRIPTEN)
     "-sALLOW_MEMORY_GROWTH=1"
   )
 endif()
+
+# Apple Framework target
+if(APPLE)
+  add_library(shards-framework SHARED ${shards_SOURCES})
+  setup_shards_target(shards-framework)
+  
+  # Framework specific settings
+  set_target_properties(shards-framework PROPERTIES
+    FRAMEWORK TRUE
+    FRAMEWORK_VERSION A
+    MACOSX_FRAMEWORK_IDENTIFIER com.fragcolor.shards
+    MACOSX_FRAMEWORK_BUNDLE_VERSION "1.0"
+    MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
+    XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
+    XCODE_ATTRIBUTE_ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES "YES"
+    XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
+    XCODE_ATTRIBUTE_SWIFT_INSTALL_OBJC_HEADER "NO"
+    OUTPUT_NAME "Shards"
+    # Debug symbols generation
+    XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
+    XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS "YES"
+    XCODE_ATTRIBUTE_DEPLOYMENT_POSTPROCESSING "YES"
+    XCODE_ATTRIBUTE_SEPARATE_STRIP "YES"
+    XCODE_ATTRIBUTE_STRIP_INSTALLED_PRODUCT "YES"
+    XCODE_ATTRIBUTE_STRIP_STYLE "debugging"
+  )
+
+  # MacOS specific settings
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set_target_properties(shards-framework PROPERTIES
+      XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/../Frameworks @loader_path/Frameworks"
+      INSTALL_RPATH "@executable_path/../Frameworks"
+      BUILD_WITH_INSTALL_RPATH TRUE
+    )
+    
+    # Link Swift runtime for MacOS
+    target_link_libraries(shards-framework
+      "-framework Foundation"
+      "-framework CoreFoundation"
+      "-lswiftCore"
+      "-lswiftFoundation"
+    )
+  endif()
+
+  # Make headers public for framework
+  file(GLOB PUBLIC_HEADERS "*.hpp")
+  set_target_properties(shards-framework PROPERTIES
+    PUBLIC_HEADER "${PUBLIC_HEADERS}"
+  )
+
+  target_link_libraries(shards-framework shards-cpp-union)
+endif()
