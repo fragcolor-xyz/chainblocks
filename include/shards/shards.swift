@@ -1357,6 +1357,13 @@ class WireController {
             G.Core.pointee.destroyVar(resultPtr)
         }
     }
+    
+    public func wait() async {
+        // Check copier status every 100ms
+        while isRunning() {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        }
+    }
 
     var nativeRef = SHWireRef(bitPattern: 0)
 }
@@ -1564,17 +1571,9 @@ class Shards {
         uiEdgeInsets.pointee = view.safeArea
     }
 
-    extension WireController {
-        public func wait() async {
-            // Check copier status every 100ms
-            while isRunning() {
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-            }
-        }
-    }
-
     extension OwnedVar {
         public static func from(image: UIImage) -> OwnedVar? {
+            #if canImport(UIKit)
             guard let cgImage = image.cgImage else {
                 print("Unable to get CGImage.")
                 return nil
@@ -1643,6 +1642,16 @@ class Shards {
             context.draw(cgImage, in: rect)
 
             return result
+            #elseif canImport(AppKit)
+            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                print("Unable to get CGImage from NSImage")
+                return nil
+            }
+            
+            // Create a temporary UIImage to use the existing conversion code
+            let tempImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
+            return OwnedVar.from(image: tempImage)
+            #endif
         }
     }
 #endif
