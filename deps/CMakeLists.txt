@@ -226,6 +226,8 @@ if(NOT EMSCRIPTEN)
   set(GGML_F16C ON CACHE BOOL "" FORCE)
   set(GGML_FMA ON CACHE BOOL "" FORCE)
   set(GGML_OPENMP OFF CACHE BOOL "" FORCE) # omp is very omp...
+  set(GGML_METAL_USE_BF16 ON CACHE BOOL "" FORCE)
+  set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)
   # Force math library to be empty, sometimes picks up libm.a from mingw64
   if(WIN32)
     set(MATH_LIBRARY "" CACHE FILEPATH "" FORCE)
