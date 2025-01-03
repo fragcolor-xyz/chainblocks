@@ -41,7 +41,6 @@ jobs:
           echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN" >> $GITHUB_ENV
           rustup toolchain install $RUSTUP_TOOLCHAIN
           rustup +$RUSTUP_TOOLCHAIN target add aarch64-apple-ios
-          rustup +$RUSTUP_TOOLCHAIN target add aarch64-apple-visionos
       - uses: Swatinem/rust-cache@v2
         if: ${{ steps.setup.outputs.rust-cache == 'true' }}
       - name: Build iOS
