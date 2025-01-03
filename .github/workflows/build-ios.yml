@@ -1,4 +1,4 @@
-name: Build (iOS)
+name: Build (iOS & visionOS)
 
 on:
   workflow_dispatch:
@@ -47,9 +47,37 @@ jobs:
       - name: Build iOS
         run: |
           cmake -Bbuild_ios -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=iphoneos
-          cmake --build build_ios --target shards-cpp-union
-          cmake --build build_ios --target shards-core
-          cmake --build build_ios --target shards-lib
+          cd build_ios
+          xcodebuild -scheme shards-framework -configuration RelWithDebInfo -destination "generic/platform=iOS" build
+
+  #
+  # Build shards for visionOS
+  #
+  visionOS:
+    runs-on: macos-latest
+    steps:
+      - name: Setup
+        id: setup
+        run: |
+          echo "rust-cache=${{ github.event.inputs.rust-cache || inputs.rust-cache }}" >> $GITHUB_OUTPUT
+      - name: Checkout shards
+        uses: actions/checkout@v3
+        with:
+          repository: fragcolor-xyz/shards
+          fetch-depth: 1
+          submodules: recursive
+      - name: Set up dependencies
+        run: |
+          sudo xcode-select --switch /Applications/Xcode.app
+          brew install cmake clang-format
+          ./bootstrap
+          RUSTUP_TOOLCHAIN=`cat rust.version`
+          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN" >> $GITHUB_ENV
+          rustup toolchain install $RUSTUP_TOOLCHAIN
+          rustup +$RUSTUP_TOOLCHAIN target add aarch64-apple-ios
+          rustup component add rust-src --toolchain $RUSTUP_TOOLCHAIN
+      - uses: Swatinem/rust-cache@v2
+        if: ${{ steps.setup.outputs.rust-cache == 'true' }}
       - name: Build visionOS
         run: |
           cmake -Bbuild_visionos_reldeb_frmwk -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=xros
