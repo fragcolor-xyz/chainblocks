@@ -52,6 +52,6 @@ jobs:
           cmake --build build_ios --target shards-lib
       - name: Build visionOS
         run: |
-          cmake -Bbuild_visionos_reldeb_frmwk -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=xros -DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM=G4QM2YRFAN -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE=Automatic
+          cmake -Bbuild_visionos_reldeb_frmwk -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=xros
           cd build_visionos_reldeb_frmwk
           xcodebuild -scheme shards-framework -configuration RelWithDebInfo -destination "generic/platform=visionOS" build
