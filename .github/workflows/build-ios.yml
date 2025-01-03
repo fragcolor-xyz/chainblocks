@@ -41,6 +41,7 @@ jobs:
           echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN" >> $GITHUB_ENV
           rustup toolchain install $RUSTUP_TOOLCHAIN
           rustup +$RUSTUP_TOOLCHAIN target add aarch64-apple-ios
+          rustup +$RUSTUP_TOOLCHAIN target add aarch64-apple-visionos
       - uses: Swatinem/rust-cache@v2
         if: ${{ steps.setup.outputs.rust-cache == 'true' }}
       - name: Build iOS
@@ -49,9 +50,8 @@ jobs:
           cmake --build build_ios --target shards-cpp-union
           cmake --build build_ios --target shards-core
           cmake --build build_ios --target shards-lib
-      # - name: Build visionOS
-      #   run: |
-      #     cmake -Bbuild_visionos -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=xros
-      #     cmake --build build_visionos --target shards-cpp-union
-      #     cmake --build build_visionos --target shards-core
-      #     cmake --build build_visionos --target shards-lib
+      - name: Build visionOS
+        run: |
+          cmake -Bbuild_visionos_reldeb_frmwk -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=xros -DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM=G4QM2YRFAN -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE=Automatic
+          cd build_visionos_reldeb_frmwk
+          xcodebuild -scheme shards-framework -configuration RelWithDebInfo -destination "generic/platform=visionOS" build
