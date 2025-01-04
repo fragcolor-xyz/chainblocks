@@ -558,6 +558,11 @@ class OwnedVar {
         v = SHVar()
         set(bytes: bytes)
     }
+    
+    init(bool: Bool) {
+        v = SHVar()
+        set(bool: bool)
+    }
 
     deinit {
         withUnsafeMutablePointer(to: &v) { ptr in
@@ -1315,6 +1320,14 @@ class WireController {
     var failed: Bool {
         let info = G.Core.pointee.getWireInfo(nativeRef)
         return info.failed
+    }
+
+    var failureMessage: String? {
+        let info = G.Core.pointee.getWireInfo(nativeRef)
+        if info.failed {
+            return info.failureMessage.toString()
+        }
+        return nil
     }
 
     private func addExternalVar(name: String, varPtr: UnsafeMutablePointer<SHVar>) {
