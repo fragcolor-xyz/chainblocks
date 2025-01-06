@@ -604,7 +604,7 @@ class OwnedVar {
     }
 }
 
-class TableVar: OwnedVar {
+class TableVar: OwnedVar, Sequence {
     override init() {
         super.init()
         v.valueType = VarType.Table.asSHType()
@@ -655,6 +655,38 @@ class TableVar: OwnedVar {
 
     func contains(string: StaticString) -> Bool {
         return contains(key: SHVar(string: string))
+    }
+
+    struct Iterator: IteratorProtocol {
+        let table: SHTable
+        // could not find a better solution... anyway why not...
+        var iterator: (CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar, CChar) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+        init(table: SHTable) {
+            self.table = table
+            table.api.pointee.tableGetIterator(table, &iterator)
+        }
+
+        mutating func next() -> (key: SHVar, value: SHVar)? {
+            var k = SHVar()
+            var v = SHVar()
+
+            if table.api.pointee.tableNext(table, &iterator, &k, &v) {
+                return (k, v)
+            }
+            return nil
+        }
+    }
+
+    func makeIterator() -> Iterator {
+        Iterator(table: v.payload.tableValue)
+    }
+
+    // Convenience method similar to the C++ ForEach
+    func forEach(_ body: (SHVar, SHVar) throws -> Void) rethrows {
+        for (key, value) in self {
+            try body(key, value)
+        }
     }
 }
 
@@ -1351,7 +1383,7 @@ class WireController {
     func addExternal(name: String, sequence: inout SeqVar) {
         addExternalVar(name: name, varPtr: sequence.ptr())
     }
-    
+
     func addExternal(name: String, table: inout TableVar) {
         addExternalVar(name: name, varPtr: table.ptr())
     }
