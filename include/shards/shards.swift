@@ -558,7 +558,7 @@ class OwnedVar {
         v = SHVar()
         set(bytes: bytes)
     }
-    
+
     init(bool: Bool) {
         v = SHVar()
         set(bool: bool)
@@ -586,7 +586,7 @@ class OwnedVar {
             G.Core.pointee.cloneVar(&v, &tmp)
         }
     }
-    
+
     func set(bool: Bool) {
         v.valueType = VarType.Bool.asSHType()
         v.payload.boolValue = bool
@@ -635,7 +635,7 @@ class TableVar: OwnedVar {
     func get(key: StaticString) -> SHVar {
         return get(key: SHVar(string: key))
     }
-    
+
     func maybeGet(key: StaticString) -> SHVar? {
         let result = get(key: SHVar(string: key))
         if result.valueType != VarType.NoValue.asSHType() {
@@ -1351,6 +1351,10 @@ class WireController {
     func addExternal(name: String, sequence: inout SeqVar) {
         addExternalVar(name: name, varPtr: sequence.ptr())
     }
+    
+    func addExternal(name: String, table: inout TableVar) {
+        addExternalVar(name: name, varPtr: table.ptr())
+    }
 
     func addExternal(name: String, raw: inout SHVar) {
         addExternalVar(name: name, varPtr: &raw)
@@ -1370,7 +1374,7 @@ class WireController {
             G.Core.pointee.destroyVar(resultPtr)
         }
     }
-    
+
     public func wait() async {
         // Check copier status every 100ms
         while isRunning() {
@@ -1587,49 +1591,110 @@ class Shards {
     extension OwnedVar {
         public static func from(image: UIImage) -> OwnedVar? {
             #if canImport(UIKit)
-            guard let cgImage = image.cgImage else {
-                print("Unable to get CGImage.")
+                guard let cgImage = image.cgImage else {
+                    print("Unable to get CGImage.")
+                    return nil
+                }
+
+                // Base width/height from the cgImage
+                let width = cgImage.width
+                let height = cgImage.height
+                let bytesPerPixel = 4 // RGBA
+                var drawWidth = width
+                var drawHeight = height
+
+                // Adjust width/height if orientation is rotated 90 or 270 degrees
+                var transform = CGAffineTransform.identity
+                switch image.imageOrientation {
+                case .down, .downMirrored:
+                    transform = transform
+                        .translatedBy(x: CGFloat(width), y: CGFloat(height))
+                        .rotated(by: .pi)
+                case .left, .leftMirrored:
+                    swap(&drawWidth, &drawHeight)
+                    transform = transform
+                        .translatedBy(x: CGFloat(drawWidth), y: 0)
+                        .rotated(by: .pi / 2)
+                case .right, .rightMirrored:
+                    swap(&drawWidth, &drawHeight)
+                    transform = transform
+                        .translatedBy(x: 0, y: CGFloat(drawHeight))
+                        .rotated(by: -.pi / 2)
+                default:
+                    break
+                }
+
+                let rowStride = drawWidth * bytesPerPixel
+                let totalBytes = drawHeight * rowStride
+
+                let result = OwnedVar()
+                result.v.valueType = VarType.Image.asSHType()
+                result.v.payload.imageValue = G.Core.pointee.imageNew(UInt32(totalBytes))
+
+                // Update final image dimensions after orientation adjustments
+                result.v.payload.imageValue.pointee.width = UInt16(drawWidth)
+                result.v.payload.imageValue.pointee.height = UInt16(drawHeight)
+                result.v.payload.imageValue.pointee.channels = UInt8(bytesPerPixel)
+                result.v.payload.imageValue.pointee.rowStride = UInt16(rowStride)
+                result.v.payload.imageValue.pointee.flags = UInt8(SHIMAGE_FLAGS_PREMULTIPLIED_ALPHA)
+
+                let colorSpace = CGColorSpaceCreateDeviceRGB()
+                let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+
+                guard let context = CGContext(
+                    data: result.v.payload.imageValue.pointee.data,
+                    width: drawWidth,
+                    height: drawHeight,
+                    bitsPerComponent: 8,
+                    bytesPerRow: rowStride,
+                    space: colorSpace,
+                    bitmapInfo: bitmapInfo
+                ) else {
+                    print("Unable to create CGContext.")
+                    return nil
+                }
+
+                context.concatenate(transform)
+                let rect = CGRect(x: 0, y: 0, width: width, height: height)
+                context.draw(cgImage, in: rect)
+
+                return result
+            #elseif canImport(AppKit)
+                guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                    print("Unable to get CGImage from NSImage")
+                    return nil
+                }
+
+                // Create a temporary UIImage to use the existing conversion code
+                let tempImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
+                return OwnedVar.from(image: tempImage)
+            #endif
+        }
+    }
+#endif
+
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
+    import AppKit
+
+    extension OwnedVar {
+        public static func from(image: NSImage) -> OwnedVar? {
+            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                print("Unable to get CGImage from NSImage")
                 return nil
             }
 
-            // Base width/height from the cgImage
             let width = cgImage.width
             let height = cgImage.height
             let bytesPerPixel = 4 // RGBA
-            var drawWidth = width
-            var drawHeight = height
-
-            // Adjust width/height if orientation is rotated 90 or 270 degrees
-            var transform = CGAffineTransform.identity
-            switch image.imageOrientation {
-            case .down, .downMirrored:
-                transform = transform
-                    .translatedBy(x: CGFloat(width), y: CGFloat(height))
-                    .rotated(by: .pi)
-            case .left, .leftMirrored:
-                swap(&drawWidth, &drawHeight)
-                transform = transform
-                    .translatedBy(x: CGFloat(drawWidth), y: 0)
-                    .rotated(by: .pi / 2)
-            case .right, .rightMirrored:
-                swap(&drawWidth, &drawHeight)
-                transform = transform
-                    .translatedBy(x: 0, y: CGFloat(drawHeight))
-                    .rotated(by: -.pi / 2)
-            default:
-                break
-            }
-
-            let rowStride = drawWidth * bytesPerPixel
-            let totalBytes = drawHeight * rowStride
+            let rowStride = width * bytesPerPixel
+            let totalBytes = height * rowStride
 
             let result = OwnedVar()
             result.v.valueType = VarType.Image.asSHType()
             result.v.payload.imageValue = G.Core.pointee.imageNew(UInt32(totalBytes))
 
-            // Update final image dimensions after orientation adjustments
-            result.v.payload.imageValue.pointee.width = UInt16(drawWidth)
-            result.v.payload.imageValue.pointee.height = UInt16(drawHeight)
+            result.v.payload.imageValue.pointee.width = UInt16(width)
+            result.v.payload.imageValue.pointee.height = UInt16(height)
             result.v.payload.imageValue.pointee.channels = UInt8(bytesPerPixel)
             result.v.payload.imageValue.pointee.rowStride = UInt16(rowStride)
             result.v.payload.imageValue.pointee.flags = UInt8(SHIMAGE_FLAGS_PREMULTIPLIED_ALPHA)
@@ -1639,8 +1704,8 @@ class Shards {
 
             guard let context = CGContext(
                 data: result.v.payload.imageValue.pointee.data,
-                width: drawWidth,
-                height: drawHeight,
+                width: width,
+                height: height,
                 bitsPerComponent: 8,
                 bytesPerRow: rowStride,
                 space: colorSpace,
@@ -1650,21 +1715,11 @@ class Shards {
                 return nil
             }
 
-            context.concatenate(transform)
+            // Draw the CGImage into the context
             let rect = CGRect(x: 0, y: 0, width: width, height: height)
             context.draw(cgImage, in: rect)
 
             return result
-            #elseif canImport(AppKit)
-            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-                print("Unable to get CGImage from NSImage")
-                return nil
-            }
-            
-            // Create a temporary UIImage to use the existing conversion code
-            let tempImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
-            return OwnedVar.from(image: tempImage)
-            #endif
         }
     }
 #endif
