@@ -514,7 +514,6 @@ private:
 };
 
 namespace shards {
-// LayeredMap Class Definition
 template <typename K, typename V> class LayeredMap {
   std::vector<std::unordered_map<K, V>> layers;
   std::vector<bool> blocker_tags;
@@ -525,6 +524,8 @@ public:
     using OuterIt = typename std::vector<std::unordered_map<K, V>>::const_iterator;
     using InnerIt = typename std::unordered_map<K, V>::const_iterator;
 
+    const std::vector<std::unordered_map<K, V>> *layers;
+    const std::vector<bool> *layers_blocker_tags;
     OuterIt current_layer;
     OuterIt end_layer;
     InnerIt current_it;
@@ -533,7 +534,12 @@ public:
     void advance_to_next() {
       while (current_layer != end_layer) {
         if (current_it == current_layer->end()) {
-          ++current_layer;
+          do {
+            ++current_layer;
+          } while (current_layer != end_layer &&
+                   static_cast<size_t>(std::distance(layers->begin(), current_layer)) < layers->size() &&
+                   (*layers_blocker_tags)[static_cast<size_t>(std::distance(layers->begin(), current_layer))]);
+
           if (current_layer != end_layer) {
             current_it = current_layer->begin();
           }
@@ -551,8 +557,9 @@ public:
     using pointer = const value_type *;
     using reference = const value_type &;
 
-    // Constructor for begin iterator
-    iterator(OuterIt start, OuterIt end) : current_layer(start), end_layer(end) {
+    // Constructor for begin/end iterator
+    iterator(const std::vector<std::unordered_map<K, V>> *l, const std::vector<bool> *bt, OuterIt start, OuterIt end)
+        : layers(l), layers_blocker_tags(bt), current_layer(start), end_layer(end) {
       if (current_layer != end_layer) {
         current_it = current_layer->begin();
         advance_to_next();
@@ -560,7 +567,8 @@ public:
     }
 
     // Constructor for specific element (used in find)
-    iterator(OuterIt layer, OuterIt end, InnerIt it) : current_layer(layer), end_layer(end), current_it(it) {}
+    iterator(const std::vector<std::unordered_map<K, V>> *l, const std::vector<bool> *bt, OuterIt layer, OuterIt end, InnerIt it)
+        : layers(l), layers_blocker_tags(bt), current_layer(layer), end_layer(end), current_it(it) {}
 
     // Dereference operators
     reference operator*() const { return *current_it; }
@@ -589,13 +597,10 @@ public:
   };
 
   // Push a new layer
-  // If blocked is true, the previous layer will be blocked from being accessed
   void pushLayer(bool blocked = false) {
     if (!layers.empty()) {
-      // Mark the current layer as blocked
       blocker_tags.back() = blocked;
     }
-    // Push a new layer and set its blocked status
     layers.emplace_back();
     blocker_tags.push_back(false);
   }
@@ -613,7 +618,7 @@ public:
     }
   }
 
-  // Insert only if the key does not exist in any accessible layer
+  // Insert only if the key doesn't exist in any accessible layer
   void insert(const K &key, const V &value) {
     auto it = find(key);
     if (it == end()) {
@@ -633,7 +638,6 @@ public:
     for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
       size_t index = std::distance(it, layers.rend()) - 1;
       if (blocker_tags[index]) {
-        // If the current layer is blocked, do not go further down
         break;
       }
       if (it->erase(key)) {
@@ -648,15 +652,13 @@ public:
     for (size_t i = num_layers; i > 0; --i) {
       size_t index = i - 1;
       if (blocker_tags[index]) {
-        // If a blocker is found and it's not the topmost layer, stop searching
         break;
       }
       const auto &layer = layers[index];
       auto found = layer.find(key);
       if (found != layer.end()) {
-        // Calculate the iterator to the found layer
         auto layer_it = layers.begin() + index;
-        return iterator(layer_it, layers.end(), found);
+        return iterator(&layers, &blocker_tags, layer_it, layers.end(), found);
       }
     }
     return end();
@@ -677,30 +679,22 @@ public:
 
   // Begin iterator
   iterator begin() const {
-    // Determine the range of layers to iterate over, respecting blockers
-    auto start = layers.end();
+    auto start = layers.begin();
     auto end_it = layers.end();
 
-    // Iterate from top to bottom to find the first blocker
     for (size_t i = layers.size(); i > 0; --i) {
       size_t index = i - 1;
       if (blocker_tags[index]) {
-        start = layers.begin() + index;
-        end_it = layers.end();
+        start = layers.begin() + index + 1; // Start AFTER the blocked layer
         break;
       }
     }
 
-    // If no blocker is found, start from the first layer
-    if (start == layers.end()) {
-      start = layers.begin();
-    }
-
-    return iterator(start, end_it);
+    return iterator(&layers, &blocker_tags, start, end_it);
   }
 
   // End iterator
-  iterator end() const { return iterator(layers.end(), layers.end()); }
+  iterator end() const { return iterator(&layers, &blocker_tags, layers.end(), layers.end()); }
 };
 
 using SHMap = SHTableImpl;
