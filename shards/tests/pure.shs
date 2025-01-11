@@ -1,5 +1,10 @@
 @mesh(root)
 
+@wire(another-test {
+  {Take("proto-data") = proto-data}
+  proto-data | Log
+} Pure: true)
+
 @wire(upload-proto {
   ExpectBytes
   "Hello" = proto-data
@@ -9,17 +14,10 @@
 @wire(main0 {
   "Proto-Indo-European" = proto-data
   proto-data | ToBytes | Do(upload-proto) | Log
-  proto-data | Log |
+  proto-data | Log
   Assert.Is("Proto-Indo-European" true)
+  {proto-data: proto-data} | Do(another-test)
 })
-
-@wire(main-pure {
-  2 >= value
-  ForRange(0 10 {
-    value | Math.Add(value) > value
-  })
-  value | Log("Result") | Assert.Is(4096 true)
-} Pure: true)
 
 @wire(pure0 {
   2 >= value
