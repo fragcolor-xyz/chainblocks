@@ -507,7 +507,7 @@ struct Pixels : public PixelBase {
       _output.payload.imageValue->width = w;
       _output.payload.imageValue->height = h;
       _output.payload.imageValue->channels = 4;
-      _output.payload.imageValue->flags = SHIMAGE_FLAGS_PREMULTIPLIED_ALPHA;
+      _output.payload.imageValue->flags = 0;
       SHImage &outImage = *_output.payload.imageValue;
 
       // grab from the bgra image
@@ -517,10 +517,10 @@ struct Pixels : public PixelBase {
         for (auto j = 0; j < w; j++) {
           auto sindex = ((grabber->width() * yindex) + xindex) * 4;
           auto dindex = ((w * i) + j) * 4;
-          outImage.data[dindex + 2] = img[sindex + 0];
-          outImage.data[dindex + 1] = img[sindex + 1];
-          outImage.data[dindex + 0] = img[sindex + 2];
-          outImage.data[dindex + 3] = img[sindex + 3];
+          outImage.data[dindex + 2] = img[sindex + 0]; // bgra -> rgba
+          outImage.data[dindex + 1] = img[sindex + 1]; // bgra -> rgba
+          outImage.data[dindex + 0] = img[sindex + 2]; // bgra -> rgba
+          outImage.data[dindex + 3] = img[sindex + 3]; // alpha
           xindex++;
         }
         yindex++;
