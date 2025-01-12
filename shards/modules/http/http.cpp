@@ -564,10 +564,12 @@ struct PeerError {
 };
 
 struct Server {
+  Server() : _port(Var(7070)) {}
+
   static inline Parameters params{
       {"Handler", SHCCSTR("The wire that will be spawned and handle a remote request."), {CoreInfo::WireOrNone}},
       {"Endpoint", SHCCSTR("The URL from where your service can be accessed by a client."), {CoreInfo::StringType}},
-      {"Port", SHCCSTR("The port this service will use."), {CoreInfo::IntType}}};
+      {"Port", SHCCSTR("The port this service will use."), {CoreInfo::IntType, CoreInfo::IntVarType}}};
 
   static SHParametersInfo parameters() { return params; }
 
@@ -585,6 +587,8 @@ struct Server {
   static SHTypesInfo inputTypes() { return CoreInfo::AnyType; }
   static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
 
+  ParamVar _port;
+
   void setParam(int idx, const SHVar &val) {
     switch (idx) {
     case 0:
@@ -594,7 +598,7 @@ struct Server {
       _endpoint = SHSTRVIEW(val);
       break;
     case 2:
-      _port = uint16_t(val.payload.intValue);
+      _port = val;
       break;
     default:
       break;
@@ -608,7 +612,7 @@ struct Server {
     case 1:
       return Var(_endpoint);
     case 2:
-      return Var(int(_port));
+      return _port;
     default:
       return Var::Empty;
     }
@@ -666,25 +670,41 @@ struct Server {
     });
   }
 
+  bool _is_running = false;
+
   void warmup(SHContext *context) {
     if (!_pool) {
       throw ComposeError("Peer wires pool not valid!");
     }
 
-    _ioc.reset(new net::io_context());
-    auto addr = net::ip::make_address(_endpoint);
-    _acceptor.reset(new tcp::acceptor(*_ioc, {addr, _port}));
-    _composer.context = context;
-    // start accepting
-    accept_once(context);
+    _port.warmup(context);
   }
 
   void cleanup(SHContext *context) {
     if (_pool)
       _pool->stopAll();
+
+    _port.cleanup(context);
+    _is_running = false;
   }
 
   SHVar activate(SHContext *context, const SHVar &input) {
+    if (!_is_running) {
+      _ioc.reset(new net::io_context());
+      auto addr = net::ip::make_address(_endpoint);
+      auto port = _port.get().payload.intValue;
+      // ensure port is in range of 1-65535
+      if (port < 1 || port > 65535) {
+        throw ActivationError("Port must be in range 1-65535");
+      }
+      _acceptor.reset(new tcp::acceptor(*_ioc, {addr, uint16_t(port)}));
+      _composer.context = context;
+      // start accepting
+      accept_once(context);
+
+      _is_running = true;
+    }
+
     try {
       _ioc->poll();
     } catch (PeerError pe) {
@@ -713,7 +733,6 @@ struct Server {
     }
   };
 
-  uint16_t _port{7070};
   std::string _endpoint{"0.0.0.0"};
   OwnedVar _handlerMaster{};
   std::unique_ptr<WireDoppelgangerPool<Peer>> _pool;
@@ -785,9 +804,7 @@ struct Read {
           _last_error = ec;
           _error_source = "Read header timeout";
           has_error = true;
-        } else if (ec == beast::http::error::end_of_stream || 
-                  ec == net::error::eof ||
-                  ec == net::error::connection_reset) {
+        } else if (ec == beast::http::error::end_of_stream || ec == net::error::eof || ec == net::error::connection_reset) {
           // Client disconnected - trigger normal peer cleanup
           throw PeerError{"Client disconnected", ec, peer};
         } else {
@@ -818,9 +835,7 @@ struct Read {
           _last_error = ec;
           _error_source = "Read body timeout";
           has_error = true;
-        } else if (ec == beast::http::error::end_of_stream || 
-                  ec == net::error::eof ||
-                  ec == net::error::connection_reset) {
+        } else if (ec == beast::http::error::end_of_stream || ec == net::error::eof || ec == net::error::connection_reset) {
           // Client disconnected - trigger normal peer cleanup
           throw PeerError{"Client disconnected", ec, peer};
         } else {

@@ -591,6 +591,16 @@ class OwnedVar {
         v.valueType = VarType.Bool.asSHType()
         v.payload.boolValue = bool
     }
+    
+    func set(int: Int) {
+        v.valueType = VarType.Int.asSHType()
+        v.payload.intValue = Int64(int)
+    }
+    
+    func set(int: Int64) {
+        v.valueType = VarType.Int.asSHType()
+        v.payload.intValue = int
+    }
 
     func set(bytes: ContiguousArray<UInt8>) {
         bytes.withUnsafeBufferPointer { buffer in
