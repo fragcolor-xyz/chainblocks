@@ -395,6 +395,7 @@ struct PixelBase {
 
     auto info = DXGIDesktopCapture::FindScreen(x, y, 1, 1);
     if (info.adapter != nullptr) {
+      SHLOG_INFO("Found screen for pixel grabber");
       auto grabber = new DXGIDesktopCapture(info);
       Grabbers.emplace_back(grabber);
       info.adapter->Release();
@@ -402,6 +403,7 @@ struct PixelBase {
       return grabber;
     }
 
+    SHLOG_ERROR("Failed to find screen for pixel grabber.");
     return nullptr;
   }
 
@@ -502,6 +504,10 @@ struct Pixels : public PixelBase {
 
       auto nbytes = 4 * w * h;
       _output = makeImage(w * h * nbytes);
+      _output.payload.imageValue->width = w;
+      _output.payload.imageValue->height = h;
+      _output.payload.imageValue->channels = 4;
+      _output.payload.imageValue->flags = SHIMAGE_FLAGS_PREMULTIPLIED_ALPHA;
       SHImage &outImage = *_output.payload.imageValue;
 
       // grab from the bgra image
@@ -1035,6 +1041,9 @@ struct CursorBitmap {
     _hdcMem = CreateCompatibleDC(0);
 
     _output = makeImage(iconw * iconh * 3);
+    _output.payload.imageValue->width = iconw;
+    _output.payload.imageValue->height = iconh;
+    _output.payload.imageValue->channels = 3;
     SHImage &outImage = *_output.payload.imageValue;
 
     _bitmap = CreateDIBSection(_hdcMem, &info, DIB_RGB_COLORS, (void **)&outImage.data, 0, 0);
