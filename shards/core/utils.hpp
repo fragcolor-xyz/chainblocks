@@ -25,6 +25,11 @@
 
 namespace shards {
 
+template <auto N> struct conststr {
+  char value[N];
+  constexpr conststr(const char (&str)[N]) { std::copy_n(str, N, value); }
+};
+
 #if SH_WINDOWS
 inline std::wstring toWindowsWString(std::string_view utf8) {
   std::wstring result;
@@ -34,32 +39,85 @@ inline std::wstring toWindowsWString(std::string_view utf8) {
 }
 #endif
 
-inline void setThreadName(std::string_view name_sv) {
+struct NativeString {
 #if SH_WINDOWS
-  std::wstring name = toWindowsWString(name_sv);
-  SetThreadDescription(GetCurrentThread(), name.c_str());
+  NativeString() = default;
+  NativeString(std::string_view name) : name(toWindowsWString(name)) {}
+  NativeString &operator=(const std::string_view &name) {
+    this->name = toWindowsWString(name);
+    return *this;
+  }
+  ~NativeString() {}
+  std::wstring name;
+  using value_type = std::wstring;
+#else
+  NativeString() = default;
+  NativeString(std::string_view name) : name(name) {}
+  NativeString &operator=(const std::string_view &name) {
+    this->name = name;
+    return *this;
+  }
+  ~NativeString() {}
+  std::string name;
+  using value_type = std::string;
+#endif
+};
+#if SH_WINDOWS
+using NativeStrType = std::wstring;
+using NativeStrViewType = std::wstring_view;
+#else
+using NativeStrType = std::string;
+using NativeStrViewType = std::string_view;
+#endif
+using NativeCStrType = const NativeStrType::value_type *;
+
+namespace detail {
+template <conststr Name> struct ConstNativeStringHolder {
+  static inline NativeString v;
+  static const auto &get() {
+    if (v.name.empty()) {
+      v = Name.value;
+    }
+    return v.name;
+  }
+};
+struct ConstNativeStringValue {
+  const NativeStrType &name;
+};
+} // namespace detail
+
+namespace literals {
+template <conststr cts> constexpr auto operator""_ns() {
+  return detail::ConstNativeStringValue{detail::ConstNativeStringHolder<cts>::get()};
+}
+} // namespace literals
+
+// NOTE: Should be null terminated
+inline void setThreadName(NativeCStrType v) {
+#if SH_WINDOWS
+  SetThreadDescription(GetCurrentThread(), v);
 #elif SH_LINUX
-  std::string name{name_sv};
-  pthread_setname_np(pthread_self(), name.c_str());
+  pthread_setname_np(pthread_self(), v);
 #elif SH_APPLE
-  std::string name{name_sv};
-  pthread_setname_np(name.c_str());
+  pthread_setname_np(v);
 #endif
 }
 
-std::list<const char *> &getThreadNameStack();
+std::list<NativeStrViewType> &getThreadNameStack();
 
 #if SH_DEBUG_THREAD_NAMES
-inline void pushThreadNameConst(std::string_view name) {
+// Use _ns suffix after constant
+inline void pushThreadName(const detail::ConstNativeStringValue &v) {
   auto &stack = getThreadNameStack();
-  stack.emplace_back(name.data());
-  setThreadName(name);
+  stack.emplace_back(v.name);
+  setThreadName(v.name.c_str());
 }
-
 // NOTE: by reference, since you should keep the string alive for the duration of the thread
-inline void pushThreadName(std::string &name) { pushThreadNameConst(name); }
-
-template <size_t N> inline void pushThreadName(const char (&str)[N]) { pushThreadNameConst(std::string_view(str, N)); }
+inline void pushThreadName(NativeString &str) {
+  auto &stack = getThreadNameStack();
+  stack.emplace_back(str.name);
+  setThreadName(str.name.c_str());
+}
 #else
 template <typename T> inline void pushThreadName(const T &v) {}
 #endif
@@ -67,7 +125,7 @@ template <typename T> inline void pushThreadName(const T &v) {}
 #if SH_DEBUG_THREAD_NAMES
 // You can add this to the debugger watch window (shards::_debugThreadStack)
 //  to see the current thread stack
-extern thread_local std::list<const char *> *_debugThreadStack;
+extern thread_local std::list<NativeStrViewType> *_debugThreadStack;
 #endif
 
 inline void popThreadName() {
@@ -76,7 +134,8 @@ inline void popThreadName() {
   _debugThreadStack = &stack;
   shassert(stack.size() > 0);
   stack.pop_back();
-  setThreadName(stack.size() > 0 ? stack.back() : "Unnamed thread");
+  static NativeString unnamed{"Unnamed thread"};
+  setThreadName(stack.size() > 0 ? stack.back().data() : unnamed.name.data());
 #endif
 }
 } // namespace shards

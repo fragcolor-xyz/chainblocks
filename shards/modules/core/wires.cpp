@@ -1590,9 +1590,9 @@ struct ParallelBase : public CapturingSpawners {
       cref->mesh = mesh;
 
 #if SH_DEBUG_THREAD_NAMES
-      static thread_local std::string debugThreadName;
-      debugThreadName.clear();
-      fmt::format_to(std::back_inserter(debugThreadName), "tf::Executor \"{}\" ({} idx: {})", cref->wire->name, context->currentWire()->name, idx);
+      static thread_local shards::NativeString debugThreadName;
+      debugThreadName.name.clear();
+      fmt::format_to(std::back_inserter(debugThreadName.name), "tf::Executor \"{}\" ({} idx: {})", cref->wire->name, context->currentWire()->name, idx);
       pushThreadName(debugThreadName);
       DEFER({ popThreadName(); });
 #endif

@@ -19,6 +19,7 @@
 #include "type_matcher.hpp"
 #include "type_info.hpp"
 #include "trait.hpp"
+#include "utils.hpp"
 #include <shards/fast_string/fast_string.hpp>
 
 #include <algorithm>
@@ -515,20 +516,20 @@ public:
 
 #if SH_DEBUG_THREAD_NAMES
   struct ThreadNameStrings {
-    ThreadNameStrings& init(SHWire *wire) {
+    ThreadNameStrings &init(SHWire *wire) {
       if (!initialized) {
-        resumeStr = fmt::format("Wire \"{}\"", (wire)->name);
-        extResumeStr = fmt::format("<resuming wire> \"{}\"", (wire)->name);
-        
-    suspendedStr= fmt::format("<suspended wire> \"{}\"", wire->name);
+        resumeStr = shards::NativeString{fmt::format("Wire \"{}\"", (wire)->name)};
+        extResumeStr = shards::NativeString{fmt::format("<resuming wire> \"{}\"", (wire)->name)};
+
+        suspendedStr = shards::NativeString{fmt::format("<suspended wire> \"{}\"", wire->name)};
         initialized = true;
       }
       return *this;
     }
     bool initialized = false;
-    std::string resumeStr;
-    std::string extResumeStr;
-    std::string suspendedStr;
+    shards::NativeString resumeStr;
+    shards::NativeString extResumeStr;
+    shards::NativeString suspendedStr;
   } threadNameStrings;
 #endif
 };

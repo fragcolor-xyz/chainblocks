@@ -106,11 +106,11 @@ int malmain(int argc, const char *argv[]) {
 }
 
 #ifndef NO_MAL_MAIN
-
+using namespace shards::literals;
 int main(int argc, const char *argv[]) {
   shards::parseArguments(argc, argv);
 
-  shards::pushThreadName("Main Thread");
+  shards::pushThreadName("Main Thread"_ns);
 
   auto result = shards_process_args(argc, const_cast<char **>(argv), false);
   if (result != 99) // 99 triggers our old main
