@@ -170,13 +170,14 @@ fn process_assignment(pair: Pair<Rule>, env: &mut ReadEnv) -> Result<Assignment,
 
   let identifier = extract_identifier(iden)?;
 
-  match assignment_op {
-    "=" => Ok(Assignment::AssignRef(pipeline, identifier)),
-    ">=" => Ok(Assignment::AssignSet(pipeline, identifier)),
-    ">" => Ok(Assignment::AssignUpd(pipeline, identifier)),
-    ">>" => Ok(Assignment::AssignPush(pipeline, identifier)),
+  let op = match assignment_op {
+    "=" => Ok(AssignmentKind::AssignRef),
+    ">=" => Ok(AssignmentKind::AssignSet),
+    ">" => Ok(AssignmentKind::AssignUpd),
+    ">>" => Ok(AssignmentKind::AssignPush),
     _ => Err(("Unexpected assignment operator.", pos).into()),
-  }
+  }?;
+  Ok(Assignment{ kind: op, identifier, line_info: Some(pos.into()) })
 }
 
 enum FunctionValue {
@@ -909,7 +910,7 @@ fn process_param(pair: Pair<Rule>, env: &mut ReadEnv) -> Result<Param, ShardsErr
 
   Ok(Param {
     name: param_name,
-    value: param_value,
+    value: param_value, 
     custom_state: CustomStateContainer::new(),
     is_default: None,
   })
@@ -1186,15 +1187,10 @@ impl ShardsErrorsShard {
   fn process_sequence(&mut self, seq: &Sequence) {
     for child in seq.statements.iter() {
       match child {
-        Statement::Assignment(x) => match x {
-          Assignment::AssignRef(p, _)
-          | Assignment::AssignSet(p, _)
-          | Assignment::AssignUpd(p, _)
-          | Assignment::AssignPush(p, _) => self.process_pipeline(p),
-        },
         Statement::Pipeline(p) => {
           self.process_pipeline(p);
-        }
+        },
+        _ => (),
       }
     }
     seq.custom_state.with::<ShardsError, _, _>(|e| {

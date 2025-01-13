@@ -47,14 +47,19 @@ inline void setThreadName(std::string_view name_sv) {
 #endif
 }
 
-std::list<std::string> &getThreadNameStack();
+std::list<const char *> &getThreadNameStack();
 
 #if SH_DEBUG_THREAD_NAMES
-inline void pushThreadName(std::string_view name) {
+inline void pushThreadNameConst(std::string_view name) {
   auto &stack = getThreadNameStack();
-  stack.emplace_back(name);
+  stack.emplace_back(name.data());
   setThreadName(name);
 }
+
+// NOTE: by reference, since you should keep the string alive for the duration of the thread
+inline void pushThreadName(std::string &name) { pushThreadNameConst(name); }
+
+template <size_t N> inline void pushThreadName(const char (&str)[N]) { pushThreadNameConst(std::string_view(str, N)); }
 #else
 template <typename T> inline void pushThreadName(const T &v) {}
 #endif
@@ -62,7 +67,7 @@ template <typename T> inline void pushThreadName(const T &v) {}
 #if SH_DEBUG_THREAD_NAMES
 // You can add this to the debugger watch window (shards::_debugThreadStack)
 //  to see the current thread stack
-extern thread_local std::list<std::string>* _debugThreadStack;
+extern thread_local std::list<const char *> *_debugThreadStack;
 #endif
 
 inline void popThreadName() {

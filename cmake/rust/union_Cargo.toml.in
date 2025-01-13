@@ -24,12 +24,13 @@ objc = { git = "https://github.com/shards-lang/rust-objc.git", version = "=0.2.7
 metal = { git = "https://github.com/shards-lang/metal-rs.git", version = "=0.29.0", branch = "shards-0.29.0" }
 
 [profile.dev.package]
-tiny-skia = { opt-level = 3 }
+tiny-skia = { opt-level = 3 } 
 resvg = { opt-level = 3 }
 usvg = { opt-level = 3 }
 shards-lang = { opt-level = 3 }
 shards-langffi = { opt-level = 3 }
 pest = { opt-level = 3, debug-assertions = false }  # This will apply to all profiles
+pest_derive = { opt-level = 3, debug-assertions = false }  # This will apply to all profiles
 syntect = { opt-level = 3 }
 flate2 = { opt-level = 3 }
 bincode = { opt-level = 3 }

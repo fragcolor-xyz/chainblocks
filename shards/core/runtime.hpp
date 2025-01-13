@@ -62,21 +62,21 @@ void __tsan_switch_to_fiber(void *fiber, unsigned flags);
 void __tsan_set_fiber_name(void *fiber, const char *name);
 const unsigned __tsan_switch_to_fiber_no_sync = 1 << 0;
 }
-#define TSANCoroEnter(wire)              \
-  {                                      \
-    if (!getCoroWireStack2().empty()) {  \
-      TracyFiberLeave;                   \
-    }                                    \
+#define TSANCoroEnter(wire)                     \
+  {                                             \
+    if (!getCoroWireStack2().empty()) {         \
+      TracyFiberLeave;                          \
+    }                                           \
     TracyFiberEnter(wire->getTracyFiberName()); \
-    getCoroWireStack2().push_back(wire); \
+    getCoroWireStack2().push_back(wire);        \
   }
-#define TSANCoroExit(wire)                                       \
-  {                                                              \
-    getCoroWireStack2().pop_back();                              \
-    TracyFiberLeave;                                             \
-    if (!getCoroWireStack2().empty()) {                          \
+#define TSANCoroExit(wire)                                              \
+  {                                                                     \
+    getCoroWireStack2().pop_back();                                     \
+    TracyFiberLeave;                                                    \
+    if (!getCoroWireStack2().empty()) {                                 \
       TracyFiberEnter(getCoroWireStack2().back()->getTracyFiberName()); \
-    }                                                            \
+    }                                                                   \
   }
 #else
 #define TSANCoroEnter(wire)
@@ -343,21 +343,21 @@ std::vector<SHWire *> &getCoroWireStack();
 #endif
 
 #if SH_DEBUG_THREAD_NAMES
-#define SH_CORO_RESUMED(_wire)                                         \
-  {                                                                    \
-    shards::pushThreadName(fmt::format("Wire \"{}\"", (_wire)->name)); \
-    SH_CORO_RESUMED_LOG(_wire)                                         \
+#define SH_CORO_RESUMED(_wire)                                                \
+  {                                                                           \
+    shards::pushThreadName((_wire)->threadNameStrings.init(_wire).resumeStr); \
+    SH_CORO_RESUMED_LOG(_wire)                                                \
   }
 #define SH_CORO_SUSPENDED(_wire)   \
   {                                \
     shards::popThreadName();       \
     SH_CORO_EXT_SUSPEND_LOG(_wire) \
   }
-#define SH_CORO_EXT_RESUME(_wire)                                                 \
-  {                                                                               \
-    shards::pushThreadName(fmt::format("<resuming wire> \"{}\"", (_wire)->name)); \
-    TracyCoroEnter(_wire);                                                        \
-    SH_CORO_EXT_RESUME_LOG(_wire);                                                \
+#define SH_CORO_EXT_RESUME(_wire)                                                \
+  {                                                                              \
+    shards::pushThreadName((_wire)->threadNameStrings.init(_wire).extResumeStr); \
+    TracyCoroEnter(_wire);                                                       \
+    SH_CORO_EXT_RESUME_LOG(_wire);                                               \
   }
 #define SH_CORO_EXT_SUSPEND(_wire) \
   {                                \
@@ -384,8 +384,8 @@ inline void prepare(SHWire *wire) {
   shassert(!coroutineValid(wire->coro) && "Wire already prepared!");
 
   auto runner = [wire]() {
-#if SH_USE_THREAD_FIBER
-    pushThreadName(fmt::format("<suspended wire> \"{}\"", wire->name));
+#if SH_DEBUG_THREAD_NAMES
+    pushThreadName(wire->threadNameStrings.init(wire).suspendedStr);
 #endif
     run(wire, &wire->coro);
   };

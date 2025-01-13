@@ -508,8 +508,28 @@ private:
   uint64_t uniqueId;
   static inline std::atomic_uint64_t idCounter{0};
 
+public:
 #if TRACY_FIBERS
   shards::fast_string::FastString tracyFiberName;
+#endif
+
+#if SH_DEBUG_THREAD_NAMES
+  struct ThreadNameStrings {
+    ThreadNameStrings& init(SHWire *wire) {
+      if (!initialized) {
+        resumeStr = fmt::format("Wire \"{}\"", (wire)->name);
+        extResumeStr = fmt::format("<resuming wire> \"{}\"", (wire)->name);
+        
+    suspendedStr= fmt::format("<suspended wire> \"{}\"", wire->name);
+        initialized = true;
+      }
+      return *this;
+    }
+    bool initialized = false;
+    std::string resumeStr;
+    std::string extResumeStr;
+    std::string suspendedStr;
+  } threadNameStrings;
 #endif
 };
 
