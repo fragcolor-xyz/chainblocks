@@ -76,7 +76,7 @@ void SphereGenerator::generate() {
       // normal
       vertex.setNormal(linalg::normalize(position));
 
-      vertex.setTexCoord(float2(1.0 - (u + uOffset), v));
+      vertex.setTexCoord(float2(u + uOffset, v));
 
       verticesRow.push_back(index++);
     }
@@ -131,7 +131,7 @@ void PlaneGenerator::generate() {
       VertexPNT &vertex = vertices.emplace_back();
       vertex.setPosition(float3(x, -y, 0));
       vertex.setNormal(float3(0, 0, 1));
-      vertex.setTexCoord(float2(float(ix) / gridX, 1 - (float(iy) / gridY)));
+      vertex.setTexCoord(float2(float(ix) / gridX, float(iy) / gridY));
     }
   }
 
@@ -194,7 +194,7 @@ void CubeGenerator::generate() {
 
         float2 uv;
         uv.x = (ix / gridX);
-        uv.y = (1 - (iy / gridY));
+        uv.y = (iy / gridY);
         vertex.setTexCoord(uv);
       }
     }
@@ -341,7 +341,7 @@ void CylinderGenerator::generate() {
         float3 normal = linalg::normalize(float3(sinTheta, slope, cosTheta));
         vertex.setNormal(normal);
 
-        vertex.setTexCoord(float2(u, 1 - v));
+        vertex.setTexCoord(float2(u, v));
 
         indexRow.emplace_back(index++);
       }

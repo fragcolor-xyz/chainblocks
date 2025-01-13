@@ -6,20 +6,20 @@
   Once({
     0.0 >= time
     GFX.BuiltinMesh(Type: BuiltinMeshType::Cube) >= mesh
-
+    
     ; Load texture
-    LoadImage("../../assets/ShardsLogo.png") >= image |
-    Log("Image") |
-    GFX.Texture >= texture |
+    LoadImage("../../assets/ShardsLogo.png") >= image
+    Log("Image")
+    GFX.Texture >= texture
     Log("Texture")
-
+    
     GFX.DrawQueue >= queue
-
+    
     ; Create render steps
     GFX.BuiltinFeature(Id: BuiltinFeatureId::Transform) >> features
     GFX.BuiltinFeature(Id: BuiltinFeatureId::BaseColor) >> features
     GFX.DrawablePass(Features: features Queue: queue) >> render-steps
-
+    
     ; Create view
     {Position: @f3(0 0 8) Target: @f3(0 0 0)} | Math.LookAt >= view-transform
     GFX.View(View: view-transform) >= view
@@ -43,21 +43,23 @@
 @wire(test-formats {
   Once({
     GFX.BuiltinMesh(Type: BuiltinMeshType::Plane) >= mesh
-
+    GFX.BuiltinMesh(Type: BuiltinMeshType::Cube) >= mesh-0
+    GFX.BuiltinMesh(Type: BuiltinMeshType::Sphere) >= mesh-1
+    
     LoadImage("data/RGBA.png") | GFX.Texture >= texture-0
     LoadImage("data/RGB.png") | GFX.Texture >= texture-1
     LoadImage("../../assets/ShardsLogo.png") | GFX.Texture >= texture-2
-
+    
     GFX.DrawQueue >= queue
-
+    
     ; Create render steps
     GFX.BuiltinFeature(Id: BuiltinFeatureId::Transform) >> features
     GFX.BuiltinFeature(Id: BuiltinFeatureId::BaseColor) >> features
     GFX.DrawablePass(Features: features Queue: queue
-                     Outputs: [{Name: "color" Clear: @f4(1.0)}]) >> render-steps
-
+    Outputs: [{Name: "color" Clear: @f4(1.0)}]) >> render-steps
+    
     ; Create view
-    {Position: @f3(0 0 8.0) Target: @f3(0 0 0)} | Math.LookAt >= view-transform
+    {Position: @f3(0 -1.0 12.0) Target: @f3(0 -1.0 0)} | Math.LookAt >= view-transform
     GFX.View(View: view-transform) >= view
   })
   GFX.MainWindow(
@@ -66,6 +68,15 @@
       @f3(-2 0 0) | Math.Translation | GFX.Drawable(Mesh: mesh Params: {baseColorTexture: texture-0}) | GFX.Draw(queue)
       @f3(0 0 0) | Math.Translation | GFX.Drawable(Mesh: mesh Params: {baseColorTexture: texture-1}) | GFX.Draw(queue)
       @f3(2 0 0) | Math.Translation | GFX.Drawable(Mesh: mesh Params: {baseColorTexture: texture-2}) | GFX.Draw(queue)
+      
+      Animation.Timer = t
+      @f3(-2 -2.0 0) | Math.Translation
+      Math.MatMul((t | Mul(2.0) | Math.AxisAngleY | Math.Rotation))
+      Math.MatMul((t | Mul(1.4) | Math.AxisAngleX | Math.Rotation))
+      GFX.Drawable(Mesh: mesh-0 Params: {baseColorTexture: texture-0}) | GFX.Draw(queue)
+      t | Mul(2.0) | Math.AxisAngleY | Math.Rotation
+      Math.MatMul((@f3(0 -2.0 0) | Math.Translation)) | GFX.Drawable(Mesh: mesh-1 Params: {baseColorTexture: texture-0}) | GFX.Draw(queue)
+      @f3(2 -2.0 0) | Math.Translation | GFX.glTF("data/RGBA-quad.glb" WrapRootNode: true) | GFX.Draw(queue)
       GFX.Render(Steps: render-steps View: view)
     }
   )
