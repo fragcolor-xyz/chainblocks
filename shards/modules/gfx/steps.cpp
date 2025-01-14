@@ -1,5 +1,6 @@
 #include "gfx.hpp"
 #include "drawable_utils.hpp"
+#include "param_types.hpp"
 #include "shader/composition.hpp"
 #include "shards_utils.hpp"
 #include "shader/translator.hpp"
@@ -372,7 +373,7 @@ struct EffectPassShard {
   PARAM_EXT(ParamVar, _outputScale, ShardsTypes::OutputScaleParameterInfo);
   PARAM_PARAMVAR(_inputs, "Inputs", "", {CoreInfo::NoneType, CoreInfo::StringSeqType, CoreInfo::StringVarSeqType});
   PARAM_PARAMVAR(_entryPoint, "EntryPoint", "", {CoreInfo::NoneType, CoreInfo::ShardRefSeqType, CoreInfo::ShardRefVarSeqType});
-  PARAM_EXT(ParamVar, _params, ShardsTypes::ParamsParameterInfo);
+  PARAM_EXT(ParamVar, _params, gfx::detail::ParamsParameterInfo);
   PARAM_EXT(ParamVar, _features, ShardsTypes::FeaturesParameterInfo);
   PARAM_PARAMVAR(_composeWith, "ComposeWith", "Any table of values that need to be injected into this feature's shaders",
                  {CoreInfo::NoneType, CoreInfo::AnyTableType, CoreInfo::AnyVarTableType});

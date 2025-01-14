@@ -1,0 +1,23 @@
+GET http://localhost:3000/ HTTP/1.1
+
+######
+
+GET http://localhost:3000/control HTTP/1.1
+
+######
+
+GET http://localhost:3000/tfs/shards/tests/gfx-cube.shs HTTP/1.1
+
+######
+
+PUT http://localhost:3000/control HTTP/1.1
+Content-Type: application/json
+
+{
+  "action": "run",
+  "data": "shards/tests/gfx-cube.shs"
+}
+
+######
+
+GET http://localhost:3000/control HTTP/1.1

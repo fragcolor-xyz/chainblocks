@@ -96,7 +96,7 @@ endif()
 
 if(EMSCRIPTEN_PTHREADS)
   list(APPEND RUST_FLAGS -Ctarget-feature=+atomics,+bulk-memory)
-  list(APPEND RUST_CARGO_UNSTABLE_FLAGS -Zbuild-std=panic_abort,std)
+  list(APPEND RUST_CARGO_UNSTABLE_FLAGS -Zbuild-std)
   set(RUST_NIGHTLY TRUE)
 endif()
 
@@ -298,6 +298,14 @@ function(add_rust_library)
 
   if(ANDROID)
     list(APPEND RUST_FLAGS -Ctarget-feature=+fp16)
+  endif()
+
+  if(EMSCRIPTEN_ROOT_PATH)
+    list(APPEND _RUST_ENVIRONMENT 
+      "PATH=${EMSCRIPTEN_ROOT_PATH}"
+      "TARGET_CC=${CMAKE_C_COMPILER}"
+      "TARGET_AR=${CMAKE_AR}"
+    )
   endif()
 
   list(APPEND _RUST_ENVIRONMENT RUSTFLAGS="${RUST_FLAGS}")

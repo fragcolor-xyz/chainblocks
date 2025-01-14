@@ -1,4 +1,5 @@
 #include "gfx.hpp"
+#include "param_types.hpp"
 #include <shards/common_types.hpp>
 #include "drawable_utils.hpp"
 #include <shards/core/foundation.hpp>
@@ -23,7 +24,7 @@ struct DrawableShard {
 
   PARAM_PARAMVAR(_mesh, "Mesh", "The mesh to use for this drawable.", {MeshVarType});
   PARAM_EXT(ParamVar, _material, ShardsTypes::MaterialParameterInfo);
-  PARAM_EXT(ParamVar, _params, ShardsTypes::ParamsParameterInfo);
+  PARAM_EXT(ParamVar, _params, gfx::detail::ParamsParameterInfo);
   PARAM_EXT(ParamVar, _features, ShardsTypes::FeaturesParameterInfo);
 
   PARAM_IMPL(PARAM_IMPL_FOR(_mesh), PARAM_IMPL_FOR(_material), PARAM_IMPL_FOR(_params), PARAM_IMPL_FOR(_features));
@@ -179,7 +180,7 @@ struct DrawShard {
 namespace shards {
 template <> struct PoolItemTraits<gfx::SHDrawQueue *> {
   gfx::SHDrawQueue *newItem() {
-    auto queue = gfx::detail::Container::DrawQueueObjectVar.New();
+    auto queue = gfx::ShardsTypes::DrawQueueObjectVar.New();
     queue->queue = std::make_shared<gfx::DrawQueue>();
     return queue;
   }

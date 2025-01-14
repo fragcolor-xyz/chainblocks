@@ -10,9 +10,10 @@
 #include <tracy/Wrapper.hpp>
 #include "buffer.hpp"
 #include "gfx.hpp"
+#include "shards_types.hpp"
 
 namespace gfx {
-
+ 
 template <typename T> inline void visitHostSharableShardsType(SHVar &var, T arg) {
   switch (var.valueType) {
   case SHType::Int:

@@ -1,5 +1,6 @@
-#include "context.hpp"
 #include <shards/linalg_shim.hpp>
+#include "context.hpp"
+#include "../shards_types.hpp"
 
 namespace shards {
 namespace Gizmos {

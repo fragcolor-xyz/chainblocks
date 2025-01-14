@@ -206,14 +206,19 @@ struct MainWindow final {
   void cleanup(SHContext *context) {
     PARAM_CLEANUP(context);
 
+    SPDLOG_DEBUG("cleanup window 0");
     if (_renderer || _windowContext) {
+      SPDLOG_DEBUG("cleanup window 1");
       callOnMeshThread(context, [&] {
+        SPDLOG_DEBUG("cleanup window 2");
         if (_renderer) {
+          SPDLOG_DEBUG("cleanup renderer");
           _renderer->cleanup(context);
           _renderer.reset();
         }
 
         if (_windowContext) {
+          SPDLOG_DEBUG("cleanup windowContext");
           if (_windowContext->window) {
             SHLOG_DEBUG("Destroying window");
             _windowContext->window->cleanup();

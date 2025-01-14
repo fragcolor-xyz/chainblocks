@@ -48,6 +48,9 @@ struct Run {
   PARAM_REQUIRED_VARIABLES()
   SHTypeInfo compose(const SHInstanceData &data) {
     PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    if (!_tickTime.isNone() && !_fps.isNone()) {
+      throw std::runtime_error("Run: run requires either a TickTime or FPS parameter");
+    }
     return data.inputType;
   }
   void warmup(SHContext *context) { PARAM_WARMUP(context); }
@@ -56,9 +59,9 @@ struct Run {
   SHVar activate(SHContext *context, const SHVar &input) {
     std::function<void()> delay;
     auto &fpsVar = (Var &)_fps.get();
+    auto &tickTimeVar = (Var &)_tickTime.get();
     auto &mesh = *reinterpret_cast<std::shared_ptr<SHMesh> *>(_mesh->payload.objectValue);
     auto &iterationsVar = (Var &)_iterations.get();
-    auto &tickTimeVar = (Var &)_tickTime.get();
 
     size_t numIterations = ~0; // Indefinitely
     if (iterationsVar.valueType == SHType::Int) {
@@ -88,6 +91,21 @@ struct Run {
           noErrors = false;
         }
         SH_SUSPEND(context, sleepDuration);
+        if (mesh->empty())
+          break;
+        if (numIterations != ~0 && ++iteration >= numIterations) {
+          break;
+        }
+      }
+    } else if (!fpsVar.isNone()) {
+      double sleepDuration = 1.0f / float(fpsVar.payload.intValue);
+      while (!mesh->empty()) {
+        if (!mesh->tick()) {
+          noErrors = false;
+        }
+        SH_SUSPEND(context, sleepDuration);
+        if (mesh->empty())
+          break;
         if (numIterations != ~0 && ++iteration >= numIterations) {
           break;
         }
@@ -98,11 +116,17 @@ struct Run {
           noErrors = false;
         }
         SH_SUSPEND(context, 0);
+        if (mesh->empty())
+          break;
         if (numIterations != ~0 && ++iteration >= numIterations) {
           break;
         }
       }
     }
+
+    // Terminate the mesh
+    SPDLOG_TRACE("Mesh is done, terminating, without errors: {}", noErrors);
+    mesh->terminate();
 
     return Var(noErrors);
   }

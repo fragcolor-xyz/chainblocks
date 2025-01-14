@@ -1,0 +1,49 @@
+#!/bin/bash
+
+echo "Running"
+
+SCRIPT_DIR=$(dirname $0)
+ROOT_DIR=$(readlink -f $SCRIPT_DIR/../../..)
+
+# Source the shared file to use the control function
+source $SCRIPT_DIR/shared
+
+function prepare_paths() {
+  local paths=("$@")
+  if [[ "$OSTYPE" == "msys" ]]; then
+    for i in "${!paths[@]}"; do
+      paths[$i]=$(cygpath -w "${paths[$i]}")
+    done
+  fi
+  local joined_paths
+  joined_paths=$(IFS=,; echo "${paths[*]}")
+  echo "$joined_paths"
+}
+
+function preload_files() {
+  local paths=(
+    "$ROOT_DIR/assets"
+    "$ROOT_DIR/shards/tests"
+    "$ROOT_DIR/lib"
+    "$ROOT_DIR/external/glTF-Sample-Assets/Models/Avocado"
+    "$ROOT_DIR/external/glTF-Sample-Assets/Models/DamagedHelmet"
+  )
+  local exclude_paths=(
+    "$ROOT_DIR/shards/tests/web"
+    "$ROOT_DIR/shards/tests/server"
+  )
+  local joined_paths
+  joined_paths=$(prepare_paths "${paths[@]}")
+  local joined_exclude_paths
+  joined_exclude_paths=$(prepare_paths "${exclude_paths[@]}")
+  
+  control action:preload-files data:"$joined_paths" exclude:"$joined_exclude_paths"
+}
+
+set -e
+(
+  sleep 0.5 &&
+    preload_files
+) &
+
+server

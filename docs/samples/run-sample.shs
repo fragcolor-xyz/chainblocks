@@ -21,4 +21,4 @@
 })
 
 @schedule(main main-wire)
-@run(main FPS: 60 Iterations: 60) | Assert.Is(true)
+@run(main FPS: 120 Iterations: 4) | Assert.Is(true)
