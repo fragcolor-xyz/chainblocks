@@ -7,26 +7,34 @@ if(APPLE)
     set(VISIONOS TRUE)
   endif()
 
+  # Set deployment target BEFORE any language enabling or project() calls
+  if(IOS)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "16.3" CACHE STRING "Minimum iOS deployment version" FORCE)
+    set(deployment_target_flag "-target ${CMAKE_SYSTEM_PROCESSOR}-apple-ios${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  elseif(VISIONOS)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "1.2" CACHE STRING "Minimum visionOS deployment version" FORCE)
+    set(deployment_target_flag "-target ${CMAKE_SYSTEM_PROCESSOR}-apple-xros${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  else()
+    set(MACOSX TRUE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3" CACHE STRING "Minimum macOS deployment version" FORCE)
+    set(deployment_target_flag "-target ${CMAKE_SYSTEM_PROCESSOR}-apple-macosx${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  endif()
+
+  # Add the deployment target flag to Swift compiler options
+  set(CMAKE_Swift_FLAGS "${CMAKE_Swift_FLAGS} ${deployment_target_flag}" CACHE STRING "Swift compiler flags" FORCE)
+  
   set(CMAKE_Swift_COMPILER /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc)
   enable_language(Swift)
   set(CMAKE_Swift_LANGUAGE_VERSION 5)
 
+  # Add link options for Swift targets
+  add_link_options("SHELL:$<$<LINK_LANGUAGE:Swift>:${deployment_target_flag}>")
+
   enable_language(OBJC)
-
-  # Remember to set proper linker to your final targets if you use swift files!
-  # set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)
-
-  if(IOS)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "16.3" CACHE STRING "Minimum iOS deployment version" FORCE)
-  elseif(VISIONOS)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "1.2" CACHE STRING "Minimum visionOS deployment version" FORCE)
-  else()
-    set(MACOSX TRUE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3" CACHE STRING "Minimum macOS deployment version" FORCE)
-  endif()
 
   message(STATUS "MACOSX: ${MACOSX}")
   message(STATUS "CMAKE_OSX_DEPLOYMENT_TARGET: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  message(STATUS "Swift deployment target flag: ${deployment_target_flag}")
 endif()
 
 if(NOT EMSCRIPTEN AND(WIN32 OR MACOSX OR DESKTOP_LINUX))
