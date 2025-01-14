@@ -175,7 +175,7 @@ jobs:
             --output-file coverage/coverage-macos-gpu.info \
             --ignore-errors inconsistent,gcov,range
           # convert absolute path to relative path
-          sed -e "s|${PWD}/|./|g" coverage/coverage-macos-gpu.info
+          sed -i '' -e "s#${PWD}/#./#g" coverage/coverage-macos-gpu.info
       - name: Upload coverage (Debug)
         if: ${{ steps.setup.outputs.build-type == 'Debug' }}
         uses: actions/upload-artifact@v3
