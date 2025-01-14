@@ -29,6 +29,7 @@ option(USE_AVX512 "Enable AVX512" OFF)
 
 # Required by Jolt as we enable RTTI
 set(CPP_RTTI_ENABLED ON CACHE BOOL "Enable C++ RTTI" FORCE)
+
 if(EMSCRIPTEN)
   set(CPP_EXCEPTIONS_ENABLED ON CACHE BOOL "Enable C++ exceptions" FORCE) # wasm requires exceptions to be enabled cos we use exceptions
 endif()
@@ -217,7 +218,7 @@ target_compile_definitions(TracyClient PUBLIC TRACY_CALLSTACK_SIZE=${TRACY_CALLS
 if(NOT EMSCRIPTEN)
   # TODO vulkan build support
   # if(WIN32 OR LINUX)
-  #   set(GGML_VULKAN ON CACHE BOOL "" FORCE)
+  # set(GGML_VULKAN ON CACHE BOOL "" FORCE)
   # endif()
   set(GGML_STATIC ON CACHE BOOL "" FORCE)
   set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
@@ -228,16 +229,24 @@ if(NOT EMSCRIPTEN)
   set(GGML_OPENMP OFF CACHE BOOL "" FORCE) # omp is very omp...
   set(GGML_METAL_USE_BF16 ON CACHE BOOL "" FORCE)
   set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)
+
   # Force math library to be empty, sometimes picks up libm.a from mingw64
   if(WIN32)
     set(MATH_LIBRARY "" CACHE FILEPATH "" FORCE)
   endif()
+
   add_subdirectory(llama.cpp)
+endif()
+
+if(WIN32)
+  set(JPEG_LIB_NAMES jpeg-static)
+else()
+  set(JPEG_LIB_NAMES jpeg)
 endif()
 
 sh_add_external_project(
   NAME mozjpeg_a
-  LIB_NAMES jpeg
+  LIB_NAMES ${JPEG_LIB_NAMES}
   TARGETS jpeg-static
   RELATIVE_INCLUDE_PATHS .
   RELATIVE_BINARY_INCLUDE_PATHS .
