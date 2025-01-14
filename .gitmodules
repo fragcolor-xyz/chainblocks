@@ -105,3 +105,6 @@
 [submodule "deps/llama.cpp"]
 	path = deps/llama.cpp
 	url = https://github.com/shards-lang/llama.cpp.git
+[submodule "deps/mozjpeg"]
+	path = deps/mozjpeg
+	url = https://github.com/shards-lang/mozjpeg.git
