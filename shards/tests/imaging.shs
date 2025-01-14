@@ -25,8 +25,14 @@ WritePNG("testResized1.png")
 baseImg
 ResizeImage(Width: 0 Height: 200)
 WritePNG("testResized2.png")
-WritePNG | ExpectBytes
-LoadImage | ImageToBytes | ExpectBytes
+StripAlpha
+WriteJPG("testResized2.jpg")
+{WritePNG | ExpectBytes
+  LoadImage | ImageToBytes | ExpectBytes
+}
+{WriteJPG | ExpectBytes
+  LoadImage | ImageToBytes | ExpectBytes
+}
 
 "../../assets/Freesample.svg"
 FS.Read(Bytes: true)

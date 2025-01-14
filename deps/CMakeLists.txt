@@ -234,3 +234,13 @@ if(NOT EMSCRIPTEN)
   endif()
   add_subdirectory(llama.cpp)
 endif()
+
+sh_add_external_project(
+  NAME mozjpeg_a
+  LIB_SUFFIX ""
+  LIB_NAMES jpeg
+  TARGETS jpeg-static
+  RELATIVE_INCLUDE_PATHS .
+  RELATIVE_BINARY_INCLUDE_PATHS .
+  CMAKE_ARGS -DBUILD_SHARED_LIBS=OFF
+  REPO_ARGS URL ${CMAKE_CURRENT_SOURCE_DIR}/mozjpeg)

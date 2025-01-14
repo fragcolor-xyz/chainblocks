@@ -17,6 +17,7 @@ using namespace linalg::aliases;
 #include <stb_image_resize.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
+#include <jpeglib.h>
 
 // Thanks windows for polluting the global namespace
 #ifdef LoadImage
@@ -864,6 +865,148 @@ struct WritePNG {
   }
 };
 
+struct WriteJPG {
+  static SHTypesInfo inputTypes() { return CoreInfo::ImageType; }
+  SHTypesInfo outputTypes() { return OutputTypes; }
+  static SHOptionalString help() { return SHCCSTR("Writes an image to a JPEG file or returns JPEG bytes."); }
+
+  PARAM_PARAMVAR(_filename, "File", "The file to write the image to", {CoreInfo::StringStringVarOrNone});
+  PARAM_VAR(_quality, "Quality", "JPEG quality (0-100)", {CoreInfo::IntType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_filename), PARAM_IMPL_FOR(_quality));
+
+  static inline Types OutputTypes = {{CoreInfo::BytesType, CoreInfo::ImageType}};
+  std::vector<uint8_t> _output;
+  FILE *_outfile{nullptr};
+  jpeg_destination_mgr _destmgr{};
+
+  void warmup(SHContext *context) { PARAM_WARMUP(context); }
+  void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
+
+  void setup() {
+    _quality = Var(int64_t(85)); // Default quality
+  }
+
+  PARAM_REQUIRED_VARIABLES();
+  SHTypeInfo compose(SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    // If param is none we output the bytes directly
+    if (_filename->valueType == SHType::None) {
+      return CoreInfo::BytesType;
+    } else {
+      return CoreInfo::ImageType;
+    }
+  }
+
+  static void init_destination(j_compress_ptr cinfo) {
+    auto dest = (WriteJPG *)cinfo->client_data;
+
+    // Ensure output buffer is allocated before setting pointers
+    if (dest->_output.empty()) {
+      dest->_output.resize(16384); // Initial buffer size
+    }
+
+    // Set the buffer pointers
+    dest->_destmgr.next_output_byte = reinterpret_cast<JOCTET *>(dest->_output.data());
+    dest->_destmgr.free_in_buffer = dest->_output.size();
+  }
+
+  static boolean empty_output_buffer(j_compress_ptr cinfo) {
+    auto dest = (WriteJPG *)cinfo->client_data;
+    size_t oldSize = dest->_output.size();
+
+    // Double the buffer size
+    dest->_output.resize(oldSize * 2);
+
+    // Update the destination pointers
+    dest->_destmgr.next_output_byte = reinterpret_cast<JOCTET *>(dest->_output.data() + oldSize);
+    dest->_destmgr.free_in_buffer = oldSize;
+
+    return TRUE;
+  }
+
+  static void term_destination(j_compress_ptr cinfo) {
+    auto dest = (WriteJPG *)cinfo->client_data;
+    dest->_output.resize(dest->_output.size() - cinfo->dest->free_in_buffer);
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    std::string filename;
+    if (_filename->valueType != SHType::None) {
+      if (!getPathChecked(filename, _filename, false)) {
+        throw ActivationError("Path does not exist!");
+      }
+    }
+
+    auto &image = *input.payload.imageValue;
+    int quality = std::clamp((int)_quality.payload.intValue, 0, 100);
+
+    auto pixsize = imageGetPixelSize(&image);
+    int w = int(image.width);
+    int h = int(image.height);
+    int c = int(image.channels);
+
+    // JPEG only supports 8-bit RGB/grayscale
+    if (pixsize != 1) {
+      throw ActivationError("JPEG only supports 8-bit per channel images!");
+    }
+
+    if (c != 1 && c != 3) {
+      throw ActivationError("JPEG only supports grayscale or RGB images!");
+    }
+
+    struct jpeg_compress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+    cinfo.err = jpeg_std_error(&jerr);
+    jpeg_create_compress(&cinfo);
+
+    if (!filename.empty()) {
+      if ((_outfile = fopen(filename.c_str(), "wb")) == NULL) {
+        jpeg_destroy_compress(&cinfo);
+        throw ActivationError("Failed to open output file!");
+      }
+      jpeg_stdio_dest(&cinfo, _outfile);
+    } else {
+      _destmgr.init_destination = init_destination;
+      _destmgr.empty_output_buffer = empty_output_buffer;
+      _destmgr.term_destination = term_destination;
+      cinfo.dest = &_destmgr;
+      cinfo.client_data = this;
+    }
+
+    cinfo.image_width = w;
+    cinfo.image_height = h;
+    cinfo.input_components = c;
+    cinfo.in_color_space = (c == 3) ? JCS_RGB : JCS_GRAYSCALE;
+
+    jpeg_set_defaults(&cinfo);
+    jpeg_set_quality(&cinfo, quality, TRUE);
+    jpeg_start_compress(&cinfo, TRUE);
+
+    int row_stride = imageGetRowStride(&image);
+    JSAMPROW row_pointer[1];
+
+    while (cinfo.next_scanline < cinfo.image_height) {
+      row_pointer[0] = &image.data[cinfo.next_scanline * row_stride];
+      jpeg_write_scanlines(&cinfo, row_pointer, 1);
+    }
+
+    jpeg_finish_compress(&cinfo);
+
+    if (_outfile) {
+      fclose(_outfile);
+      _outfile = nullptr;
+    }
+
+    jpeg_destroy_compress(&cinfo);
+
+    if (!filename.empty()) {
+      return input;
+    } else {
+      return Var(_output.data(), _output.size());
+    }
+  }
+};
+
 } // namespace Imaging
 } // namespace shards
 
@@ -881,5 +1024,6 @@ SHARDS_REGISTER_FN(imaging) {
   REGISTER_SHARD("ResizeImage", Resize);
   REGISTER_SHARD("LoadImage", LoadImage);
   REGISTER_SHARD("WritePNG", WritePNG);
+  REGISTER_SHARD("WriteJPG", WriteJPG);
   REGISTER_SHARD("ImageSize", ImageSize);
 }
