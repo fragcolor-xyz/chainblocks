@@ -217,12 +217,195 @@ struct Exe {
     return Var(_buf);
   }
 };
+
+struct Shell {
+  // boost process sucks.. we use our own pipe implementation
+  
+  static constexpr size_t bufferSize = 4096;
+  std::vector<char> _readBuffer;
+
+#ifdef _WIN32
+  HANDLE _childStdin_Rd = NULL;
+  HANDLE _childStdin_Wr = NULL;
+  HANDLE _childStdout_Rd = NULL;
+  HANDLE _childStdout_Wr = NULL;
+  PROCESS_INFORMATION _processInfo{};
+#else
+  int _stdin[2];  // Parent write, child read
+  int _stdout[2]; // Parent read, child write
+  pid_t _pid;
+#endif
+
+  std::string _outputBuffer;
+
+  static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::StringType; }
+
+  PARAM_VAR(_shell_path, "Shell", "The shell executable path", {CoreInfo::StringType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_shell_path));
+
+  Shell() : _readBuffer(bufferSize) {
+#ifdef _WIN32
+    _shell_path = shards::Var("cmd.exe");
+#else
+    _shell_path = shards::Var("/bin/bash");
+#endif
+  }
+
+  void warmup(SHContext *context) {
+    PARAM_WARMUP(context);
+
+#ifdef _WIN32
+    SECURITY_ATTRIBUTES saAttr;
+    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+    saAttr.bInheritHandle = TRUE;
+    saAttr.lpSecurityDescriptor = NULL;
+
+    // Create pipes
+    if (!CreatePipe(&_childStdout_Rd, &_childStdout_Wr, &saAttr, 0) ||
+        !CreatePipe(&_childStdin_Rd, &_childStdin_Wr, &saAttr, 0)) {
+      throw ActivationError("Failed to create pipes");
+    }
+
+    // Ensure the read handle to the pipe for STDOUT is not inherited
+    SetHandleInformation(_childStdout_Rd, HANDLE_FLAG_INHERIT, 0);
+    SetHandleInformation(_childStdin_Wr, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFO startupInfo{};
+    startupInfo.cb = sizeof(STARTUPINFO);
+    startupInfo.hStdError = _childStdout_Wr;
+    startupInfo.hStdOutput = _childStdout_Wr;
+    startupInfo.hStdInput = _childStdin_Rd;
+    startupInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+    std::string shellPath = SHSTRING_PREFER_SHSTRVIEW(_shell_path);
+
+    if (!CreateProcess(NULL, const_cast<LPSTR>(shellPath.c_str()), NULL, NULL, TRUE, 0, NULL, NULL, &startupInfo,
+                       &_processInfo)) {
+      throw ActivationError("Failed to create process");
+    }
+
+#else
+    if (pipe(_stdin) == -1 || pipe(_stdout) == -1) {
+      throw ActivationError("Failed to create pipes");
+    }
+
+    _pid = fork();
+    if (_pid == -1) {
+      throw ActivationError("Failed to fork process");
+    }
+
+    if (_pid == 0) {     // Child process
+      close(_stdin[1]);  // Close write end of stdin
+      close(_stdout[0]); // Close read end of stdout
+
+      dup2(_stdin[0], STDIN_FILENO);
+      dup2(_stdout[1], STDOUT_FILENO);
+      dup2(_stdout[1], STDERR_FILENO);
+
+      close(_stdin[0]);
+      close(_stdout[1]);
+
+      std::string shellPath = SHSTRING_PREFER_SHSTRVIEW(_shell_path);
+      execl(shellPath.c_str(), shellPath.c_str(), NULL);
+      exit(1);           // In case exec fails
+    } else {             // Parent process
+      close(_stdin[0]);  // Close read end of stdin
+      close(_stdout[1]); // Close write end of stdout
+
+      // Set non-blocking
+      fcntl(_stdout[0], F_SETFL, O_NONBLOCK);
+    }
+#endif
+  }
+
+  void cleanup(SHContext *context) {
+#ifdef _WIN32
+    if (_processInfo.hProcess) {
+      TerminateProcess(_processInfo.hProcess, 0);
+      CloseHandle(_processInfo.hProcess);
+      CloseHandle(_processInfo.hThread);
+    }
+    if (_childStdin_Rd)
+      CloseHandle(_childStdin_Rd);
+    if (_childStdin_Wr)
+      CloseHandle(_childStdin_Wr);
+    if (_childStdout_Rd)
+      CloseHandle(_childStdout_Rd);
+    if (_childStdout_Wr)
+      CloseHandle(_childStdout_Wr);
+#else
+    if (_pid > 0) {
+      kill(_pid, SIGTERM);
+      waitpid(_pid, NULL, 0);
+    }
+    close(_stdin[1]);
+    close(_stdout[0]);
+#endif
+    PARAM_CLEANUP(context);
+  }
+
+  std::string readAvailable() {
+    std::string output;
+#ifdef _WIN32
+    DWORD bytesAvailable = 0;
+    DWORD bytesRead = 0;
+
+    while (PeekNamedPipe(_childStdout_Rd, NULL, 0, NULL, &bytesAvailable, NULL) && bytesAvailable > 0) {
+      if (ReadFile(_childStdout_Rd, _readBuffer.data(), _readBuffer.size(), &bytesRead, NULL) && bytesRead > 0) {
+        output.append(_readBuffer.data(), bytesRead);
+      }
+    }
+#else
+    ssize_t bytesRead;
+    while ((bytesRead = read(_stdout[0], _readBuffer.data(), _readBuffer.size())) > 0) {
+      output.append(_readBuffer.data(), bytesRead);
+    }
+#endif
+    return output;
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    return awaitne(
+        context,
+        [&]() {
+          std::string cmd = SHSTRING_PREFER_SHSTRVIEW(input);
+          cmd += "\n";
+
+#ifdef _WIN32
+          DWORD bytesWritten;
+          WriteFile(_childStdin_Wr, cmd.c_str(), cmd.length(), &bytesWritten, NULL);
+#else
+          write(_stdin[1], cmd.c_str(), cmd.length());
+#endif
+
+          // Small sleep to allow output to be ready
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+          _outputBuffer = readAvailable();
+          return Var(_outputBuffer);
+        },
+        [&] {
+          SHLOG_DEBUG("Shell terminated");
+#ifdef _WIN32
+          if (_processInfo.hProcess) {
+            TerminateProcess(_processInfo.hProcess, 0);
+          }
+#else
+          if (_pid > 0) {
+            kill(_pid, SIGTERM);
+          }
+#endif
+        });
+  }
+};
 } // namespace Process
 
 SHARDS_REGISTER_FN(process) {
   REGISTER_SHARD("Process.Run", Process::Run);
   REGISTER_SHARD("Process.StackTrace", Process::StackTrace);
   REGISTER_SHARD("Process.Exe", Process::Exe);
+  REGISTER_SHARD("Process.Shell", Process::Shell);
 }
 } // namespace shards
 // namespace shards

@@ -8,22 +8,40 @@
   Assert.Is("Hello world\n" true)
   "" | Process.Run("echo" ["Hello world"]) | Log
   Assert.Is("Hello world\n" true)
-
+  
   ["10"] = args
   Maybe({"" | Process.Run("sleep" args Timeout: 1) | Log})
-
+  
   ; New test for stdin
   "Hello from stdin" | Process.Run("cat" []) | Log
   Assert.Is("Hello from stdin\n" true)
-
+  
   ; Test with multiple lines of input
   "Line 1\nLine 2\nLine 3" | Process.Run("cat" []) | Log
   Assert.Is("Line 1\nLine 2\nLine 3\n" true)
-
+  
   ; Test with a command that processes input
   "hello world" | Process.Run("tr" ["a-z" "A-Z"]) | Log
   Assert.Is("HELLO WORLD\n" true)
 })
 
 @schedule(root n)
+@run(root) | Assert.Is(true)
+
+@wire(shell-instance {
+  Process.Shell
+})
+
+@wire(shell-test {
+  Msg("Running echo hello")
+  "echo hello" | Do(shell-instance) | Log
+  Msg("Running ls")
+  "ls" | Do(shell-instance) | Log
+  Msg("Running export TEST_VAR=123")
+  "export TEST_VAR=123" | Do(shell-instance) | Log
+  Msg("Running echo $TEST_VAR")
+  "echo $TEST_VAR" | Do(shell-instance) | Log
+})
+
+@schedule(root shell-test)
 @run(root) | Assert.Is(true)
