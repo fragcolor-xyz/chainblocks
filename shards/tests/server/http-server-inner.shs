@@ -1,0 +1,71 @@
+@include("http-server-shared.shs")
+@define(root-path "../../..")
+@define(web-path "./")
+@define(binaries-path "../../../build/emscripten-mt/release")
+
+@define(headers {
+  "Cross-Origin-Opener-Policy": "same-origin"
+  "Cross-Origin-Embedder-Policy": "require-corp"
+})
+
+@template(send-as-json [] {
+  ToJson = json-data
+  Log("Response")
+  {"Content-Type": "application/json"} = hdrs
+  json-data | Http.Response(Headers: hdrs)
+})
+
+Http.Read = request
+{Take("target") >= target-raw}
+{Take("method") >= method}
+
+; ; filter out query params
+; target | Regex.Search("""(.*)\?""") = matches
+; Count(matches) | When(Is(2) {matches | Take(1) > target})
+
+target-raw String.Split("?") Take(0) = target
+target | Log("request")
+Cond([
+  {Is("/control")} {
+    method | Cond([
+      {Is("GET")} {
+        Count(action-queue) | If(Is(0) {
+            [] | @send-as-json()
+          } {
+            action-queue | Take(0) >> tmp-seq
+            tmp-seq | @send-as-json()
+          }
+        )
+      }
+      {Is("PUT")} {
+        request | Take("body") | FromJson = json-data
+        Expect(@action-type) >> action-queue
+      }
+      {Is("DELETE")} {
+        Count(action-queue) | When(IsMore(0) {
+          Log("Erasing action")
+          Erase(0 action-queue)
+          "" | Http.Response(Status: 200)
+        })
+      }
+      {true} {
+        "Method not allowed" | Http.Response(Status: 405 ContentType: "text/plain")
+      }])
+  }
+  {String.Starts("/tfs/")} {; Index test filesystem
+    target | Slice(4) = rel-path
+    [@root-path rel-path] | FS.Join | Log("Serving test file") | Http.SendFile(@headers)
+  }
+  {Is("/")} {
+    "/index.html" | Http.SendFile(@headers)
+  }
+  {String.Starts("/bin/")} {
+    target | Slice(4) = rel-path
+    [@binaries-path rel-path] | FS.Join | Log("Serving binary") | Http.SendFile(@headers)
+  }
+  {true} {
+    [@root-path target] | FS.Join | Log("Serving")
+    Http.SendFile(@headers)
+  }] Passthrough: true)
+Log("Done")
+

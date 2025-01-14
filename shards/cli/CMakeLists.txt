@@ -37,6 +37,33 @@ setup_shards_library_target(shards-lib)
 set_target_properties(shards-lib PROPERTIES OUTPUT_NAME "${LIB_PREFIX}shards-static")
 target_compile_definitions(shards-lib PRIVATE "shards_EXPORTS=1")
 
+if(EMSCRIPTEN)
+  if(EMSCRIPTEN_PTHREADS)
+    set_target_properties(shards PROPERTIES SUFFIX "-mt.js")
+  else()
+    set_target_properties(shards PROPERTIES SUFFIX "-st.js")
+  endif()
+
+  target_sources(shards PRIVATE emscripten_api.cpp)
+
+  target_link_options(shards PUBLIC
+    "-sMODULARIZE=1"
+    "-sEXPORT_NAME=shards"
+    "-sEXPORT_ES6=1" # Don't need compatibility with older browsers, wgpu is a limiting factor
+    "-sMIN_FIREFOX_VERSION=125"
+    "-sMIN_CHROME_VERSION=113"
+    "-sMIN_SAFARI_VERSION=-1"
+    "-sPTHREAD_POOL_SIZE=12"
+    "-sEXPORTED_RUNTIME_METHODS=['FS', 'stringToNewUTF8', 'ccall', 'cwrap', 'gfxSetup']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free']"
+    "-sOFFSCREENCANVAS_SUPPORT=1"
+    "-sSTACK_SIZE=2097152"
+    "-sINITIAL_MEMORY=2147483648"
+    "-sWASMFS"
+    "-sFORCE_FILESYSTEM"
+  )
+endif()
+
 # Apple Framework target
 if(APPLE)
   add_library(shards-framework SHARED ${cli_SOURCES})
