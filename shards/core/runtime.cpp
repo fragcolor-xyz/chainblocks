@@ -701,9 +701,13 @@ NO_INLINE void handleActivationError(SHContext *context, Shard *blk) {
   SHLOG_ERROR(msg);
   context->pushError(std::move(msg));
   auto wire = context->currentWire();
-  auto mesh = context->currentWire()->mesh.lock();
-  shards::OwnedVar errVar((Var(context->getErrorMessage())));
-  mesh->dispatcher.trigger(SHWire::OnErrorEvent{wire, blk, std::move(errVar)});
+  if (wire) {
+    auto mesh = wire->mesh.lock();
+    if (mesh) {
+      shards::OwnedVar errVar((Var(context->getErrorMessage())));
+      mesh->dispatcher.trigger(SHWire::OnErrorEvent{wire, blk, std::move(errVar)});
+    }
+  }
 }
 
 template <typename T, bool HANDLES_RETURN>

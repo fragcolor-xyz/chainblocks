@@ -237,7 +237,6 @@ endif()
 
 sh_add_external_project(
   NAME mozjpeg_a
-  LIB_SUFFIX ""
   LIB_NAMES jpeg
   TARGETS jpeg-static
   RELATIVE_INCLUDE_PATHS .
