@@ -84,9 +84,9 @@ template <auto V> struct constant {
   constexpr static decltype(V) value = V;
 };
 
-inline SHOptionalString operator"" _optional(const char *s, size_t) { return SHOptionalString{s}; }
-inline SHStringWithLen operator"" _swl(const char *s, size_t l) { return SHStringWithLen{s, l}; }
-inline std::string_view operator"" _sv(const char *s, size_t l) { return std::string_view{s, l}; }
+inline SHOptionalString operator""_optional(const char *s, size_t) { return SHOptionalString{s}; }
+inline SHStringWithLen operator""_swl(const char *s, size_t l) { return SHStringWithLen{s, l}; }
+inline std::string_view operator""_sv(const char *s, size_t l) { return std::string_view{s, l}; }
 
 constexpr std::size_t StrLen(const char *str) {
   std::size_t len = 0;
