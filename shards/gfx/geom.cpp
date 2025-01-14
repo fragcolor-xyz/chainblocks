@@ -131,7 +131,11 @@ void PlaneGenerator::generate() {
       VertexPNT &vertex = vertices.emplace_back();
       vertex.setPosition(float3(x, -y, 0));
       vertex.setNormal(float3(0, 0, 1));
-      vertex.setTexCoord(float2(float(ix) / gridX, float(iy) / gridY));
+      if(flipTextureVertically) {
+        vertex.setTexCoord(float2(float(ix) / gridX, 1 - float(iy) / gridY));
+      } else {
+        vertex.setTexCoord(float2(float(ix) / gridX, float(iy) / gridY));
+      }
     }
   }
 
