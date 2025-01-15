@@ -3253,9 +3253,14 @@ SHVar shards_deserialize_var(const SHVar *bytes_buffer_var) {
   return leaking_tmp;
 }
 
-void shards_cancel_abort(SHContext *context) {
+SHBool shards_cancel_abort(SHContext *context) {
+  if (context->shouldStop()) {
+    // ok this flow should stop already... so we can just return false
+    return false;
+  }
   context->resetErrorStack();
   context->continueFlow();
+  return true;
 }
 }
 

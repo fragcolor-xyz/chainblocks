@@ -194,17 +194,15 @@ pub fn abortWire(context: &SHContext, message: &str) {
   }
 }
 
-// void shards_cancel_abort(SHContext *context)
+// SHBool shards_cancel_abort(SHContext *context)
 // Not exposed in the C API, but used internally
 extern "C" {
-  fn shards_cancel_abort(context: *mut SHContext);
+  fn shards_cancel_abort(context: *mut SHContext) -> SHBool;
 }
 
 #[inline(always)]
-pub fn cancel_abort(context: &SHContext) {
-  unsafe {
-    shards_cancel_abort(context as *const SHContext as *mut SHContext);
-  }
+pub fn cancel_abort(context: &SHContext) -> bool {
+  unsafe { shards_cancel_abort(context as *const SHContext as *mut SHContext) }
 }
 
 #[inline(always)]
