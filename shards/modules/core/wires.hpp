@@ -126,7 +126,9 @@ struct BaseRunner : public WireBase {
 
   SHTypeInfo compose(const SHInstanceData &data) {
     resolveWire();
-    assert(wire && "wire should be set at this point");
+    if (!wire) {
+      throw std::runtime_error("wire should be set at this point");
+    }
     // Start/Resume need to capture all it needs, so we need deeper informations
     // this is triggered by populating requiredVariables variable
     auto dataCopy = data;
@@ -218,7 +220,9 @@ struct BaseRunner : public WireBase {
 
   void warmup(SHContext *ctx) {
     if (capturing) {
-      assert(wire && "wire should be set at this point");
+      if (!wire) {
+        throw std::runtime_error("wire should be set at this point");
+      }
 
       for (auto &v : _vars) {
         SHLOG_TRACE("BaseRunner: warming up variable: {}, wire: {}", v.variableName(), wire->name);
