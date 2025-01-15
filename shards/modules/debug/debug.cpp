@@ -88,6 +88,18 @@ struct DumpWireStack {
   }
 };
 
+struct LastError {
+  static SHTypesInfo inputTypes() { return shards::CoreInfo::AnyType; }
+  static SHTypesInfo outputTypes() { return shards::CoreInfo::AnyType; }
+  static SHOptionalString help() { return SHCCSTR("Outputs the last error"); }
+
+  OwnedVar _lastError;
+
+  SHVar &activate(SHContext *shContext, const SHVar &input) {
+    _lastError = Var(shContext->getErrorMessage());
+    return _lastError;
+  }
+};
 } // namespace shards::Debug
 
 namespace shards {
@@ -96,5 +108,6 @@ SHARDS_REGISTER_FN(debug) {
   REGISTER_SHARD("Debug.Noop", DebugNoop);
   REGISTER_SHARD("Debug.DumpEnv", DumpEnv);
   REGISTER_SHARD("Debug.WireStack", DumpWireStack);
+  REGISTER_SHARD("Debug.LastError", LastError);
 }
 } // namespace shards

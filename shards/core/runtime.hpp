@@ -160,20 +160,6 @@ struct SHContext {
     return out;
   }
 
-  SHStateSnapshot takeStateSnapshot() {
-    return SHStateSnapshot{
-        state,
-        std::move(flowStorage),
-        std::move(errorMessage),
-    };
-  }
-
-  void restoreStateSnapshot(SHStateSnapshot &&snapshot) {
-    errorMessage = std::move(snapshot.errorMessage);
-    state = std::move(snapshot.state);
-    flowStorage = std::move(snapshot.flowStorage);
-  }
-
   constexpr void rebaseFlow() { state = SHWireState::Rebase; }
 
   constexpr void continueFlow() { state = SHWireState::Continue; }
