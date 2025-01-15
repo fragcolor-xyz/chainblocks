@@ -587,10 +587,13 @@ macro_rules! get_like {
             if retries == 0 {
               return Err("Request failed");
             } else {
-              shards::core::cancel_abort(context);
-              shlog_debug!("Retrying request, {} tries left", retries);
-              shards::core::suspend(context, self.rb.backoff as f64); // use backoff instead of hardcoded 1.0
-              retries -= 1;
+              if shards::core::cancel_abort(context) {
+                shlog_debug!("Retrying request, {} tries left", retries);
+                shards::core::suspend(context, self.rb.backoff as f64); // use backoff instead of hardcoded 1.0
+                retries -= 1;
+              } else {
+                return Err("Cannot retry request, wire might have been aborted");
+              }
             }
           }
         }
@@ -793,10 +796,13 @@ macro_rules! post_like {
             if retries == 0 {
               return Err("Request failed");
             } else {
-              shards::core::cancel_abort(context);
-              shlog_debug!("Retrying request, {} tries left", retries);
-              shards::core::suspend(context, self.rb.backoff as f64); // use backoff instead of hardcoded 1.0
-              retries -= 1;
+              if shards::core::cancel_abort(context) {
+                shlog_debug!("Retrying request, {} tries left", retries);
+                shards::core::suspend(context, self.rb.backoff as f64); // use backoff instead of hardcoded 1.0
+                retries -= 1;
+              } else {
+                return Err("Cannot retry request, wire might have been aborted");
+              }
             }
           }
         }
