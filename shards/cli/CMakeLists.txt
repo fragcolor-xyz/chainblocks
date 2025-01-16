@@ -8,9 +8,9 @@ function(setup_shards_target TARGET)
   endif()
 
   if(APPLE)
-    target_link_libraries(${TARGET} shards-core shards_core_swift)
+    target_link_libraries(${TARGET} replxx shards-core shards_core_swift)
   else()
-    target_link_libraries(${TARGET} shards-core)
+    target_link_libraries(${TARGET} replxx shards-core)
   endif()
 
   set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)
@@ -26,36 +26,45 @@ function(setup_shards_library_target TARGET)
   setup_shards_target(${TARGET})
 endfunction()
 
-# Executable
-add_executable(shards ${cli_SOURCES})
-setup_shards_target(shards)
-target_link_libraries(shards shards-cpp-union)
+if(NOT EMSCRIPTEN)
+  # Executable
+  add_executable(shards ${cli_SOURCES})
+  setup_shards_target(shards)
 
-# library
-add_library(shards-lib)
-setup_shards_library_target(shards-lib)
-set_target_properties(shards-lib PROPERTIES OUTPUT_NAME "${LIB_PREFIX}shards-static")
-target_compile_definitions(shards-lib PRIVATE "shards_EXPORTS=1")
+  target_link_libraries(shards shards-cpp-union)
 
-if(EMSCRIPTEN)
+  # library
+  add_library(shards-lib)
+  setup_shards_library_target(shards-lib)
+  set_target_properties(shards-lib PROPERTIES OUTPUT_NAME "${LIB_PREFIX}shards-static")
+  target_compile_definitions(shards-lib PRIVATE "shards_EXPORTS=1")
+
+  # Apple Framework target
+  if(APPLE)
+    target_link_libraries(${TARGET} shards-core shards_core_swift)
+  else()
+    target_link_libraries(${TARGET} shards-core)
+  endif()
+else()
+  add_executable(shards emscripten_api.cpp)
+
   if(EMSCRIPTEN_PTHREADS)
     set_target_properties(shards PROPERTIES SUFFIX "-mt.js")
   else()
     set_target_properties(shards PROPERTIES SUFFIX "-st.js")
   endif()
 
-  target_sources(shards PRIVATE emscripten_api.cpp)
-
   target_link_options(shards PUBLIC
     "-sMODULARIZE=1"
     "-sEXPORT_NAME=shards"
+    "-sENVIRONMENT=web,worker"
     "-sEXPORT_ES6=1" # Don't need compatibility with older browsers, wgpu is a limiting factor
     "-sMIN_FIREFOX_VERSION=125"
     "-sMIN_CHROME_VERSION=113"
     "-sMIN_SAFARI_VERSION=-1"
     "-sPTHREAD_POOL_SIZE=12"
     "-sEXPORTED_RUNTIME_METHODS=['FS', 'FETCHFS', 'stringToNewUTF8', 'UTF8ToString', 'ccall', 'cwrap', 'gfxSetup']"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free', '_main']"
     "-sOFFSCREENCANVAS_SUPPORT=1"
     "-sSTACK_SIZE=2097152"
     "-sINITIAL_MEMORY=2147483648"
@@ -65,13 +74,10 @@ if(EMSCRIPTEN)
     "-sASYNCIFY_EXPORTS=['_shardsLoadScript', '_shardsTick', '_shardsFreeInstance']"
   )
 
-  if(TRUE)
-    target_link_options(shards PUBLIC
+  target_link_libraries(shards shards-core shards-cpp-union)
 
-      # "-sJSPI_IMPORTS=['_wasmfs_create_fetch_backend']"
-      # "-sJSPI_EXPORTS=['wasmfs_create_fetch_backend, _wasmfs_create_fetch_backend']"
-    )
-  endif()
+  # Need the lang-ffi bindings
+  add_dependencies(shards cargo-shards-langffi-rust)
 
   if(SHARDS_DEBUG_SYMBOL_URL)
     # Set cache to something like:

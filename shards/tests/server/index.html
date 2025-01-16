@@ -281,13 +281,13 @@
         });
       }
 
-      currentAction.style.display = 'none';
-      isProcessingAction = false;
-
       // Delete completed action
       await fetch('/control', {
         method: 'DELETE'
       });
+      
+      currentAction.style.display = 'none';
+      isProcessingAction = false;
     }
 
     async function pollControl() {

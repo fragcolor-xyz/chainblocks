@@ -55,15 +55,15 @@ var LibraryGFXEvents = {
       e.type_ = 2;
       handleMouseEvent(e);
     };
-    window.oncontextmenu = (e) => {
+    canvasContainer.oncontextmenu = (e) => {
       e.preventDefault();
     };
 
     var state = { cursorInPage: false };
-    window.onmouseout = () => {
+    canvasContainer.onmouseout = () => {
       state.cursorInPage = false;
     };
-    window.onmouseover = () => {
+    canvasContainer.onmouseover = () => {
       state.cursorInPage = true;
     };
     const trapKeyEvents = (code) => { return state.cursorInPage; };
@@ -92,7 +92,7 @@ var LibraryGFXEvents = {
       }
     }, true);
     window.addEventListener('wheel', (event) => {
-      console.log("Wheel", event);
+      // console.log("Wheel", event);
 
       // Flip the wheel direction to translate from browser wheel direction
       // (+:down) to SDL direction (+:up)

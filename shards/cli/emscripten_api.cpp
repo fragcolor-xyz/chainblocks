@@ -183,9 +183,14 @@ EMSCRIPTEN_KEEPALIVE void shardsFSMountHTTP(const char *target_, const char *bas
   });
 }
 
-EMSCRIPTEN_KEEPALIVE Instance *shardsLoadScript(const char *code, const char *base_path) {
+EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *code, const char *base_path) {
   shards::logging::setupDefaultLoggerConditional("");
-  Instance *instance = new Instance();
+  if (!outInstance) {
+    SPDLOG_ERROR("shardsLoadScript: outInstance is null");
+    return;
+  }
+
+  Instance *instance = (*outInstance) = new Instance();
   SHLEvalEnv *env{};
   std::vector<SHStringWithLen> includeDirs;
 
@@ -209,7 +214,7 @@ EMSCRIPTEN_KEEPALIVE Instance *shardsLoadScript(const char *code, const char *ba
       SPDLOG_ERROR("Failed to eval script at {}:{}: {}", err->line, err->column, err->message);
       instance->error = err->message;
       shards_free_error(err);
-      return instance;
+      return;
     }
 
     SHLWire shlwire = shards_eval(&ast, "script"_swl);
@@ -218,7 +223,7 @@ EMSCRIPTEN_KEEPALIVE Instance *shardsLoadScript(const char *code, const char *ba
       SPDLOG_ERROR("Failed to evaluate script at {}:{}: {}", shlwire.error->line, shlwire.error->column, shlwire.error->message);
       instance->error = shlwire.error->message;
       shards_free_error(shlwire.error);
-      return instance;
+      return;
     }
 
     auto wire = SHWire::sharedFromRef(*shlwire.wire);
@@ -232,18 +237,19 @@ EMSCRIPTEN_KEEPALIVE Instance *shardsLoadScript(const char *code, const char *ba
 
   // BUG: Fixes return value
   // see https://github.com/emscripten-core/emscripten/issues/13302
-  emscripten_sleep(0);
-
-  return instance;
+  // emscripten_sleep(0);
+  // return instance;
 }
 
-EMSCRIPTEN_KEEPALIVE bool shardsTick(Instance *instance) {
+EMSCRIPTEN_KEEPALIVE void shardsTick(Instance *instance, bool *result) {
   bool r = instance->mesh->tick();
 
   // BUG: Fixes return value
   // see https://github.com/emscripten-core/emscripten/issues/13302
-  emscripten_sleep(0);
-  return r;
+  // emscripten_sleep(0);
+
+  if (result)
+    *result = r;
 }
 
 EMSCRIPTEN_KEEPALIVE const char *shardsGetError(Instance *instance) {
@@ -273,4 +279,6 @@ EMSCRIPTEN_KEEPALIVE void shardsUnlockLogBuffer() {
 }
 
 EMSCRIPTEN_KEEPALIVE MessageRep *shardsGetLogMessages(int *count) { return logBuffer.getMessages(count); }
+
+EMSCRIPTEN_KEEPALIVE int main(int argc, char **argv) { return 0; }
 }
