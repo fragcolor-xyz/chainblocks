@@ -14,12 +14,31 @@
 #include <spdlog/sinks/dist_sink.h>
 
 namespace shards {
-REGISTER_ENUM(Enums::LogLevelEnumInfo);
 
 struct LoggingBase {
   static SHTypesInfo inputTypes() { return CoreInfo::AnyType; }
-
   static SHTypesInfo outputTypes() { return CoreInfo::AnyType; }
+
+  PARAM_PARAMVAR(_level, "Level", "The logging level to use.",
+                 {Enums::LogLevelEnumInfo::Type, Type::VariableOf(Enums::LogLevelEnumInfo::Type)})
+  PARAM_PARAMVAR(_name, "Name", "The name of the logger to use.", {CoreInfo::StringType, Type::VariableOf(CoreInfo::StringType)})
+  PARAM_IMPL(PARAM_IMPL_FOR(_level), PARAM_IMPL_FOR(_name))
+
+  LoggingBase() {
+    _name = Var("shards");
+    _level = Var::Enum(Enums::LogLevel::Info, Enums::LogLevelEnumInfo::Type);
+  }
+
+  void warmup(SHContext *context) { _logger = shards::logging::getOrCreate(SHSTRING_PREFER_SHSTRVIEW(_name.get())); }
+
+  void maybeUpdateDynamicLogger() {
+    if (_name.isVariable() && _logger->name() != SHSTRVIEW(_name.get())) {
+      _logger = shards::logging::getOrCreate(SHSTRING_PREFER_SHSTRVIEW(_name.get()));
+    }
+  }
+
+protected:
+  shards::logging::Logger _logger;
 };
 
 #define SHLOG_LEVEL(_level_, ...)                                                                      \
@@ -28,9 +47,6 @@ struct LoggingBase {
   }
 
 struct Log : public LoggingBase {
-  shards::logging::Logger _logger;
-  std::string _name = "shards";
-
   static SHOptionalString inputHelp() { return SHCCSTR("The value to be logged to the console."); }
 
   static SHOptionalString outputHelp() { return SHCCSTR("The same value that was inputted, unmodified."); }
@@ -40,67 +56,44 @@ struct Log : public LoggingBase {
                    "The logging level can be specified to control the verbosity of the log output.");
   }
 
-  static SHParametersInfo parameters() { return _params; }
+  PARAM_PARAMVAR(_prefix, "Prefix", "A prefix string to be added to the log message.", {CoreInfo::StringType})
+  PARAM_IMPL_DERIVED_PREPEND(LoggingBase, PARAM_IMPL_FOR(_prefix))
 
-  void setParam(int index, const SHVar &inValue) {
-    switch (index) {
-    case 0:
-      _prefix = SHSTRVIEW(inValue);
-      break;
-    case 1:
-      _level = Enums::LogLevel(inValue.payload.enumValue);
-      break;
-    case 2:
-      _name = std::string(SHSTRVIEW(inValue));
-      break;
-    default:
-      break;
-    }
+  void warmup(SHContext *context) {
+    PARAM_WARMUP(context);
+    LoggingBase::warmup(context);
   }
 
-  SHVar getParam(int index) {
-    switch (index) {
-    case 0:
-      return Var(_prefix);
-    case 1:
-      return Var::Enum(_level, CoreCC, Enums::LogLevelEnumInfo::TypeId);
-    case 2:
-      return Var(_name);
-    default:
-      return Var::Empty;
-    }
-  }
+  void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
 
-  void warmup(SHContext *context) { _logger = shards::logging::getOrCreate(_name); }
+  PARAM_REQUIRED_VARIABLES();
+  SHTypeInfo compose(SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return data.inputType;
+  }
 
   SHVar activate(SHContext *context, const SHVar &input) {
+    maybeUpdateDynamicLogger();
     auto current = context->wireStack.back();
     auto id = findId(context);
-    if (_prefix.size() > 0) {
+    auto prefix = _prefix.get();
+    auto level = spdlog::level::level_enum(_level.get().payload.intValue);
+    auto prefixSV = fmt::basic_string_view<char>(prefix.payload.stringValue, prefix.payload.stringLen);
+    if (prefixSV.size() > 0) {
       if (id != entt::null) {
-        SPDLOG_LOGGER_CALL(_logger, spdlog::level::level_enum(_level), "[{} {}] {}: {}", current->name, id, _prefix, input);
+        SPDLOG_LOGGER_CALL(_logger, level, "[{} {}] {}: {}", current->name, id, prefixSV, input);
       } else {
-        SPDLOG_LOGGER_CALL(_logger, spdlog::level::level_enum(_level), "[{}] {}: {}", current->name, _prefix, input);
+        SPDLOG_LOGGER_CALL(_logger, level, "[{}] {}: {}", current->name, prefixSV, input);
       }
     } else {
       if (id != entt::null) {
-        SPDLOG_LOGGER_CALL(_logger, spdlog::level::level_enum(_level), "[{} {}] {}", current->name, id, input);
+        SPDLOG_LOGGER_CALL(_logger, level, "[{} {}] {}", current->name, id, input);
       } else {
-        SPDLOG_LOGGER_CALL(_logger, spdlog::level::level_enum(_level), "[{}] {}", current->name, input);
+        SPDLOG_LOGGER_CALL(_logger, level, "[{}] {}", current->name, input);
       }
     }
     return input;
   }
-
-  static inline Parameters _params = {
-      {"Prefix",
-       SHCCSTR("The message to prefix to the logged output. Note: the prefix will include a colon ':' before the value."),
-       {CoreInfo::StringType}},
-      {"Level", SHCCSTR("The level of logging."), {Enums::LogLevelEnumInfo::Type}},
-      {"Name", SHCCSTR("The name of the logger to use, the default is 'shards'."), {CoreInfo::StringType}}};
-
-  std::string _prefix;
-  Enums::LogLevel _level{Enums::LogLevel::Info};
 };
 
 struct LogType : public Log {
@@ -114,19 +107,23 @@ struct LogType : public Log {
   }
 
   SHVar activate(SHContext *context, const SHVar &input) {
+    maybeUpdateDynamicLogger();
     auto current = context->wireStack.back();
     auto id = findId(context);
-    if (_prefix.size() > 0) {
+    auto prefix = _prefix.get();
+    auto level = spdlog::level::level_enum(_level.get().payload.intValue);
+    auto prefixSV = fmt::basic_string_view<char>(prefix.payload.stringValue, prefix.payload.stringLen);
+    if (prefixSV.size() > 0) {
       if (id != entt::null) {
-        SHLOG_LEVEL((int)_level, "[{} {}] {}: {}", current->name, id, _prefix, type2Name(input.valueType));
+        SPDLOG_LOGGER_CALL(_logger, level, "[{} {}] {}: {}", current->name, id, prefixSV, type2Name(input.valueType));
       } else {
-        SHLOG_LEVEL((int)_level, "[{}] {}: {}", current->name, _prefix, type2Name(input.valueType));
+        SPDLOG_LOGGER_CALL(_logger, level, "[{}] {}: {}", current->name, prefixSV, type2Name(input.valueType));
       }
     } else {
       if (id != entt::null) {
-        SHLOG_LEVEL((int)_level, "[{} {}] {}", current->name, id, type2Name(input.valueType));
+        SPDLOG_LOGGER_CALL(_logger, level, "[{} {}] {}", current->name, id, type2Name(input.valueType));
       } else {
-        SHLOG_LEVEL((int)_level, "[{}] {}", current->name, type2Name(input.valueType));
+        SPDLOG_LOGGER_CALL(_logger, level, "[{}] {}", current->name, type2Name(input.valueType));
       }
     }
     return input;
@@ -143,51 +140,41 @@ struct Msg : public LoggingBase {
                    "the static message is displayed.");
   }
 
-  static SHParametersInfo parameters() { return _params; }
+  PARAM_PARAMVAR(_msg, "Message", "The message to display on the user's screen or console.",
+                 {CoreInfo::StringType, Type::VariableOf(CoreInfo::StringType)})
+  PARAM_VAR(_raw, "Raw", "Ignore all other formatting and output the message as-is.", {CoreInfo::BoolType})
+  PARAM_IMPL_DERIVED_PREPEND(LoggingBase, PARAM_IMPL_FOR(_msg), PARAM_IMPL_FOR(_raw))
 
-  void setParam(int index, const SHVar &inValue) {
-    switch (index) {
-    case 0: {
-      auto sv = SHSTRVIEW(inValue);
-      _msg = sv;
-    } break;
-    case 1:
-      _level = Enums::LogLevel(inValue.payload.enumValue);
-      break;
-    default:
-      break;
-    }
+  void warmup(SHContext *context) {
+    PARAM_WARMUP(context);
+    LoggingBase::warmup(context);
   }
 
-  SHVar getParam(int index) {
-    switch (index) {
-    case 0:
-      return Var(_msg);
-    case 1:
-      return Var::Enum(_level, CoreCC, Enums::LogLevelEnumInfo::TypeId);
-    default:
-      return Var::Empty;
-    }
+  void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
+
+  PARAM_REQUIRED_VARIABLES();
+  SHTypeInfo compose(SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return data.inputType;
   }
 
   SHVar activate(SHContext *context, const SHVar &input) {
-    auto current = context->wireStack.back();
-    auto id = findId(context);
-    if (id != entt::null) {
-      SHLOG_LEVEL((int)_level, "[{} {}] {}", current->name, id, _msg);
+    maybeUpdateDynamicLogger();
+    auto level = spdlog::level::level_enum(_level.get().payload.intValue);
+    auto msgSV = fmt::basic_string_view<char>(_msg.get().payload.stringValue, _msg.get().payload.stringLen);
+    if (_raw.payload.boolValue) {
+      SPDLOG_LOGGER_CALL(_logger, level, msgSV);
     } else {
-      SHLOG_LEVEL((int)_level, "[{}] {}", current->name, _msg);
+      auto current = context->wireStack.back();
+      auto id = findId(context);
+      if (id != entt::null) {
+        SPDLOG_LOGGER_CALL(_logger, level, "[{} {}] {}", current->name, id, msgSV);
+      } else {
+        SPDLOG_LOGGER_CALL(_logger, level, "[{}] {}", current->name, msgSV);
+      }
     }
     return input;
   }
-
-private:
-  static inline Parameters _params = {
-      {"Message", SHCCSTR("The message to display on the user's screen or console."), {CoreInfo::StringType}},
-      {"Level", SHCCSTR("The level of logging."), {Enums::LogLevelEnumInfo::Type}}};
-
-  std::string _msg;
-  Enums::LogLevel _level{Enums::LogLevel::Info};
 };
 
 struct Output {
@@ -450,5 +437,6 @@ SHARDS_REGISTER_FN(logging) {
 
   REGISTER_SHARD("FlushLog", LogFlush);
   REGISTER_SHARD("SetLogLevel", LogChangeLevel);
+  REGISTER_ENUM(Enums::LogLevelEnumInfo);
 }
 }; // namespace shards
