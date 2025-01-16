@@ -157,24 +157,30 @@
 
       mod._shardsInit();
 
-      // var mountedTestFS = mod.stringToNewUTF8(window.location.origin + "/tfs/");
-      // mod._shardsFSMountHTTP("/tfs", mountedTestFS);
+      var mountedTestFS = mod.stringToNewUTF8(window.location.origin + "/tfs/");
+      var str0 = mod.stringToNewUTF8("/tfs");
+      mod._shardsFSMountHTTP(str0, mountedTestFS);
 
       // const tfsUrl = window.location.origin + "/tfs/";
-      // const fs = mod.FS;
-      // fs.mount(mod.FETCHFS, tfsUrl, "/tfs");
+      // fs.mount(mod.FETCHFS, { base_url: tfsUrl }, "/tfs");
 
-      // while (true) {
-      //   try {
-      //     const file = fs.open("/tfs/README.md", "r");
-      //     fs.close(file);
-      //     log("Shards test file system mounted on /tfs");
-      //     break;
-      //   } catch {
-      //     await sleep(100);
-      //     log("Waiting for test file system to mount...");
-      //   }
-      // }
+      // Maybe?
+      await sleep(100);
+      mod._emscripten_current_thread_process_queued_calls();
+
+      const fs = mod.FS;
+      while (true) {
+        try {
+          const file = fs.open("/tfs/README.md", "r");
+          fs.close(file);
+          log("Shards test file system mounted on /tfs");
+          break;
+        } catch (e) {
+          await sleep(100);
+          mod._emscripten_current_thread_process_queued_calls();
+          log(`Waiting for test file system to mount... (${e})`);
+        }
+      }
     }
 
     log("Loading shards...");
@@ -183,6 +189,7 @@
 
     // Add log polling function
     const countPtr = mod._malloc(4);
+    const returnValuePtr = mod._malloc(4); // Allocate memory for return value
     function pollLogs() {
       const mod = instance.module;
       mod._shardsLockLogBuffer();
@@ -231,9 +238,9 @@
       const codePtr = mod.stringToNewUTF8(code);
       const basePathPtr = mod.stringToNewUTF8("/tfs/");
       try {
-        const inst = await mod.ccall('shardsLoadScript', 'pointer', ['pointer', 'pointer'], [codePtr, basePathPtr], {async: true});
-        // const inst = mod._shardsLoadScript(codePtr);
-        
+        mod._shardsLoadScript(returnValuePtr, codePtr, basePathPtr);
+        const inst = mod.HEAP32[returnValuePtr >> 2];
+
         if (!inst) {
           throw new Error("Failed to load script");
         }
@@ -244,7 +251,8 @@
         try {
           var run = true;
           while (run) {
-            run = mod._shardsTick(inst);
+            mod._shardsTick(inst, returnValuePtr);
+            run = Boolean(mod.HEAP32[returnValuePtr >> 2]);
             const err = mod._shardsGetError(inst);
             if (err) {
               throw new Error(mod.UTF8ToString(err));
@@ -285,7 +293,7 @@
       await fetch('/control', {
         method: 'DELETE'
       });
-      
+
       currentAction.style.display = 'none';
       isProcessingAction = false;
     }

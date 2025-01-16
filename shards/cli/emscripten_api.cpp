@@ -178,9 +178,14 @@ EMSCRIPTEN_KEEPALIVE void shardsFSMountHTTP(const char *target_, const char *bas
   std::string target{target_};
   std::string baseUrl{baseUrl_};
   asyncRunner.post([target, baseUrl]() {
+    SPDLOG_INFO("Mounting HTTP FS at {} with base URL {}", target, baseUrl);
     auto backend = wasmfs_create_fetch_backend(baseUrl.c_str());
     wasmfs_create_directory(target.c_str(), 0777, backend);
   });
+}
+
+EMSCRIPTEN_KEEPALIVE void shardsPollMainThread() {
+  // emscripten_current_thread_process_queued_calls
 }
 
 EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *code, const char *base_path) {

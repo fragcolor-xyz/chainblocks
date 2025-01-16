@@ -64,7 +64,7 @@ else()
     "-sMIN_SAFARI_VERSION=-1"
     "-sPTHREAD_POOL_SIZE=12"
     "-sEXPORTED_RUNTIME_METHODS=['FS', 'FETCHFS', 'stringToNewUTF8', 'UTF8ToString', 'ccall', 'cwrap', 'gfxSetup']"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free', '_main']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free', '_main', '_emscripten_current_thread_process_queued_calls']"
     "-sOFFSCREENCANVAS_SUPPORT=1"
     "-sSTACK_SIZE=2097152"
     "-sINITIAL_MEMORY=2147483648"
