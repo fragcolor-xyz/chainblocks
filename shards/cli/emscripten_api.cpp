@@ -67,6 +67,20 @@ static LogBuffer logBuffer;
 using shards::operator""_swl;
 using shards::toSWL;
 
+// This code only works with JSPI is enabled.
+// typedef bool (*AsyncRunnerFrameCallback)(void *);
+// EM_JS(void, requestAsyncRunnerJSPI, (void *runner, AsyncRunnerFrameCallback callback), {
+//   var wrappedCallback = WebAssembly.promising(getWasmTableEntry(callback));
+//   async function tick() {
+//     // Start the frame callback. 'await' means we won't call
+//     // requestAnimationFrame again until it completes.
+//     var keepLooping = await wrappedCallback(runner);
+//     if (keepLooping)
+//       requestAnimationFrame(tick);
+//   }
+//   requestAnimationFrame(tick);
+// })
+
 struct AsyncRunner {
   bool shouldRun = true;
   std::list<std::function<void()>> tasks;
@@ -74,20 +88,32 @@ struct AsyncRunner {
   std::condition_variable cv;
   std::optional<std::thread> thread;
 
+  // static bool step1(void *runner_) {
+  //   auto &runner = *(AsyncRunner *)runner_;
+  //   runner.step();
+  //   return runner.shouldRun;
+  // }
+
   void run() {
-    std::unique_lock<std::mutex> lock(mutex);
-    while (true) {
-      cv.wait(lock);
-      if (!shouldRun)
-        break;
-      if (tasks.empty())
-        continue;
-      auto task = std::move(tasks.front());
-      tasks.pop_front();
-      lock.unlock();
-      task();
-      lock.lock();
+    while (shouldRun) {
+      step();
     }
+  }
+
+  void step() {
+    std::unique_lock<std::mutex> lock(mutex);
+    if (shouldRun && tasks.empty())
+      cv.wait(lock);
+    if (!shouldRun)
+      return;
+    if (tasks.empty())
+      return;
+    SPDLOG_INFO("Running async task");
+    auto task = std::move(tasks.front());
+    tasks.pop_front();
+    lock.unlock();
+    task();
+    lock.lock();
   }
 
   void post(std::function<void()> task) {
@@ -97,7 +123,12 @@ struct AsyncRunner {
   }
 
   void start() {
-    thread = std::thread([this]() { run(); });
+    thread = std::thread([this]() {
+      SPDLOG_INFO("Async runner starting");
+      run();
+      // requestAsyncRunnerJSPI(this, &AsyncRunner::step1);
+      SPDLOG_INFO("Async runner stopped");
+    });
   }
 
   void stop() {
@@ -119,7 +150,8 @@ protected:
     spdlog::memory_buf_t formatted;
     formatter_->format(msg, formatted);
 
-    logBuffer.addMessage(fmt::to_string(formatted), msg.level, msg.source.filename ? msg.source.filename : "");
+    auto str = std::string(msg.payload.begin(), msg.payload.end());
+    logBuffer.addMessage(str, msg.level, msg.source.filename ? msg.source.filename : "");
   }
 
   void flush_() override {}
@@ -129,14 +161,14 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE void shardsInit() {
   // Add log buffer sink
   shards::logging::setupDefaultLoggerConditional("shards.log");
-  auto sink = std::make_shared<LogBufferSink>();
-  auto logger = spdlog::default_logger();
-  logger->sinks().push_back(sink);
+  shards::logging::getDistSink()->add_sink(std::make_shared<LogBufferSink>());
 
   auto core = shardsInterface(SHARDS_CURRENT_ABI);
   shards_init(core); // to init rust things
   asyncRunner.start();
   shards::EmMainProxy::instance = &emMainProxy;
+
+  SPDLOG_INFO("Test log entry");
 }
 
 // Needs to be polled on the main thread for audio and other stuff that needs to be run on the main browser thread
@@ -185,6 +217,7 @@ EMSCRIPTEN_KEEPALIVE Instance *shardsLoadScript(const char *code, const char *ba
     if (shlwire.error) {
       SPDLOG_ERROR("Failed to evaluate script at {}:{}: {}", shlwire.error->line, shlwire.error->column, shlwire.error->message);
       instance->error = shlwire.error->message;
+      shards_free_error(shlwire.error);
       return instance;
     }
 
@@ -192,15 +225,26 @@ EMSCRIPTEN_KEEPALIVE Instance *shardsLoadScript(const char *code, const char *ba
     instance->wire = wire;
     instance->mesh->schedule(wire);
     instance->error.reset();
-
-    return instance;
   } catch (std::exception &ex) {
     SPDLOG_ERROR("Unhandled exception in shardsLoadScript: {}", ex.what());
-    return nullptr;
+    instance->error = ex.what();
   }
+
+  // BUG: Fixes return value
+  // see https://github.com/emscripten-core/emscripten/issues/13302
+  emscripten_sleep(0);
+
+  return instance;
 }
 
-EMSCRIPTEN_KEEPALIVE bool shardsTick(Instance *instance) { return instance->mesh->tick(); }
+EMSCRIPTEN_KEEPALIVE bool shardsTick(Instance *instance) {
+  bool r = instance->mesh->tick();
+
+  // BUG: Fixes return value
+  // see https://github.com/emscripten-core/emscripten/issues/13302
+  emscripten_sleep(0);
+  return r;
+}
 
 EMSCRIPTEN_KEEPALIVE const char *shardsGetError(Instance *instance) {
   if (instance->error)

@@ -13,11 +13,13 @@
       width: 60%;
       height: 100%;
       position: relative;
+      overflow: hidden;
     }
 
     #canvas {
       width: 100%;
       height: 100%;
+      image-rendering: pixelated;
     }
 
     #current-action {
@@ -33,7 +35,7 @@
 
     #log-container {
       width: 40%;
-      height: 100%;
+      /* height: 100%; */
       overflow-y: auto;
       background: #f0f0f0;
       padding: 10px;
@@ -51,6 +53,7 @@
 
   <script type="module">
     const logContainer = document.getElementById('log-container');
+    const canvasContainer = document.getElementById("canvas-container");
     const canvas = document.getElementById('canvas');
     const currentAction = document.getElementById('current-action');
     let isProcessingAction = false;
@@ -67,13 +70,6 @@
     }
     const urlQuery = parseWindowSearchOpts();
 
-    function log(message) {
-      const div = document.createElement('div');
-      div.textContent = message;
-      logContainer.appendChild(div);
-      logContainer.scrollTop = logContainer.scrollHeight;
-    }
-
     const SPDLOG_LEVEL_TRACE = 0;
     const SPDLOG_LEVEL_DEBUG = 1;
     const SPDLOG_LEVEL_INFO = 2;
@@ -81,11 +77,57 @@
     const SPDLOG_LEVEL_ERROR = 4;
     const SPDLOG_LEVEL_CRITICAL = 5;
     const SPDLOG_LEVEL_OFF = 6;
+
+    const logQueue = [];
+    function logRemote(message, level, name, file, col, line) {
+      logQueue.push({ d: message, l: level, n: name, f: file, c: col, l: line });
+    }
+
+    function logLocal(message) {
+      const div = document.createElement('div');
+      div.textContent = message;
+      logContainer.appendChild(div);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function log(message) {
+      logLocal(message);
+      logRemote(message, SPDLOG_LEVEL_INFO, "web-automation", "index.html", 0, 0);
+    }
+
+    async function sleep(ms) {
+      await new Promise(done => setTimeout(done, ms));
+    }
+
+    async function processLogQueue() {
+      if (logQueue.length > 0) {
+        const queueSize = logQueue.length;
+        const resp = await fetch('/log', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(logQueue)
+        });
+        if (resp.ok) {
+          logQueue.splice(0, queueSize);
+        } else {
+          log(`Failed to log messages: ${resp.statusText}`);
+        }
+      }
+      setTimeout(processLogQueue, 100);
+    }
+    processLogQueue();
+
     let instance = {};
+    // import ShardsModule from "./bin/shards-mt1.js";
+    // const bpath = "./bin/shards-mt1.wasm";
+
     import ShardsModule from "./bin/shards-mt.js";
+    const bpath = "./bin/shards-mt.wasm";
 
     async function loadShards() {
-      const response = await fetch("./bin/shards-mt.wasm");
+      const response = await fetch(bpath);
       if (!response.ok) {
         log(`Failed to fetch wasm: ${response.statusText}`);
       }
@@ -96,13 +138,11 @@
       });
       log("Module loaded");
 
-
       instance.setLoggerLevel = (loggerName, level) => {
         const tmpStr = mod.stringToNewUTF8(loggerName);
         mod._shardsSetLoggerLevel(tmpStr, level);
         mod._free(tmpStr);
       };
-
       if (urlQuery["trace"] !== "1") {
         instance.setLoggerLevel("gfx", SPDLOG_LEVEL_TRACE);
         instance.setLoggerLevel("wgpu", SPDLOG_LEVEL_TRACE);
@@ -110,12 +150,36 @@
         instance.setLoggerLevel("http", SPDLOG_LEVEL_TRACE);
       }
       instance.setLoggerLevel("audio", SPDLOG_LEVEL_DEBUG);
+
+      // Set the canvas to use for input and graphics
+      mod["canvas"] = canvas;
+      mod.gfxSetup(canvasContainer, canvas);
+
+      mod._shardsInit();
+
+      // var mountedTestFS = mod.stringToNewUTF8(window.location.origin + "/tfs/");
+      // mod._shardsFSMountHTTP("/tfs", mountedTestFS);
+
+      // const tfsUrl = window.location.origin + "/tfs/";
+      // const fs = mod.FS;
+      // fs.mount(mod.FETCHFS, tfsUrl, "/tfs");
+
+      // while (true) {
+      //   try {
+      //     const file = fs.open("/tfs/README.md", "r");
+      //     fs.close(file);
+      //     log("Shards test file system mounted on /tfs");
+      //     break;
+      //   } catch {
+      //     await sleep(100);
+      //     log("Waiting for test file system to mount...");
+      //   }
+      // }
     }
 
     log("Loading shards...");
     await loadShards();
     const mod = instance.module;
-    mod._shardsInit();
 
     // Add log polling function
     const countPtr = mod._malloc(4);
@@ -147,7 +211,8 @@
               case 5: prefix = '[critical] '; break;
             }
 
-            log(`${prefix}${file ? `[${file}] ` : ''}${msg}`);
+            logLocal(`${prefix}${file ? `[${file}] ` : ''}${msg}`);
+            logRemote(msg, level, file, 0, 0);
           }
         }
       } finally {
@@ -157,6 +222,43 @@
     }
     pollLogs();
 
+    async function runAction(action) {
+      const mod = instance.module;
+      const dstFile = `/tfs/${action.data}`;
+
+      const code = await fetch(dstFile).then(r => r.text());
+
+      const codePtr = mod.stringToNewUTF8(code);
+      const basePathPtr = mod.stringToNewUTF8("/tfs/");
+      try {
+        const inst = await mod.ccall('shardsLoadScript', 'pointer', ['pointer', 'pointer'], [codePtr, basePathPtr], {async: true});
+        // const inst = mod._shardsLoadScript(codePtr);
+        
+        if (!inst) {
+          throw new Error("Failed to load script");
+        }
+        const err = mod._shardsGetError(inst);
+        if (err) {
+          throw new Error(mod.UTF8ToString(err));
+        }
+        try {
+          var run = true;
+          while (run) {
+            run = mod._shardsTick(inst);
+            const err = mod._shardsGetError(inst);
+            if (err) {
+              throw new Error(mod.UTF8ToString(err));
+            }
+          }
+        } finally {
+          mod._shardsFreeInstance(inst);
+        }
+      } finally {
+        mod._free(codePtr);
+        mod._free(basePathPtr);
+      }
+    }
+
     async function processAction(action) {
       isProcessingAction = true;
       currentAction.textContent = JSON.stringify(action);
@@ -164,11 +266,23 @@
       log(`Processing action: ${JSON.stringify(action)}`);
 
       // Dummy completion after 3 seconds
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // await new Promise(resolve => setTimeout(resolve, 3000));
+      try {
+        await runAction(action);
+        log('Action completed successfully');
+      } catch (error) {
+        log(`Error running action: ${error}`);
+        await fetch('/error', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ d: error.toString(), a: action })
+        });
+      }
 
       currentAction.style.display = 'none';
       isProcessingAction = false;
-      log('Action completed');
 
       // Delete completed action
       await fetch('/control', {
@@ -192,7 +306,6 @@
 
       setTimeout(pollControl, 1000);
     }
-
     pollControl();
   </script>
 </body>

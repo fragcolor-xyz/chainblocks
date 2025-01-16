@@ -1,7 +1,4 @@
 @define(action-type @type({
-  action: Type::Int
+  action: Type::String
   data: Type::String
 }))
-
-@define(action-type-run 0)
-@define(action-type-quit 1)

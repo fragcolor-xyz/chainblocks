@@ -6,11 +6,17 @@
 @define(headers {
   "Cross-Origin-Opener-Policy": "same-origin"
   "Cross-Origin-Embedder-Policy": "require-corp"
+  "Cache-Control": "public, max-age=30"
+  "Expires": "30"
+})
+
+@template(srv-log [msg] {
+  Log(msg Name: "http-server-inner" Level: LogLevel::Debug)
 })
 
 @template(send-as-json [] {
   ToJson = json-data
-  Log("Response")
+  @srv-log("Response")
   {"Content-Type": "application/json"} = hdrs
   json-data | Http.Response(Headers: hdrs)
 })
@@ -23,8 +29,8 @@ Http.Read = request
 ; target | Regex.Search("""(.*)\?""") = matches
 ; Count(matches) | When(Is(2) {matches | Take(1) > target})
 
-target-raw String.Split("?") Take(0) = target
-target | Log("request")
+target-raw | String.Split("?") | Take(0) = target
+target | @srv-log("request")
 Cond([
   {Is("/control")} {
     method | Cond([
@@ -40,10 +46,11 @@ Cond([
       {Is("PUT")} {
         request | Take("body") | FromJson = json-data
         Expect(@action-type) >> action-queue
+        "" | Http.Response(Status: 200)
       }
       {Is("DELETE")} {
         Count(action-queue) | When(IsMore(0) {
-          Log("Erasing action")
+          @srv-log("Erasing action")
           Erase(0 action-queue)
           "" | Http.Response(Status: 200)
         })
@@ -52,20 +59,44 @@ Cond([
         "Method not allowed" | Http.Response(Status: 405 ContentType: "text/plain")
       }])
   }
+  {Is("/error")} {
+    method | Cond([
+      {Is("PUT")} {
+        request | Take("body") | FromJson
+        Log("Test error reported")
+        ExpectTable
+        {Take("d") | ExpectString = data}
+        Msg(data Level: LogLevel::Error Name: "REMOTE")
+        "" | Http.Response(Status: 200)
+      }])
+  }
+  {Is("/log")} {
+    method | Cond([
+      {Is("PUT")} {
+        request | Take("body") | FromJson
+        ExpectSeq
+        ForEach({
+          ExpectTable
+          {Take("d") | ExpectString = data}
+          Msg(data Level: LogLevel::Info Name: "REMOTE")
+        })
+      }])
+    "" | Http.Response(Status: 200)
+  }
   {String.Starts("/tfs/")} {; Index test filesystem
     target | Slice(4) = rel-path
-    [@root-path rel-path] | FS.Join | Log("Serving test file") | Http.SendFile(@headers)
+    [@root-path rel-path] | FS.Join | @srv-log("Serving test file") | Http.SendFile(@headers)
   }
   {Is("/")} {
     "/index.html" | Http.SendFile(@headers)
   }
   {String.Starts("/bin/")} {
     target | Slice(4) = rel-path
-    [@binaries-path rel-path] | FS.Join | Log("Serving binary") | Http.SendFile(@headers)
+    [@binaries-path rel-path] | FS.Join | @srv-log("Serving binary") | Http.SendFile(@headers)
   }
   {true} {
-    [@root-path target] | FS.Join | Log("Serving")
+    [@root-path target] | FS.Join | @srv-log("Serving")
     Http.SendFile(@headers)
   }] Passthrough: true)
-Log("Done")
+@srv-log("Done")
 

@@ -35,4 +35,4 @@
 } Looped: true)
 
 @schedule(root web-server)
-@run(root 0.1)
+@run(root 0.01)

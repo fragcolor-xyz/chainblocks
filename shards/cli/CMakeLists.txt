@@ -54,14 +54,32 @@ if(EMSCRIPTEN)
     "-sMIN_CHROME_VERSION=113"
     "-sMIN_SAFARI_VERSION=-1"
     "-sPTHREAD_POOL_SIZE=12"
-    "-sEXPORTED_RUNTIME_METHODS=['FS', 'stringToNewUTF8', 'ccall', 'cwrap', 'gfxSetup']"
+    "-sEXPORTED_RUNTIME_METHODS=['FS', 'FETCHFS', 'stringToNewUTF8', 'UTF8ToString', 'ccall', 'cwrap', 'gfxSetup']"
     "-sEXPORTED_FUNCTIONS=['_malloc','_free']"
     "-sOFFSCREENCANVAS_SUPPORT=1"
     "-sSTACK_SIZE=2097152"
     "-sINITIAL_MEMORY=2147483648"
     "-sWASMFS"
+    "-lfetchfs.js"
     "-sFORCE_FILESYSTEM"
+    "-sASYNCIFY_EXPORTS=['_shardsLoadScript', '_shardsTick', '_shardsFreeInstance']"
   )
+
+  if(TRUE)
+    target_link_options(shards PUBLIC
+
+      # "-sJSPI_IMPORTS=['_wasmfs_create_fetch_backend']"
+      # "-sJSPI_EXPORTS=['wasmfs_create_fetch_backend, _wasmfs_create_fetch_backend']"
+    )
+  endif()
+
+  if(SHARDS_DEBUG_SYMBOL_URL)
+    # Set cache to something like:
+    # SHARDS_DEBUG_SYMBOL_URL:STRING=http://localhost/fbl.debug.wasm
+    string(REGEX MATCH "([^/]+)$" DEBUG_SYMBOL_FILENAME ${SHARDS_DEBUG_SYMBOL_URL})
+    target_link_options(shards PRIVATE "-gseparate-dwarf=${DEBUG_SYMBOL_FILENAME}")
+    target_link_options(shards PRIVATE "-sSEPARATE_DWARF_URL=${SHARDS_DEBUG_SYMBOL_URL}")
+  endif()
 endif()
 
 # Apple Framework target

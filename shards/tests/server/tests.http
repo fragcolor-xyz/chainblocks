@@ -14,7 +14,7 @@ PUT http://localhost:3000/control HTTP/1.1
 Content-Type: application/json
 
 {
-  "action": 2,
+  "action": "run",
   "data": "shards/tests/gfx-cube.shs"
 }
 

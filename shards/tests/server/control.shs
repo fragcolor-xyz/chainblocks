@@ -1,0 +1,17 @@
+@define(host "http://localhost:3000" IgnoreRedefined: true)
+@define(action none IgnoreRedefined: true)
+@define(data none IgnoreRedefined: true)
+
+@action | Match([
+  "run" {
+    {"Content-Type": "application/json"} = hdrs
+    {action: @action data: @data} | ToJson | Http.Put(
+      URL: ([@host "/control"] | String.Join)
+      Headers: hdrs
+    )
+  }
+  none {
+    Log("Unrecognized action")
+    Fail
+  }
+])
