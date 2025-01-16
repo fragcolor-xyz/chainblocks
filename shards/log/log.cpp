@@ -223,6 +223,10 @@ void flush() {
   globalSinks().distSink->flush();
 }
 
+std::shared_ptr<spdlog::sinks::dist_sink_mt> getDistSink() {
+  return globalSinks().distSink;
+}
+
 void __init(Logger logger) {
   spdlog::register_logger(logger);
   initFlush(logger);
