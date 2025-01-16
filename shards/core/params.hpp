@@ -32,7 +32,7 @@
 
 namespace shards {
 #define PARAM_EXT(_type, _name, _paramInfo)                              \
-  static inline shards::ParameterInfo _name##ParameterInfo = _paramInfo; \
+  static inline shards::ParameterInfo& _name##ParameterInfo = _paramInfo; \
   _type _name{};
 
 #define PARAM(_type, _name, _displayName, _help, ...)                                                     \
