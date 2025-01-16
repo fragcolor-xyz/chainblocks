@@ -152,6 +152,32 @@ struct IterableParam {
   PARAM_PARAMS()                                                                \
   PARAM_GET_SET()
 
+// Add new macro for prepending parameters
+#define PARAM_IMPL_DERIVED_PREPEND(BaseClass, ...)                              \
+  SELF_MACRO_DEFINE_SELF(Self, public)                                          \
+  static const shards::IterableParam *getIterableParams(size_t &outNumParams) { \
+    static std::vector<shards::IterableParam> combined = []() {                 \
+      static shards::IterableParam prependParams[] = {__VA_ARGS__};            \
+      size_t numPrependParams = std::extent<decltype(prependParams)>::value;    \
+                                                                                \
+      size_t numBaseParams{};                                                   \
+      auto *baseParams = BaseClass::getIterableParams(numBaseParams);           \
+      std::vector<shards::IterableParam> result;                                \
+      result.resize(numBaseParams + numPrependParams);                          \
+      /* Add prepend params first */                                            \
+      for (size_t i = 0; i < numPrependParams; ++i)                             \
+        result[i] = prependParams[i];                                           \
+      /* Then add base params */                                                \
+      for (size_t i = 0; i < numBaseParams; ++i)                                \
+        result[numPrependParams + i] = baseParams[i];                           \
+      return result;                                                            \
+    }();                                                                        \
+    outNumParams = combined.size();                                             \
+    return combined.data();                                                     \
+  }                                                                             \
+  PARAM_PARAMS()                                                                \
+  PARAM_GET_SET()
+
 #define PARAM_IMPL_FOR(_name)                                                                                       \
   shards::IterableParam::create<decltype(_name)>([](void *obj) -> void * { return (void *)&((Self *)obj)->_name; }, \
                                                  &_name##ParameterInfo)
