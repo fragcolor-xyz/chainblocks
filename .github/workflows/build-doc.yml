@@ -72,7 +72,7 @@ jobs:
       - name: Generate markdown
         shell: bash
         run: |
-          ./shards.exe docs/generate.edn
+          ./shards.exe new docs/generate.shs
       - name: Upload markdown
         uses: actions/upload-artifact@v3
         with:
