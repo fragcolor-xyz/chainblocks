@@ -1,8 +1,0 @@
-;; Multiply equal-sized sequences
-[4 5.1 6.4] ;; :Input
-(Log) ;; prints input => [4 5.1 6.4]
-(Math.Multiply
- [3 4.0 2.2]) ;; :Operand
-;; input seq elements compute with corresponding operand seq elements
-(Log) ;; prints input * operand => [12 20.4 14.08]
-(Assert.IsAlmost [12 20.4 14.08]) ;; expect: [(4 * 3) (5.1 * 4.0) (6.4 * 2.2)] => [12 20.4 14.08]

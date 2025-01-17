@@ -1,6 +1,0 @@
-42
-(WhenNot
- ;:Predicate
- (IsMore 50)
- ;:Action
- (Msg "Less than 50"))

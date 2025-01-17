@@ -1,5 +1,5 @@
 @wire(fibo {
-  n >= n
+  >= n
   n | If(
     {IsLess(2)}
     {Pass}

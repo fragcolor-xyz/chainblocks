@@ -1,6 +1,0 @@
-;; Update a local-variable table (:Global = false, table available to only this wire in the mesh)
-{:key1 [10 20] :key2 [30 40]} >= .table ; (needs to be mutable!)
-(Log) ;; prints original table => {:key1 [10 20] :key2 [30 40]}
-[0 2 1 3] (Assoc .table "key2") ;; input sequence updates value of key "key2" in table
-.table (Log) ;; prints updated table => {:key1 [10 20] :key2 [2 3]}
-.table (Assert.Is {:key1 [10 20] :key2 [2 3]} true)

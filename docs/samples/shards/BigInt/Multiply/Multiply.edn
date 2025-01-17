@@ -1,8 +1,0 @@
-24 (BigInt) = .expected
-3 (BigInt) = .operand
-
-8 (BigInt)
-(BigInt.Multiply
- ;:Operand
- .operand)
-(BigInt.Is .expected) (Assert.Is true true)

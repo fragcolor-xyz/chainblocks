@@ -3,4 +3,4 @@
 })
 
 -10 | Do(dologic) | Assert.Is(true Break: true)
-5 | Do("dologic") | Assert.IsNot(true Break: true)
+5 | Do(dologic) | Assert.IsNot(true Break: true)

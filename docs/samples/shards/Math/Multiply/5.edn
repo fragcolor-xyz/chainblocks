@@ -1,9 +1,0 @@
-;; Multiply unequal-sized sequences (input size > operand size)
-[4 2 1 5 8] ;; :Input
-(Log) ;; prints input => [4 2 1 5 8]
-(Math.Multiply
- [6 4]) ;; :Operand
-;; input seq elements compute with corresponding operand seq elements
-;; for (input size > operand size): remaining input seq elements continually loop over operand seq elements
-(Log) ;; prints input + operand => [24 8 6 20 48]
-(Assert.Is [24 8 6 20 48] true) ;; expect: [(4 * 6) (2 * 4) (1 * 6) (5 * 4) (8 * 6)] => [24 8 6 20 48]

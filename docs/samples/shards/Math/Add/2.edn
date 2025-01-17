@@ -1,7 +1,0 @@
-;; Add floats
-(float 5.3) ;; :Input
-(Log) ;; prints input => 5.3
-(Math.Add
- 2.1) ;; :Operand
- (Log) ;; prints input + operand => 7.4
-(Assert.Is 7.4 true) ;; expect: (5.3 + 2.1) => 7.4

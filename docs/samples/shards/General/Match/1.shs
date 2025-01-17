@@ -1,30 +1,30 @@
 ; single match + nil match at end + no passthrough
 1 | Match([
-  2 {"Matched 2"}         ; case processed, match not found
-  1 {"Matched 1"}         ; case processed, match found
-  3 {"Matched 3"}         ; case ignored
-  none {"Matched nil"}    ; case ignored
+  2 {"Matched 2"} ; case processed, match not found
+  1 {"Matched 1"} ; case processed, match found
+  3 {"Matched 3"} ; case ignored
+  none {"Matched nil"} ; case ignored
 ] Passthrough: false) | Assert.Is("Matched 1" Break: true)
 
 ; multiple matches + nil match at end + no passthrough
 1 | Match([
-  Math.Add(0 1) {"Matched 1a"}  ; case processed, match found
-  1 {"Matched 1"}         ; case ignored
-  2 {"Matched 2"}         ; case ignored
-  none {"Matched nil"}    ; case ignored
+  1 {"Matched 1a"} ; case processed, match found
+  1 {"Matched 1"} ; case ignored
+  2 {"Matched 2"} ; case ignored
+  none {"Matched nil"} ; case ignored
 ] Passthrough: false) | Assert.Is("Matched 1a" Break: true)
 
 ; multiple matches + nil match at start + with passthrough
 1 | Match([
-  none {Msg("Matched nil")}     ; case processed, match found
-  1 {Msg("Matched 1")}         ; case ignored
-  Math.Add(0 1) {Msg("Matched 1a")}  ; case ignored
-  2 {Msg("Matched 2")}        ; case ignored
+  none {Msg("Matched nil")} ; case processed, match found
+  1 {Msg("Matched 1")} ; case ignored
+  1 {Msg("Matched 1a")} ; case ignored
+  2 {Msg("Matched 2")} ; case ignored
 ] Passthrough: true) | Assert.Is(1 Break: true)
 
 ; no matches + nil match in the middle + with passthrough
 1 | Match([
-  2 {Msg("Matched 2")}         ; case processed, match not found
-  none {Msg("Matched nil")}     ; case processed, match found
-  3 {Msg("Matched 3")}        ; case ignored
+  2 {Msg("Matched 2")} ; case processed, match not found
+  none {Msg("Matched nil")} ; case processed, match found
+  3 {Msg("Matched 3")} ; case ignored
 ] Passthrough: true) | Assert.Is(1 Break: true)

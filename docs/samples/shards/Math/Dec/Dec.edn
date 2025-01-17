@@ -1,7 +1,0 @@
- 10.0 >= .mutable
-(Math.Dec
- ;:Value
- .mutable)
-.mutable (Log)
-
-(Assert.Is 9.0 true)

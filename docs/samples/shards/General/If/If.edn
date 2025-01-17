@@ -1,8 +1,0 @@
-5
-(If
- ;:Predicate
- (IsLess 2)
- ;:Then
- (Msg "lesser than 2")
- ;:Else
- (Msg "equal or greater than 2"))

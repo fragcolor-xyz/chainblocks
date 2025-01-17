@@ -1,2 +1,0 @@
-"42" (ParseInt) (Log)
-(Assert.Is 42 :Break true)

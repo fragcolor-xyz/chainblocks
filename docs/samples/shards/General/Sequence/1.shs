@@ -1,31 +1,31 @@
 ; without key, without types, local scope, Clear: true, using Push
 Sequence(Name: seqA)
-seqA | Log             ; created an empty sequence => []
+seqA | Log ; created an empty sequence => []
 1 | Push(seqA)
-seqA | Log             ; updated sequence => [1]
+seqA | Log ; updated sequence => [1]
 2 | Push(seqA)
-seqA | Log             ; updated sequence => [1, 2]
+seqA | Log ; updated sequence => [1, 2]
 
 ; with key (becomes table), single type, global scope, Clear: true, using Set
-Sequence(seqB Key: "A" Global: true Type: Type.Float)
-seqB | Log            ; created an empty table => {A: []}
+Sequence(seqB Key: "A" Global: true Type: @type([Type::Float]))
+seqB | Log ; created an empty table => {A: []}
 10.2 | Set(seqB "A")
-seqB | Log            ; updated table => {A: 10.2}
+seqB | Log ; updated table => {A: 10.2}
 20.1 | Set(seqB "A")
-seqB | Log            ; updated table => {A: 20.1}
+seqB | Log ; updated table => {A: 20.1}
 
 ; without key, multiple types, local scope, Clear: false, using Push
-Sequence(seqC Type: [Type.Float Type.Int] Clear: false)
-seqC | Log             ; created an empty sequence => []
+Sequence(seqC Type: @type([Type::Float Type::Int]) Clear: false)
+seqC | Log ; created an empty sequence => []
 10.3 | Push(seqC)
-seqC | Log             ; updated sequence => [10.3]
+seqC | Log ; updated sequence => [10.3]
 20 | Push(seqC)
-seqC | Log             ; updated sequence => [10.3, 20]
+seqC | Log ; updated sequence => [10.3, 20]
 
 ; with key (becomes table), single type, local scope, Clear: true, using Push
-Sequence(seqD Key: "A" Type: Type.Int)
-seqD | Log             ; created an empty table => {A: []}
+Sequence(seqD Key: "A" Type: @type([Type::Int]))
+seqD | Log ; created an empty table => {A: []}
 10 | Push(seqD "A")
-seqD | Log             ; updated table => {A: [10]}
+seqD | Log ; updated table => {A: [10]}
 20 | Push(seqD "A")
-seqD | Log             ; updated table => {A: [10, 20]}
+seqD | Log ; updated table => {A: [10, 20]}

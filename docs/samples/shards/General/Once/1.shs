@@ -1,5 +1,5 @@
 ; Once
-@wire(test {
+@wire(test1 {
   "Hello World, every 1.5s during a wire flow execution" = string1
   "Hello World, once during every wire flow execution" = string2
   
@@ -14,19 +14,27 @@
 
 ; here one wire flow execution is 5 secs (5 mesh iterations, one per second)
 ; so string1 logs for a maximum of 5/(1.5) => ~3 times and string2 logs only once
-{logic-behavior: test}
+{Do(test1)}
+{Do(test1)}
+{Do(test1)}
+{Do(test1)}
+{Do(test1)}
 
 ; Setup
-@wire(test {
+@wire(test2 {
   Once({
     0 >= counter
     counter | Log("counter set to 0 only once")
     ; => 0
   })
   
-  Math.Inc(counter) > counter
+  Math.Inc(counter)
   counter | Log("counter incremented every time wire executes")
   ; => 1, 2, 3, 4, 5
 })
 
-{logic-behavior: test}
+{Do(test2)}
+{Do(test2)}
+{Do(test2)}
+{Do(test2)}
+{Do(test2)}

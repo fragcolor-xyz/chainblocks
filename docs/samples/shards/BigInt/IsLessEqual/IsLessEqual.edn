@@ -1,7 +1,0 @@
-11 (BigInt) = .expected
-
-9 (BigInt)
-(BigInt.IsLessEqual
- ;:Operand
- .expected)
-(Assert.Is true true)

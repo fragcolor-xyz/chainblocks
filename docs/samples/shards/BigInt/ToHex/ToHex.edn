@@ -1,3 +1,0 @@
-42 (BigInt)
-(BigInt.ToHex)
-(Assert.Is "0x2a" true)

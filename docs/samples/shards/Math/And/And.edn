@@ -1,6 +1,0 @@
-(int4 0 2 4 8)
-(Math.And
- ;:Operand
- (int4 3 3 3 3)) (Log)
-
-(Assert.Is (int4 0 2 0 0) true)

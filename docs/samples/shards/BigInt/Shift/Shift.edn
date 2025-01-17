@@ -1,7 +1,0 @@
-4200 (BigInt) = .expected
-
-42 (BigInt)
-(BigInt.Shift
- ;:By
- 2)
-(BigInt.Is .expected) (Assert.Is true true)

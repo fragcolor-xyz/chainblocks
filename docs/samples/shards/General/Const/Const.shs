@@ -11,7 +11,7 @@ Const("Hello World!") | Log    ; => "Hello World!"
 Const(["A" "B" "C"]) | Log     ; => ["A" "B" "C"]
 
 ; declare a Float4 with `Const`
-Const(Float4(1 2 3 4)) | Log  ; => (Float4 1 2 3 4)
+Const(@f4(1 2 3 4)) | Log  ; => @f4(1 2 3 4)
 
 ; declare a table with `Const`
 Const({key1: 10 key2: 20.0}) | Log  ; => {key1: 10 key2: 20.0}

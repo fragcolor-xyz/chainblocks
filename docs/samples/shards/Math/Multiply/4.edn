@@ -1,9 +1,0 @@
-;; Multiply unequal-sized sequences (input size < operand size)
-[4.0] ;; :Input
-(Log) ;; prints input => [4.0]
-(Math.Multiply
- [3.0 4.0 2.2]) ;; :Operand
-;; input seq elements compute with corresponding operand seq elements
-;; since input size < operand size, remaining operand seq elements ignored
-(Log) ;; prints input * operand => [12.0]
-(Assert.Is [12.0] true) ;; expect: [(4.0 * 3.0) ... ...] => [12.0]

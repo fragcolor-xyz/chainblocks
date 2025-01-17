@@ -1,4 +1,0 @@
-(float3 -0.95 4.0 7.54)
-(Math.Trunc) (Log)
-
-(Assert.Is (float3 0 4 7) true)

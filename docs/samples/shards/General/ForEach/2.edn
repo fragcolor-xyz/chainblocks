@@ -1,9 +1,0 @@
-;; ForEach on a table: processes every key in alphabetic order
-{"Name" "Universe" "Age" "13.8B Yrs"}
-(ForEach ;; receives each key/value pair as a sequence in alphabetic order of key
- (->
-  (| (Slice 0 1 1) ;; seq => every element starting from 0 till 0 => key of that pair
-     (Log))  ;; => ["Age"], ["Name"]
-  (| (Slice 1 2 1) ;; seq => every element starting from 1 till 1 => value of that pair
-     (Log))  ;; => ["13.8 B Yrs"], ["Universe"]
-  ))

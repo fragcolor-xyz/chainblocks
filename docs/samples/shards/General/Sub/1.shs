@@ -1,45 +1,45 @@
 ; SubFlow container shard + nesting
 5 | Log("input to Sub1") ; => 5
 
-Sub({
+{
   Math.Multiply(2)
   Assert.Is(10 Break: true)
   Log("Sub1 inner shard o/p | 5 * 2") ; => 10
-})
+}
 
 Log("Sub1 output => input to Sub2") ; => 5
 
-Sub({
+{
   Math.Multiply(3)
   Assert.Is(15 Break: true)
   Log("Sub2 inner shard o/p | 5 * 3") ; => 15
   Log("input to nested-SubFlow") ; => 15
   
-  Sub({
+  {
     Math.Multiply(2)
     Assert.Is(30 Break: true)
     Log("nested-SubFlow inner shard o/p | (5 * 3) * 2") ; => 30
-  })
+  }
   
   Log("output from nested SubFlow") ; => 15
-})
+}
 
 Log("Sub2 output => output") ; => 5
 
 ; Using Sub, with multiple operations
-5                                ; input to Sub shards
-Sub({
+5 ; input to Sub shards
+{
   Math.Multiply(2)
-  Log                            ; 5 * 2 => 10
-})
+  Log ; 5 * 2 => 10
+}
 
-Sub({
+{
   Math.Multiply(3)
-  Log                            ; 5 * 3 => 15
-  Sub({
+  Log ; 5 * 3 => 15
+  {
     Math.Multiply(2)
-    Log                          ; 15 * 2 => 30
-  })
-})
+    Log ; 15 * 2 => 30
+  }
+}
 
 Log("output of the last Sub shard") ; input is output => 5

@@ -48,10 +48,8 @@ pushd $script_dir/docs/samples
 for i in $(find shards -name '*.shs' $negative $pattern);
 do
     echo "running sample $i";
-    rm -f "$i-error.log"
     rm -f "$i.log"
-    $script_dir/build/$build_type/shards new $script_dir/docs/samples/run-sample.shs looped:$looped file:"$i" 2>"$i-error.log" | tee "$i.log";
-    # delete any log that is empty
+    $script_dir/build/$build_type/shards new $script_dir/docs/samples/run-sample.shs looped:$looped file:"$i" 2>"$i.log"
     find . -name '*.log' -size 0 -delete
 done
 popd

@@ -5,4 +5,4 @@
 testWire | WriteFile("data/testWire.bin" Flush: true)
 ReadFile("data/testWire.bin") | ExpectWire >= loadedWire
 
-WireRunner(Wire: loadedWire Mode: RunWireMode.Inline)
+WireRunner(Wire: loadedWire Mode: RunWireMode::Inline)

@@ -1,8 +1,0 @@
-1 (ToFloat) (Log)
-(Assert.Is 1.0 :Break true)
-
-2.2 (ToFloat) (Log)
-(Assert.Is 2.2 :Break true)
-
-"3" (ToFloat) (Log)
-(Assert.Is 3.0 :Break true)

@@ -1,7 +1,0 @@
-(defwire logic
-  (IsMore 10) (Or) (IsLess 0))
-
-11
-(-> (Spawn logic) >= .ccc
-    (Wait .ccc))
-(Assert.Is true true)

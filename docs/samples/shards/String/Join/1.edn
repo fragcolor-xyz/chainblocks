@@ -1,9 +1,0 @@
-["The quick brown fox "
- "jumps over the lazy dog"
- "."]
-(String.Join) (Log)
-(Assert.Is "The quick brown fox jumps over the lazy dog." :Break true)
-
-["2001" "01" "01"]
-(String.Join "/") (Log)
-(Assert.Is "2001/01/01" :Break true)

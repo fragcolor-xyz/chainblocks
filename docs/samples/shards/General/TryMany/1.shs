@@ -1,8 +1,9 @@
 ["A" "B" "C"] | TryMany(
-  Wire: @wire(print {
+  Wire: {
     Log
     "Ok"
-  })
-  Policy: WaitUntil.AllSuccess
+  }
+  Policy: WaitUntil::AllSuccess
   Threads: 12
 ) | Assert.Is(["Ok" "Ok" "Ok"] Break: true)
+
