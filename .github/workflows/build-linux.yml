@@ -167,10 +167,10 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           cd docs/samples
-          for i in $(find shards -name '*.edn' \( ! -path '*UI*' ! -path '*GFX*' \));
+          for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' \));
           do
             echo "Running sample $i";
-            ../../build/shards run-sample.edn --file "$i";
+            ../../build/shards new run-sample.shs file:"$i";
           done
       - name: Test runtime
         env:
