@@ -1,0 +1,32 @@
+GFX.MainWindow(
+  Contents: {
+    Once({
+      GFX.DrawQueue >= ui-draw-queue
+      GFX.UIPass(ui-draw-queue) >> render-steps
+    })
+    UI(
+      UI.Window(
+        Title: "Greetings"
+        MinWidth: 200.0 ; Makes window resizable but with a minimum width of 200, allowing resizing window to manipulate number of rows in autogrid
+        Contents: {
+          [
+            "Hello" "World" "Please" "Sort" "Me"
+            "Hello" 2 "Please" 4 5.5
+          ]
+          | UI.AutoGrid(
+            ItemWidth: 300.0
+            Contents: {
+              UI.Button(Label: "Test" Action: {
+                | Log ; Logs the given sequence element
+              })
+            }
+          ) 
+          ; | Log ; Passthrough
+        }
+      )
+    ) | UI.Render(ui-draw-queue
+)
+
+    GFX.Render(Steps: render-steps)
+  }
+)

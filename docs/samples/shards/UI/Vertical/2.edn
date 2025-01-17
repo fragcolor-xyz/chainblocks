@@ -1,0 +1,19 @@
+(GFX.MainWindow
+ :Contents
+ (->
+  (Setup
+   (GFX.DrawQueue) >= .ui-draw-queue
+   (GFX.UIPass .ui-draw-queue) >> .render-steps)
+  .ui-draw-queue (GFX.ClearQueue)
+
+  (UI
+   (UI.CentralPanel
+    (UI.Vertical
+     :Centered true
+     :Contents
+     (->
+      "Hello" (UI.Label)
+      (UI.Separator)
+      "World" (UI.Label)))))
+
+  (GFX.Render :Steps .render-steps)))

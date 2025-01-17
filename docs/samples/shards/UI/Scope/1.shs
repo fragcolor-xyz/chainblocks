@@ -1,0 +1,17 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Scope(Contents: {
+        ; UI here
+        none
+      })
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

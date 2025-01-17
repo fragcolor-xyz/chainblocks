@@ -1,0 +1,19 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      "Hello Shards!" | UI.Label
+      "Hello Shards!" | UI.Label(Style: {strikethrough: true})
+      "Hello Shards!" | UI.Label(Style: {underline: true})
+      "Hello Shards!" | UI.Label(Style: {italics: true})
+      "Hello Shards!" | UI.Label(Style: {color: Color(96 96 12)})
+      "Hello Shards!" | UI.Label(Style: {color: Color(12 96 96) italics: true})
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

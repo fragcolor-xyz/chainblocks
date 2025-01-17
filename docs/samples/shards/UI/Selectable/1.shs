@@ -1,0 +1,46 @@
+@template(is-selected [idx] {
+  currently-selected | Is(idx)
+})
+
+@template(select [idx] {
+  idx > currently-selected | Log
+})
+
+GFX.MainWindow(
+  Contents: {
+    Once({
+      GFX.DrawQueue >= ui-draw-queue
+      GFX.UIPass(ui-draw-queue) >> render-steps
+      1 >= currently-selected
+      "" >= currently-selected-str
+    })
+    UI(
+      UI.CentralPanel(
+        Contents: {
+          UI.Selectable(
+            Contents: { UI.Button("Select Button 1" { "Select Button 1 Clicked" | Log }) }
+            IsSelected: { @is-selected(1) }
+            Clicked: { @select(1) }
+          )
+          UI.Selectable(
+            Contents: {
+              UI.Button("Select Button 2" { "Select Button 2 Clicked" | Log })
+              "Another part of the same selectable as Select Button 2" | UI.Label(Wrap: TextWrap::Extend)
+            }
+            IsSelected: { @is-selected(2) }
+            Clicked: { @select(2) }
+          )
+
+          currently-selected | ToString > currently-selected-str
+          [
+            "Currently selected: "
+            currently-selected-str
+          ] | String.Join | UI.Label
+        }
+      )
+    ) | UI.Render(ui-draw-queue
+)
+
+    GFX.Render(Steps: render-steps)
+  }
+)

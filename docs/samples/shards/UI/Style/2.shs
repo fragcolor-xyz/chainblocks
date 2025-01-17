@@ -1,0 +1,19 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Style(
+        Style: {color: Color(255 255 0) italics: true}
+        Contents: {
+          "Hello" | UI.Label
+        }
+      )
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

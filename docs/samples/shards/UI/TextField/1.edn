@@ -1,0 +1,13 @@
+(GFX.MainWindow
+ :Contents
+ (->
+  (Setup
+   (GFX.DrawQueue) >= .ui-draw-queue
+   (GFX.UIPass .ui-draw-queue) >> .render-steps)
+  (UI
+   (UI.CentralPanel
+    (->
+     (Setup "Lorem ipsum dolor sit amet" >= .text)
+     (UI.TextField :Variable .text :Multiline false))))
+
+  (GFX.Render :Steps .render-steps)))

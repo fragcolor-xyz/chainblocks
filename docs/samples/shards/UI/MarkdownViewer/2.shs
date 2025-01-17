@@ -1,0 +1,14 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      ReadFile("sample.md") | UI.MarkdownViewer(Style: {color: Color(200 10 200)})
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

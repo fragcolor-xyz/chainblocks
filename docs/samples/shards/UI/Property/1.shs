@@ -1,0 +1,15 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel(Contents: {
+      UI.Property(UIProperty.RemainingSpace)
+      Once({Log})
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

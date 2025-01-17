@@ -1,0 +1,21 @@
+; Styled button
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Button(
+        Label: "Click me!"
+        Style: {color: Color(255 255 0)}
+        Action: {
+          Msg("Clicked")
+        }
+      )
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

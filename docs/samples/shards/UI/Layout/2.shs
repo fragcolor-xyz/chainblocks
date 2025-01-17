@@ -1,0 +1,40 @@
+GFX.MainWindow(
+  Contents: {
+    Once({
+      GFX.DrawQueue >= ui-draw-queue
+      GFX.UIPass(ui-draw-queue) >> render-steps
+      UI.LayoutClass(
+        MainDirection: LayoutDirection::BottomUp
+        MainWrap: true
+        CrossAlign: LayoutAlign::Center
+        CrossJustify: true
+      ) >= bottom-up-layout-class
+      false >= checked
+      1 >= choice
+    })
+    UI(
+      UI.CentralPanel({
+        UI.Layout(
+          Class: bottom-up-layout-class
+          Contents: {
+            "Wrapping text followed by example widgets:" | UI.Label
+            UI.Checkbox(
+              Label: "checkbox"
+              Variable: checked
+            )
+            UI.RadioButton(
+              Label: "radio"
+              Variable: choice
+              Value: 1
+            )
+            UI.Button(
+              Label: "button"
+              Action: Msg("Clicked")
+            )
+          }
+        )
+      })
+    ) | UI.Render(ui-draw-queue)
+    GFX.Render(Steps: render-steps)
+  }
+)

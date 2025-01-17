@@ -1,0 +1,21 @@
+; Collapsing with button heading
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel(Contents: {
+      UI.Collapsing(
+        Heading: {UI.Button("Heading" {Msg("Clicked")})}
+        DefaultOpen: true
+        Contents: {
+          "Content" | UI.Label
+        }
+      )
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

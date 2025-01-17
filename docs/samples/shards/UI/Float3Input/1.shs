@@ -1,0 +1,14 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Float3Input(Variable: float3) | ExpectFloat3
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

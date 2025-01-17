@@ -1,0 +1,36 @@
+GFX.MainWindow(
+  Contents: {
+    Once({
+      GFX.DrawQueue >= ui-draw-queue
+      GFX.UIPass(ui-draw-queue) >> render-steps
+      UI.LayoutClass(
+        MainDirection: LayoutDirection::LeftToRight
+      ) >= left-to-right-layout-class
+      UI.LayoutClass(
+        MainDirection: LayoutDirection::TopDown
+      ) >= top-down-layout-class
+    })
+    UI(
+      UI.CentralPanel({
+        UI.Layout(
+          Class: left-to-right-layout-class
+          MaxSize: @f2(0 0) ; use as small area as possible, this vertical separator needs this to act like egui vertical separator
+          Contents: {
+            "Hello" | UI.Label
+            UI.Separator
+            "World" | UI.Label
+          }
+        )
+        UI.Layout(
+          Class: top-down-layout-class
+          Contents: {
+            "Hello" | UI.Label
+            UI.Separator
+            "World" | UI.Label
+          }
+        )
+      })
+    ) | UI.Render(ui-draw-queue)
+    GFX.Render(Steps: render-steps)
+  }
+)

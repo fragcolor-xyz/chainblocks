@@ -1,0 +1,37 @@
+(GFX.MainWindow
+ :Contents
+ (->
+  (Setup
+   (GFX.DrawQueue) >= .ui-draw-queue
+   (GFX.UIPass .ui-draw-queue) >> .render-steps)
+  (UI
+   (UI.CentralPanel
+    (->
+     (Setup
+      64 >= .hue
+      0 >= .r >= .g
+      (color 0 0 0 0) >= .color
+      16.0 >= .size)
+
+     255 (Math.Subtract .hue) (Math.Multiply 2) (Min 255) > .r
+     .hue (Math.Multiply 2) (Min 255) > .g
+     [.r .g 0 255] (ToColor) > .color
+
+     (UI.Scope
+      (->
+       (UI.Style
+        :OverrideTextStyle "MyStyle"
+        :TextStyles {:MyStyle {:Size .size
+                               :Family FontFamily.Monospace}}
+        :OverrideTextColor .color)
+       (UI.IntSlider
+        :Variable .hue
+        :Min 0 :Max 255)
+       (UI.FloatSlider
+        :Variable .size
+        :Min 8.0 :Max 96.0)
+       "Hello Shards!" (UI.Label)))
+
+     "This text is not affected" (UI.Label))))
+
+  (GFX.Render :Steps .render-steps)))

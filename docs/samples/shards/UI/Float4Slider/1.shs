@@ -1,0 +1,18 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Float4Slider(
+        Variable: float4
+        Min: Float4(0 0 0 0)
+        Max: Float4(1 1 1 1)
+      ) | ExpectFloat4
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

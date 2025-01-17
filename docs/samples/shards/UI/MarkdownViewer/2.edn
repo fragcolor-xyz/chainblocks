@@ -1,0 +1,19 @@
+(GFX.MainWindow
+ :Contents
+ (->
+  (Setup
+   (GFX.DrawQueue) >= .ui-draw-queue
+   (GFX.UIPass .ui-draw-queue) >> .render-steps)
+  (UI
+   (UI.CentralPanel
+    :Contents
+    (->
+     (Setup
+      "shards/UI/MarkdownViewer/sample.md" (FS.Read) = .text)
+
+     (UI.ScrollArea
+      :Contents
+      (->
+       .text (UI.MarkdownViewer))))))
+
+  (GFX.Render :Steps .render-steps)))

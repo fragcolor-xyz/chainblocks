@@ -1,0 +1,16 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Plot({
+        [Float2(-1 0) Float2(0 0) Float2(1 0)] | UI.PlotLine
+      })
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

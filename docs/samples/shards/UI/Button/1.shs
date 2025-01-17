@@ -1,0 +1,17 @@
+; Simple button
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Button(Label: "Click me!" Action: {
+        Msg("Clicked")
+      })
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

@@ -1,0 +1,19 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      "Hello shards!" >= text
+      UI.Horizontal({
+        "Text: " | UI.Label
+        UI.TextField(text)
+      })
+      text | UI.HexViewer
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

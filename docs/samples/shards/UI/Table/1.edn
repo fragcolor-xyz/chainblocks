@@ -1,0 +1,29 @@
+(GFX.MainWindow
+ :Contents
+ (->
+  (Setup
+   (GFX.DrawQueue) >= .ui-draw-queue
+   (GFX.UIPass .ui-draw-queue) >> .render-steps)
+  (UI
+   (UI.CentralPanel
+    :Contents
+    (->
+     [{:Name "Doe" :Surname "John"}
+      {:Name "Dough" :Surname "Jane"}
+      {:Name "Smith" :Surname "Dick"}]
+     (UI.Table
+      :Resizable true
+      :Striped true
+      :RowIndex .index
+      :Columns
+      [{:Initial (float 20)}
+       {:Header "Surname"
+        :Initial (float 100) :AtLeast (float 60) :AtMost (float 160)}
+       {:Header "Name"
+        :Initial (float 80) :AtLeast (float 60) :AtMost (float 160)}]
+      :Builder
+      [(-> .index (ToString) (UI.Label))
+       (-> (Take "Surname") (UI.Label))
+       (-> (Take "Name") (UI.Label))]))))
+
+  (GFX.Render :Steps .render-steps)))

@@ -1,0 +1,24 @@
+(GFX.MainWindow
+ :Contents
+ (->
+  (Setup
+   (GFX.DrawQueue) >= .ui-draw-queue
+   (GFX.UIPass .ui-draw-queue) >> .render-steps)
+  (UI
+   (UI.CentralPanel
+    :Contents
+    (->
+     [(int2 0) (int2 0 1) (int2 1) (int2 1 0)]
+     (UI.Table
+      :Columns
+      [{:Header "A"}
+       {:Header "B"}
+       {:Header "A xor B"}]
+      :Builder
+      [(-> (Take 0) (ToString) (UI.Label))
+       (-> (Take 1) (ToString) (UI.Label))
+       (-> (| (Take 0) >= .a)
+           (| (Take 1) >= .b)
+           .a (Math.Xor .b) (ToString) (UI.Label))]))))
+
+  (GFX.Render :Steps .render-steps)))

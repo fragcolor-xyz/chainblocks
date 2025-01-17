@@ -1,0 +1,32 @@
+GFX.MainWindow(
+  Contents: {
+    Once({
+      GFX.DrawQueue >= ui-draw-queue
+      GFX.UIPass(ui-draw-queue) >> render-steps
+    })
+    UI(
+      UI.Window(
+        Title: "Greetings"
+        Contents: {
+          [
+            "Hello" "World" "Please" "Sort" "Me"
+            "Hello" "World" "Please" "Sort" "Me"
+          ]
+          | UI.AutoGrid(
+            ItemWidth: 300.0
+            MaxGridWidth: 700.0
+            ColumnSpacing: 50.0 ; Spacing between columns, not included in MaxGridWidth
+            RowSpacing: 30.0 ; Spacing between rows
+            Contents: {
+              UI.Button(Label: "Test" Action: {
+                | Log
+              })
+            }
+          ) 
+        }
+      )
+    ) | UI.Render(ui-draw-queue)
+
+    GFX.Render(Steps: render-steps)
+  }
+)

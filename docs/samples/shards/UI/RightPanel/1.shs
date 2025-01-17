@@ -1,0 +1,14 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.RightPanel(Contents: {
+      "Right Panel" | UI.Label
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

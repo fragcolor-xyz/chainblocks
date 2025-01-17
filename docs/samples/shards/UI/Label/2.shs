@@ -1,0 +1,20 @@
+"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua." = lorem_ipsum
+
+GFX.MainWindow(Width: 480 Height: 360 Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Columns([
+        {lorem_ipsum | UI.Label(Wrap: true)}
+        none
+        {lorem_ipsum | UI.Label(Wrap: false)}
+      ])
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})

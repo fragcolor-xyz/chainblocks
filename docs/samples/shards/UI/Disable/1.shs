@@ -1,0 +1,16 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  Table(ui-draw-queue Type: GFX.DrawQueue)
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Disable(Disable: true Contents: {
+        UI.Button(Label: "Cant be clicked")
+      })
+    })
+  })
+
+  GFX.Render(Steps: render-steps)
+})
