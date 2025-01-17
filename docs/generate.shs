@@ -17,525 +17,666 @@
 
 @define(input-help-shards {If({IsNotNone} {ExpectString} {""}) | If(Is("") {"The input of the shard, if any"} Pass)})
 @define(output-help-shards {If({IsNotNone} {ExpectString} {""}) | If(Is("") {"The resulting output of the shard"} Pass)})
-@define(params-types-shards {Map({ExpectTable | Take("name")}) | ToString | Slice(1 -1)})
+@define(params-types-shards Map({ExpectTable | Take("name")}))
 
-@template(get-filename [path extension fallback-general] {
-  = f
-  Regex.Match("""(\w+)\.(.*)""") = match
-  Count(match) | If(Is(3) {
-      match
-      {Take(1) = first}
-      {Take(2) = second}
-      [path first "/" second extension] | String.Join
-    } {
-      [path (If({fallback-general} {"General/"} {""})) f extension] | String.Join
-    }
-  )
-})
-
-@template(print-type-info [buffer] {
-  ExpectTable
-  {Take("name") | ExpectString | Assert.IsNot("") = p-type-name}
-  {Take("type") | ExpectInt = p-type-type}
-
-  "[`" >> buffer
-  p-type-name >> buffer
-  "`](" >> buffer
-
-  p-type-type
-  Match([
-    2 ; Enum
-    {
-      "../../../enums/" >> buffer
-      p-type-name >> buffer
-    }
-    15 ; ShardRef
-    {
-      "../../types/#shard" >> buffer
-    }
-    54 ; ContextVar
-    {
-      "../../types/#contextvar" >> buffer
-    }
-    56 ; Seq
-    {
-      "../../types/#seq" >> buffer
-    }
-    57 ; Table
-    {
-      "../../types/#table" >> buffer
-    }
-    59 ; Object
-    {
-      "../../types/#object" >> buffer
-    }
-    61 ; Set
-    {
-      "../../types/#set" >> buffer
-    }
-    none
-    {
-      "../../types/#" >> buffer
-      p-type-name | String.ToLower >> buffer
-    }
-  ])
-  ")" >> buffer
-})
-
-@wire(document-shard {
-  ; remove forbidden/internal shards
-  = shard-name
-  {[
-      ; (String.Starts(With: "_"))
-      ; (String.Starts(With: "Desktop."))
-      ; (String.Starts(With: "FS."))
-      ; (String.Starts(With: "Debug."))
-      ; (String.Starts(With: "Process."))
-      ; (String.Starts(With: "Tracy."))
-      ; (String.Starts(With: "Wasm."))
-      ; (String.Starts(With: "Desktop."))
-      ; (String.Starts(With: "Events."))
-      ; (String.Starts(With: "_Emscripten."))
-      ; (String.Starts(With: "Reflect."))
-      ; (String.Starts(With: "DB.")) ; File access
-      ; (Is("ReadFile"))
-      ; (Is("WriteFile"))
-      ; (Is("WritePNG"))
-      ; (Is("SleepBlocking"))
-      ; (Is("PtrToString"))
-      ; (Is("BytesBuffer"))
-      ; (Is("VarPtr"))
-      ; (Is("VarAddr"))
-      ; (Is("Pack"))
-      ; (Is("Unpack"))
-      ; ; Channels
-      ; (Is("Produce"))
-      ; (Is("Broadcast"))
-      ; (Is("Consume"))
-      ; (Is("Listen"))
-      ; (Is("Complete"))
-      ; ; Audio
-      ; (Is("Audio.Device"))
-      ; ; GFX
-      ; (Is("GFX.MainWindow"))
-      ; (Is("GFX.Renderer"))
-      ; ; Input
-      ; (Is("Inputs.Detached"))
-      ; ; Unsafe stuff
-      ; (Is("UnsafeActivate!"))
-      ; (Is("SleepBlocking!"))
-      ; (Is("Exit"))
-      ; (Is("DShard"))
-    ]
-    When(IsAny(true) {
-      shard-name | Stop
-    })
-  }
-
-  Set(shard-doc "name")
-  Shards.Help
-  {Take("help") | Set(shard-doc "help")}
-
-  {Take("inputHelp") | Set(shard-doc "input-help")}
-  {Take("outputHelp") | Set(shard-doc "output-help")}
-
-  {Take("inputTypes") | ExpectSeq | Set(shard-doc "input-types")}
-  {Take("outputTypes") | ExpectSeq | Set(shard-doc "output-types")}
-
-  {Take("parameters") | ExpectSeq = parameters}
-
-  {Take("properties") = properties}
-
-  Sequence(parameters-seq Type: @type([{none: Type::String}]))
-  0 >= idx
-  parameters | ForEach({
-    ExpectTable
-    {Take("default") | ToString = default-value | Set(param-doc "default")}
-    {Take("help") | Set(param-doc "help")}
-    {Take("name") | Set(param-doc "name")}
-    {Take("types") = types}
-    true | Set(param-doc "optional")
-    false >= has-none
-    Sequence(param-types Type: @type([{none: Type::String}]))
-    types | When(IsNotNone {ExpectSeq | ForEach({
-        ExpectTable
-        {
-          Take("name") | Set(param-type "name") | When(Is("None") {
-            true > has-none
-          })
-        }
-        {Take("type") | Set(param-type "type")}
-        param-type >> param-types
-      })
-    })
-    default-value | When({Is("None") | And | has-none | Not} {
-      false | Set(param-doc "optional")
-    })
-    param-types | Set(param-doc "types")
-    param-doc >> parameters-seq
-    Math.Inc(idx)
-  })
-
-  shard-doc:name | @get-filename(@shards-path ".md" true) = file
-  {String.Contains("General/") = is-general-shard}
-  [""] >= o
-
-  ; metadata (front matter)
-  "---\r\n" >> o
-  "authors: Fragcolor Pte Ltd & contributors\r\n" >> o
-  "license: CC-BY-SA-4.0\r\n" >> o
-  "---\r\n" >> o
-  "\r\n\r\n" >> o
-
-  ; title
-  "# " >> o
-  shard-doc:name >> o
-  "\r\n\r\n" >> o
-
-  ; ; Combined table showing the input/outpus and parameters
-  "<div class=\"sh-parameters\" markdown=\"1\">\r\n" >> o
-  "| Name | Mandatory | Description | Default | Type |\r\n" >> o
-  "|------|---------------------|-------------|---------|------|\r\n" >> o
-
-  "| `⬅️ Input` ||" >> o
-  shard-doc:input-help | @input-help-shards >> o
-  " | " >> o
-  "| " >> o
-  shard-doc:input-types | ForEach(@print-type-info(o))
-  " |\r\n" >> o
-
-  "| `Output ➡️` ||" >> o
-  shard-doc:output-help | @output-help-shards >> o
-  " | " >> o
-  "| " >> o
-  shard-doc:output-types | ForEach(@print-type-info(o))
-  " |\r\n" >> o
-
-  parameters-seq | ForEach({
-    ExpectTable
-    {Take("name") | ExpectString = p-name}
-    {Take("types") | ExpectSeq = p-types}
-    {Take("help") | ExpectString = p-help}
-    {Take("default") | ExpectString = p-default}
-    {Take("optional") | ExpectBool = p-optional}
-    "| `" >> o
-    p-name >> o
-    p-optional | If(IsTrue {
-        "` | :fontawesome-solid-circle-plus:{title=\"No\"} No " >> o
+@wire(main {
+  @template(get-filename [path extension fallback-general] {
+    = f
+    Regex.Match("""(\w+)\.(.*)""") = match
+    Count(match) | If(Is(3) {
+        match
+        {Take(1) = first}
+        {Take(2) = second}
+        [path first "/" second extension] | String.Join
       } {
-        "` | :fontawesome-solid-circle-xmark:{title=\"Yes\"} Yes " >> o
+        [path (If({fallback-general} {"General/"} {""})) f extension] | String.Join
       }
     )
-    " | " >> o
-    p-help >> o
-    " | `" >> o
-    p-default >> o
-    "` | " >> o
-    p-types | ForEach(@print-type-info(o))
-    " |\r\n" >> o
   })
-
-  "\r\n</div>\r\n" >> o
-  "\r\n" >> o
-
-  properties | When(IsNotNone {
+  
+  @template(print-type-info [buffer] {
     ExpectTable
-    {
-      Take("deprecated") | When({IsNotNone | And | ExpectBool | IsTrue} {
-        "--8<-- \"includes/deprecated.md\"\r\n\r\n" >> o
-      })
-    }
-    {
-      Take("experimental") | When({IsNotNone | And | ExpectBool | IsTrue} {
-        "--8<-- \"includes/experimental.md\"\r\n\r\n" >> o
-      })
-    }
+    {Take("name") | ExpectString | Assert.IsNot("") = p-type-name}
+    {Take("type") | ExpectInt = p-type-type}
+    
+    "[`" >> buffer
+    p-type-name >> buffer
+    "`](" >> buffer
+    
+    p-type-type
+    Match([
+      2 ; Enum
+      {
+        "../../../enums/" >> buffer
+        p-type-name >> buffer
+      }
+      15 ; ShardRef
+      {
+        "../../types/#shard" >> buffer
+      }
+      54 ; ContextVar
+      {
+        "../../types/#contextvar" >> buffer
+      }
+      56 ; Seq
+      {
+        "../../types/#seq" >> buffer
+      }
+      57 ; Table
+      {
+        "../../types/#table" >> buffer
+      }
+      59 ; Object
+      {
+        "../../types/#object" >> buffer
+      }
+      61 ; Set
+      {
+        "../../types/#set" >> buffer
+      }
+      none
+      {
+        "../../types/#" >> buffer
+        p-type-name | String.ToLower >> buffer
+      }
+    ])
+    ")" >> buffer
   })
+  
+  @wire(document-shard {
+    = shard-name
+    
+    {
+      [] = done-seq
 
-  ; Help text
-  shard-doc:help | If({IsNotNone} {ExpectString} {"ToDo"}) >> o
-  "\r\n\r\n" >> o
-
-  When({shard-doc:name | @get-filename(@shards-details-path ".md" true) | FS.IsFile} {
-    "## Details\r\n\r\n" >> o
-    "--8<-- \"" >> o
-    shard-doc:name | @get-filename(@shards-details-path ".md" true) >> o
-    "\"\r\n" >> o
-    "\r\n\r\n" >> o
-  })
-
-  When({shard-doc:name | @get-filename(@shards-sample-path "" true) | FS.IsDirectory} {
-    "## Examples\r\n\r\n" >> o
-    shard-doc:name | @get-filename(@shards-sample-path "" true) | FS.Iterate | ForEach({
-      When({FS.Extension | Is(".shs")} {
-        FS.Filename(NoExtension: true) = sample-filename
-        [shard-doc:name "/" sample-filename ".shs"] | String.Join = sample-script-fname
-        [shard-doc:name "/" sample-filename ".shs.log"] | String.Join = sample-log-fname
-        [shard-doc:name "/" sample-filename ".out.md"] | String.Join = sample-out-md-fname
-
-        "=== \"Code\"\r\n\r\n" >> o
-        "  ```x86asm linenums=\"1\"\r\n" >> o
-        "  --8<-- \"" >> o
-        sample-script-fname | @get-filename(@shards-sample-path "" true) >> o
-        "\"\r\n" >> o
-        "  ```\r\n\r\n" >> o
-
-        sample-out-md-fname | @get-filename(@shards-sample-path "" true) | FS.IsFile | When(IsTrue {
-          "=== \"Output\"\r\n\r\n" >> o
-          "  --8<-- \"" >> o
-          sample-out-md-fname | @get-filename(@shards-sample-path "" true) >> o
-          "\"\r\n\r\n" >> o
+      false >= is-it-done
+      
+      done-seq | ForEach({
+        When(Predicate: {Is(shard-name)} Action: {
+          true > is-it-done
         })
-
-        "  ```\r\n" >> o
-        "  --8<-- \"" >> o
-        sample-log-fname | @get-filename(@shards-sample-path "" true) >> o
-        "\"\r\n" >> o
-        "  ```\r\n" >> o
-
-        "&nbsp;\r\n" >> o
+      })
+    }
+    
+    Set(shard-doc "name")
+    Shards.Help
+    {Take("help") | Set(shard-doc "help")}
+    
+    {Take("inputHelp") | Set(shard-doc "input-help")}
+    {Take("outputHelp") | Set(shard-doc "output-help")}
+    
+    {Take("inputTypes") | ExpectSeq | Set(shard-doc "input-types")}
+    {Take("outputTypes") | ExpectSeq | Set(shard-doc "output-types")}
+    
+    {Take("parameters") | ExpectSeq = parameters}
+    
+    {Take("properties") = properties}
+    
+    Sequence(parameters-seq Type: @type([{none: Type::String}]))
+    0 >= idx
+    parameters | ForEach({
+      ExpectTable
+      {Take("default")
+        {Set(param-doc "real-default")}
+        ToString = default-value | Set(param-doc "default")
+      }
+      {Take("help") | Set(param-doc "help")}
+      {Take("name") | Set(param-doc "name")}
+      {Take("types") = types}
+      true | Set(param-doc "optional")
+      false >= has-none
+      Sequence(param-types Type: @type([{none: Type::String}]))
+      types | When(IsNotNone {ExpectSeq | ForEach({
+          ExpectTable
+          {
+            Take("name") | Set(param-type "name") | When(Is("None") {
+              true > has-none
+            })
+          }
+          {Take("type") | Set(param-type "type")}
+          param-type >> param-types
+        })
+      })
+      default-value | When({Is("None") | And | has-none | Not} {
+        false | Set(param-doc "optional")
+      })
+      param-types | Set(param-doc "types")
+      param-doc >> parameters-seq
+      Math.Inc(idx)
+    })
+    
+    shard-doc:name | @get-filename(@shards-path ".md" true) = file
+    {String.Contains("General/") = is-general-shard}
+    [""] >= o
+    
+    ; metadata (front matter)
+    "---\n" >> o
+    "authors: Formabble & contributors\n" >> o
+    "license: CC-BY-SA-4.0\n" >> o
+    "---\n" >> o
+    "\n\n" >> o
+    
+    ; title
+    "# " >> o
+    shard-doc:name >> o
+    "\n\n" >> o
+    
+    ; ; Combined table showing the input/outpus and parameters
+    "<div class=\"sh-parameters\" markdown=\"1\">\n" >> o
+    "| Name | Mandatory | Description | Default | Type |\n" >> o
+    "|------|---------------------|-------------|---------|------|\n" >> o
+    
+    "| `⬅️ Input` ||" >> o
+    shard-doc:input-help | @input-help-shards >> o
+    " | " >> o
+    "| " >> o
+    shard-doc:input-types | ForEach(@print-type-info(o))
+    " |\n" >> o
+    
+    "| `Output ➡️` ||" >> o
+    shard-doc:output-help | @output-help-shards >> o
+    " | " >> o
+    "| " >> o
+    shard-doc:output-types | ForEach(@print-type-info(o))
+    " |\n" >> o
+    
+    parameters-seq | ForEach({
+      ExpectTable
+      {Take("name") | ExpectString = p-name}
+      {Take("types") | ExpectSeq = p-types}
+      {Take("help") | ExpectString = p-help}
+      {Take("default") | ExpectString = p-default}
+      {Take("optional") | ExpectBool = p-optional}
+      "| `" >> o
+      p-name >> o
+      p-optional | If(IsTrue {
+          "` | :fontawesome-solid-circle-plus:{title=\"No\"} No " >> o
+        } {
+          "` | :fontawesome-solid-circle-xmark:{title=\"Yes\"} Yes " >> o
+        }
+      )
+      " | " >> o
+      p-help >> o
+      " | `" >> o
+      p-default >> o
+      "` | " >> o
+      p-types | ForEach(@print-type-info(o))
+      " |\n" >> o
+    })
+    
+    "\n</div>\n" >> o
+    "\n" >> o
+    
+    properties | When(IsNotNone {
+      ExpectTable
+      {
+        Take("deprecated") | When({IsNotNone | And | ExpectBool | IsTrue} {
+          "--8<-- \"includes/deprecated.md\"\n\n" >> o
+        })
+      }
+      {
+        Take("experimental") | When({IsNotNone | And | ExpectBool | IsTrue} {
+          "--8<-- \"includes/experimental.md\"\n\n" >> o
+        })
+      }
+    })
+    
+    ; Help text
+    shard-doc:help | If({IsNotNone} {ExpectString} {"ToDo"}) >> o
+    "\n\n" >> o
+    
+    "" >= shard-details
+    shard-doc:name | @get-filename(@shards-details-path ".md" true) = details-file-name
+    When({details-file-name | FS.IsFile} {
+      "## Details\n\n" >> o
+      "--8<-- \"" >> o
+      shard-doc:name | details-file-name >> o
+      "\"\n" >> o
+      "\n\n" >> o
+      details-file-name | FS.Read > shard-details
+    })
+    
+    shard-doc:name | @get-filename(@shards-sample-path "" true) = samples-dir
+    When({samples-dir | FS.IsDirectory} {
+      "## Examples\n\n" >> o
+      samples-dir | FS.Iterate | ForEach({
+        When({FS.Extension | Is(".shs")} {
+          FS.Filename(NoExtension: true) = sample-filename
+          [shard-doc:name "/" sample-filename ".shs"] | String.Join = sample-script-fname
+          [shard-doc:name "/" sample-filename ".shs.log"] | String.Join = sample-log-fname
+          [shard-doc:name "/" sample-filename ".out.md"] | String.Join = sample-out-md-fname
+          
+          "=== \"Code\"\n\n" >> o
+          "  ```x86asm linenums=\"1\"\n" >> o
+          "  --8<-- \"" >> o
+          sample-script-fname | @get-filename(@shards-sample-path "" true) >> o
+          "\"\n" >> o
+          "  ```\n\n" >> o
+          
+          sample-out-md-fname | @get-filename(@shards-sample-path "" true) | FS.IsFile | When(IsTrue {
+            "=== \"Output\"\n\n" >> o
+            "  --8<-- \"" >> o
+            sample-out-md-fname | @get-filename(@shards-sample-path "" true) >> o
+            "\"\n\n" >> o
+          })
+          
+          "  ```\n" >> o
+          "  --8<-- \"" >> o
+          sample-log-fname | @get-filename(@shards-sample-path "" true) >> o
+          "\"\n" >> o
+          "  ```\n" >> o
+          
+          "&nbsp;\n" >> o
+        })
       })
     })
-  })
-
-  "--8<-- \"includes/license.md\"\r\n\r\n" >> o
-
-  o | String.Join = content
-  file | FS.Write(content Overwrite: true)
-
-  {
-    ; for AI purposes
-    shard-doc:input-help | @input-help-shards | Set(shard-doc "input-help")
-    shard-doc:output-help | @output-help-shards | Set(shard-doc "output-help")
-
-    shard-doc:input-types | @params-types-shards | Set(shard-doc "input-types")
-    shard-doc:output-types | @params-types-shards | Set(shard-doc "output-types")
-
-    false >= missing-help
-    shard-doc:help | When(Is("") {
-      "Help text is missing!" | Set(shard-doc "help")
-      true > missing-help
-    })
-
-    parameters-seq | Map({
-      ExpectTable = param-table
-      param-table:types | ExpectSeq
-      Map({ExpectTable | Take("name")}) | ToString | Slice(1 -1) | Set(param-table "types")
-      param-table
-    }) = parameters-seq-edited
-
-    shard-doc | ToString >= shard-doc-string
-
-    "\nParams: " | AppendTo(shard-doc-string)
-    parameters-seq-edited | ToString | AppendTo(shard-doc-string)
-
-    "\n----\n" | AppendTo(shard-doc-string)
-    "shards_docs_merged.txt" | FS.Write(shard-doc-string Append: true)
-  }
-
-  {
-    @notion-api-key | When(IsNot("") {
-      false >= invalid-defaults
-      ; prep params
-      {
-        "type": "table_row"
-        "table_row": {
-          "cells": [
-            [{"type": "text"
-              "text": {
-                  "content": "Name"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": "Mandatory"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": "Description"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": "Default"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": "Type"
-              }}]]
+    
+    "--8<-- \"includes/license.md\"\n\n" >> o
+    
+    o | String.Join = content
+    file | FS.Write(content Overwrite: true)
+    
+    {
+      "" >= usage-example
+      
+      ; for AI purposes
+      shard-doc:input-help | @input-help-shards | Set(shard-doc "input-help")
+      shard-doc:output-help | @output-help-shards | Set(shard-doc "output-help")
+      
+      shard-doc:input-types | @params-types-shards | Set(shard-doc "input-types")
+      shard-doc:output-types | @params-types-shards | Set(shard-doc "output-types")
+      
+      false >= missing-help
+      shard-doc:help | When(Is("") {
+        "Help text is missing!" | Set(shard-doc "help")
+        true > missing-help
+      })
+      
+      parameters-seq | Map({
+        ExpectTable >= param-table
+        param-table:types | ExpectSeq
+        Map({ExpectTable | Take("name")}) | Set(param-table "types")
+        param-table
+      }) = parameters-seq-edited
+      
+      "# " >= shard-doc-string
+      Get(shard-doc "name") | AppendTo(shard-doc-string)
+      " {.shard}\n\n" | AppendTo(shard-doc-string)
+      Get(shard-doc "help") | ExpectString | AppendTo(shard-doc-string)
+      "\n\n" | AppendTo(shard-doc-string)
+      "## Shard Input\n\n" | AppendTo(shard-doc-string)
+      Get(shard-doc "input-help") | AppendTo(shard-doc-string)
+      "\n\n" | AppendTo(shard-doc-string)
+      "### Possible Input Types\n" | AppendTo(shard-doc-string)
+      Get(shard-doc "input-types") | ForEach({
+        {"* " | AppendTo(shard-doc-string)}
+        ExpectString | AppendTo(shard-doc-string)
+        "\n" | AppendTo(shard-doc-string)
+      })
+      "\n" | AppendTo(shard-doc-string)
+      "## Shard Output\n\n" | AppendTo(shard-doc-string)
+      Get(shard-doc "output-help") | AppendTo(shard-doc-string)
+      "\n\n" | AppendTo(shard-doc-string)
+      "### Possible Output Types\n" | AppendTo(shard-doc-string)
+      Get(shard-doc "output-types") | ForEach({
+        {"* " | AppendTo(shard-doc-string)}
+        ExpectString | AppendTo(shard-doc-string)
+        "\n" | AppendTo(shard-doc-string)
+      })
+      "\n" | AppendTo(shard-doc-string)
+      Count(parameters-seq-edited) | If(IsMore(0) {
+          ["```shards\n" shard-name "(\n"] | String.Join | AppendTo(usage-example)
+          
+          "## Shard Parameters\n\n" | AppendTo(shard-doc-string)
+          parameters-seq-edited | ForEach({
+            ExpectTable
+            {Take("name") | ExpectString = p-name}
+            {Take("types") | ExpectSeq = p-types}
+            {Take("help") | ExpectString = p-help}
+            {Take("default") | ExpectString = p-default}
+            {Take("real-default") = p-real-default}
+            {Take("optional") | ExpectBool = p-optional}
+            
+            ; update usage example
+            ["  " p-name ": " (
+             p-real-default
+             Cond([
+                  {IsString}
+                  {["\"" p-default "\""] | String.Join}
+                  
+                  {p-default | String.Starts(With: "Var: ")}
+                  {["some-variable ; if omitted defaults to internal variable " p-real-default] | String.Format}
+                  
+                  {true}
+                  {p-default}] Passthrough: false)
+             ) "\n"] | String.Join | AppendTo(usage-example)
+            
+            "### " | AppendTo(shard-doc-string)
+            p-name | AppendTo(shard-doc-string)
+            "\n" | AppendTo(shard-doc-string)
+            p-help | AppendTo(shard-doc-string)
+            "\n" | AppendTo(shard-doc-string)
+            "\n**Default parameter value:** " | AppendTo(shard-doc-string)
+            p-default | AppendTo(shard-doc-string)
+            "\n" | AppendTo(shard-doc-string)
+            "\n**Is the parameter optional?** " | AppendTo(shard-doc-string)
+            (p-optional | If(IsTrue {"Yes"} {"No"})) | AppendTo(shard-doc-string)
+            "\n" | AppendTo(shard-doc-string)
+            "\n**Possible parameter types:**\n" | AppendTo(shard-doc-string)
+            p-types | ForEach({
+              {"  * " | AppendTo(shard-doc-string)}
+              ExpectString | AppendTo(shard-doc-string)
+              "\n" | AppendTo(shard-doc-string)
+            })
+            "\n" | AppendTo(shard-doc-string)
+          })
+          
+          ")\n```\n" | AppendTo(usage-example)
+        } {
+          ["```shards\n" shard-name "\n```\n"] | String.Join >= usage-example
         }
-      } >> notion-params
-      {
-        "type": "table_row"
-        "table_row": {
-          "cells": [
-            [{"type": "text"
-              "text": {
-                  "content": "⬅️ Input"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": "N/A"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": shard-doc:input-help
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": "N/A"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": shard-doc:input-types
-              }}]]
-        }
-      } >> notion-params
-      {
-        "type": "table_row"
-        "table_row": {
-          "cells": [
-            [{"type": "text"
-              "text": {
-                  "content": "Output ➡️"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": "N/A"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": shard-doc:output-help
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": "N/A"
-              }}]
-            [{"type": "text"
-              "text": {
-                  "content": shard-doc:output-types
-              }}]]
-        }
-      } >> notion-params
-      parameters-seq | ForEach({
-        ExpectTable
-        {Take("name") | ExpectString = p-name}
-        {Take("types") | ExpectString = p-types}
-        {Take("help") | ExpectString = p-help}
-        {Take("default") | ExpectString = p-default}
-        {Take("optional") | ExpectBool = p-optional}
-        false >= has-none
+      )
+      
+      "## Example\n\n" | AppendTo(shard-doc-string)
+      usage-example | AppendTo(shard-doc-string)
+      
+      shard-details | When(IsNot("") {
+        "## Shard Details\n" | AppendTo(shard-doc-string)
+        shard-details | AppendTo(shard-doc-string)
+        "\n" | AppendTo(shard-doc-string)
+      })
+      
+      "\n----\n\n" | AppendTo(shard-doc-string)
+      ; "shards_docs_merged.md" | FS.Write(shard-doc-string Append: true)
+    }
+    
+    {
+      @notion-api-key | When(IsNot("") {
+        false >= invalid-defaults
+        ; prep params
         {
           "type": "table_row"
           "table_row": {
             "cells": [
               [{"type": "text"
                 "text": {
-                    "content": p-name
+                    "content": "Name"
                 }}]
               [{"type": "text"
                 "text": {
-                    "content": (p-optional | If(IsTrue {"No"} {"Yes"}))
+                    "content": "Mandatory"
                 }}]
               [{"type": "text"
                 "text": {
-                    "content": p-help
+                    "content": "Description"
                 }}]
               [{"type": "text"
                 "text": {
-                    "content": p-default
+                    "content": "Default"
                 }}]
               [{"type": "text"
                 "text": {
-                    "content": p-types
+                    "content": "Type"
                 }}]]
           }
         } >> notion-params
-        p-default | When({Is("None") | And | has-none | Not} {
-          true > invalid-defaults
-        })
-      })
-
-      ; create a new page in the Notion database
-      {
-        "parent": {
-          "database_id": @notion-db-id
-        }
-        "properties": {
-          "Shard": {
-            "title": [
-              {
+        {
+          "type": "table_row"
+          "table_row": {
+            "cells": [
+              [{"type": "text"
                 "text": {
-                  "content": shard-name
-                }
-              }]
+                    "content": "⬅️ Input"
+                }}]
+              [{"type": "text"
+                "text": {
+                    "content": "N/A"
+                }}]
+              [{"type": "text"
+                "text": {
+                    "content": shard-doc:input-help
+                }}]
+              [{"type": "text"
+                "text": {
+                    "content": "N/A"
+                }}]
+              [{"type": "text"
+                "text": {
+                    "content": shard-doc:input-types
+                }}]]
           }
-          "No Defaults": {; checkbox
-            "checkbox": invalid-defaults}
-          "No Help": {; checkbox
-            "checkbox": missing-help}
-          "General": {; checkbox
-            "checkbox": is-general-shard}
-        }
-        "children": [
+        } >> notion-params
+        {
+          "type": "table_row"
+          "table_row": {
+            "cells": [
+              [{"type": "text"
+                "text": {
+                    "content": "Output ➡️"
+                }}]
+              [{"type": "text"
+                "text": {
+                    "content": "N/A"
+                }}]
+              [{"type": "text"
+                "text": {
+                    "content": shard-doc:output-help
+                }}]
+              [{"type": "text"
+                "text": {
+                    "content": "N/A"
+                }}]
+              [{"type": "text"
+                "text": {
+                    "content": shard-doc:output-types
+                }}]]
+          }
+        } >> notion-params
+        parameters-seq | ForEach({
+          ExpectTable
+          {Take("name") | ExpectString = p-name}
+          {Take("types") | ExpectString = p-types}
+          {Take("help") | ExpectString = p-help}
+          {Take("default") | ExpectString = p-default}
+          {Take("optional") | ExpectBool = p-optional}
+          false >= has-none
           {
-            "object": "block"
-            "type": "heading_1"
-            "heading_1": {
-              "rich_text": [
+            "type": "table_row"
+            "table_row": {
+              "cells": [
+                [{"type": "text"
+                  "text": {
+                      "content": p-name
+                  }}]
+                [{"type": "text"
+                  "text": {
+                      "content": (p-optional | If(IsTrue {"No"} {"Yes"}))
+                  }}]
+                [{"type": "text"
+                  "text": {
+                      "content": p-help
+                  }}]
+                [{"type": "text"
+                  "text": {
+                      "content": p-default
+                  }}]
+                [{"type": "text"
+                  "text": {
+                      "content": p-types
+                  }}]]
+            }
+          } >> notion-params
+          p-default | When({Is("None") | And | has-none | Not} {
+            true > invalid-defaults
+          })
+        })
+        
+        ; create a new page in the Notion database
+        {
+          "parent": {
+            "database_id": @notion-db-id
+          }
+          "properties": {
+            "Shard": {
+              "title": [
                 {
-                  "type": "text"
                   "text": {
                     "content": shard-name
                   }
                 }]
             }
+            "No Defaults": {; checkbox
+              "checkbox": invalid-defaults}
+            "No Help": {; checkbox
+              "checkbox": missing-help}
+            "General": {; checkbox
+              "checkbox": is-general-shard}
+            "Done": {; checkbox
+              "checkbox": is-it-done}
           }
-          {
-            "object": "block"
-            "type": "table"
-            "table": {
-              "table_width": 5
-              "has_column_header": true
-              "children": notion-params
+          "children": [
+            {
+              "object": "block"
+              "type": "heading_1"
+              "heading_1": {
+                "rich_text": [
+                  {
+                    "type": "text"
+                    "text": {
+                      "content": shard-name
+                    }
+                  }]
+              }
             }
-          }
-          {
-            "object": "block"
-            "type": "paragraph"
-            "paragraph": {
-              "rich_text": [
-                {
-                  "type": "text"
-                  "text": {
-                    "content": shard-doc:help
-                  }
-                }]
+            {
+              "object": "block"
+              "type": "table"
+              "table": {
+                "table_width": 5
+                "has_column_header": true
+                "children": notion-params
+              }
             }
-          }]
-      } | ToJson
-      Http.Post(@url Headers: @headers Retry: 3)
+            {
+              "object": "block"
+              "type": "paragraph"
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text"
+                    "text": {
+                      "content": shard-doc:help
+                    }
+                  }]
+              }
+            }]
+        } | ToJson
+        Http.Post(@url Headers: @headers Retry: 3 KeepAlive: true)
+      })
+    }
+    
+    Log("Documented shard")
+    
+    ""
+  })
+  
+  @notion-api-key | When(IsNot("") {
+    @notion-db-id | Log("Populating notion database")
+  })
+  
+  @wire(document-enum {
+    = enum-id
+    enum-id | Shards.EnumTypeHelp = enum-help
+    
+    enum-help | Take("labels") | ExpectSeq = labels
+    enum-help | Take("descriptions") | ExpectSeq = descriptions
+    Count(labels) = count
+    
+    "" >> o
+    "---\n" >> o
+    "authors: Formabble & contributors\n" >> o
+    "license: CC-BY-SA-4.0\n" >> o
+    "---\n" >> o
+    "\n\n" >> o
+    
+    "# " >> o
+    enum-help:name | ExpectString = name | Set(enum-doc "name")
+    name >> o
+    "\n\n" >> o
+    
+    "<div class=\"sh-parameters\" markdown=\"1\">\n" >> o
+    "| Value  | Description |\n" >> o
+    "|------|---------------------|\n" >> o
+    
+    ; Sequence(enum-doc "values")
+    
+    0 >= idx
+    Repeat({
+      labels | Take(idx) | ExpectString = label
+      descriptions | Take(idx) | ExpectString = description
+      "| `" >> o
+      label >> o
+      "` | " >> o
+      description >> o
+      " |\n" >> o
+      
+      {
+        label: label
+        description: description
+      } | Push(enum-doc "values" Clear: false)
+      
+      Inc(idx)
+    } Times: count)
+    
+    "\n</div>\n" >> o
+    "\n" >> o
+    
+    "--8<-- \"includes/license.md\"\n" >> o
+    
+    o | String.Join = content
+    name | @get-filename(@enums-path ".md" false) = file
+    file | FS.Write(content Overwrite: true)
+    
+    ["# " name " {.enum}\n\n"] | String.Join >= enum-doc-string
+    enum-help:help | ExpectString | AppendTo(enum-doc-string)
+    "\n\n" | AppendTo(enum-doc-string)
+    "| Value  | Description |\n" | AppendTo(enum-doc-string)
+    "|------|---------------------|\n" | AppendTo(enum-doc-string)
+    enum-doc:values | ExpectSeq | ForEach({
+      ExpectTable
+      {Take("label") | ExpectString = label}
+      {Take("description") | ExpectString = description}
+      ["| `" label "` | " description " |\n"] | String.Join | AppendTo(enum-doc-string)
     })
-  }
-
-  Log("Documented shard")
-
-  ""
+    
+    "\n----\n" | AppendTo(enum-doc-string)
+    ; "enums_docs_merged.md" | FS.Write(enum-doc-string Append: true)
+    
+    none
+  })
+  
+  ; @wire(document-object {
+  ;   = object-id
+  ;   object-id | Shards.ObjectTypeHelp = object-help | Log
+  ; })
+  
+  ; ;;Deleta pages first
+  ; Http.Post("https://api.notion.com/v1/databases/@notion-db-id/query" Headers: @headers) | Take("results") | ForEach({
+  ;   Take("id") | Http.Delete("https://api.notion.com/v1/pages/" Headers: @headers)
+  ; })
+  
+  "shards_docs_merged.md" | FS.Remove
+  "enums_docs_merged.md" | FS.Remove
+  
+  ; process documentation in parallel
+  ; Empty results indicate success, returning the shard name adds it to the skipped list
+  Shards.Enumerate | TryMany(document-shard Threads: 4)
+  
+  Shards.EnumTypes | TryMany(document-enum Threads: 4)
+  
+  ; Shards.ObjectTypes | TryMany(document-object Threads: 4)
 })
 
-@notion-api-key | When(IsNot("") {
-  @notion-db-id | Log("Populating notion database")
-})
-
-"shards_docs_merged.txt" | FS.Remove
-
-; process documentation in parallel
-; Empty results indicate success, returning the shard name adds it to the skipped list
-Shards.Enumerate | TryMany(document-shard Threads: 4) = tmp-list
-Remove(tmp-list Predicate: Is("")) = skipped-list
-["constexpr std::array<std::string_view, " (Count(skipped-list)) "> ForbiddenShards = {\n"] | String.Format >> out
-skipped-list | ForEach({
-  = shard-name
-  ["  \"" shard-name "\",\n"] | String.Format >> out
-})
-["};\n\n"] | String.Format >> out
-out | String.Join("") = file-content
-"forbidden_shards.inl" | FS.Write(file-content Overwrite: true)
+@mesh(root)
+@schedule(root main)
+@run(root)
