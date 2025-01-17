@@ -1,0 +1,4 @@
+@define(port 3000)
+@define(root-path "../../..")
+@define(web-path "./")
+@define(binaries-path "../../../build/emscripten-mt/release")
