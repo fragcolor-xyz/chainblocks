@@ -16,7 +16,7 @@ nvar | Log("modified .nvar")        ; => modified .nvar: 200
 sequence | Log(".sequence")         ; => .sequence: [100]
 
 ; update a mutable table: update existing key-value pair
-["a" "b"] | Set(Name: "table1" Key: "key1")
+["a" "b"] | Set(Name: table1 Key: "key1")
 table1 | Log(".table1")             ; => .table1: {key1: [a, b]}
 ["def"] | Update(table1 Key: "key1")
 table1 | Log(".table1")             ; => .table1: {key1: [def]}
@@ -29,8 +29,8 @@ svarA | Log(".svarA")               ; => .svar: Hello
 svarA | Log("modified .svar")       ; => .svar: World
 
 ; create and update local/global table variables
-["a" "b"] | Set(Name: "table" Key: "key1")            ; create local table
-["c" "d"] | Set(Name: "table" Key: "key1" Global: true)  ; create same-name global table
+["a" "b"] | Set(Name: table Key: "key1")            ; create local table
+["c" "d"] | Set(Name: table Key: "key1" Global: true)  ; create same-name global table
 Get(table) | Log                    ; local table => {key1: [a, b]}
 Get(table Global: true) | Log       ; same-name global table => {key1: [c, d]}
 ["X"] | Update(table Key: "key1")   ; update local table
