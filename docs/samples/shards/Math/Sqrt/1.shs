@@ -1,0 +1,3 @@
+@f3(1.0 2.0 4.0) | Math.Sqrt | Log
+Math.Subtract(@f3(1.0 1.4142136 2.0)) | Math.Abs
+IsLess(@f3(1e-05 1e-05 1e-05)) | Assert.Is(true Break: true)

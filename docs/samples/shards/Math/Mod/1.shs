@@ -1,0 +1,2 @@
+@i4(1 2 3 4) | Math.Mod(Operand: @i4(2 2 2 2)) | Log
+Assert.Is(@i4(1 0 1 0) Break: true)

@@ -1,0 +1,16 @@
+[1 2 3] >= seq                     ; create local sequence
+[4 5 6] | Set(seq-global Global: true)  ; create global sequence with different name
+Get(seq) | Log                        ; read local sequence  => [1, 2, 3]
+Get(seq-global Global: true) | Log    ; read global sequence => [4, 5, 6]
+
+; clear local sequence
+Clear(Name: seq)                      ; clear local sequence
+Get(seq) | Log                        ; local sequence cleared => []  
+Get(seq-global Global: true) | Log    ; global sequence intact => [4, 5, 6]  
+100 | AppendTo(seq)                   ; append something to local sequence
+Get(seq) | Log                        ; local sequence no more empty => [100]
+
+; clear the global sequence
+Clear(Name: seq-global Global: true)  ; clear global sequence
+Get(seq-global Global: true) | Log    ; global sequence cleared => []
+Get(seq) | Log                        ; local sequence intact => [100]

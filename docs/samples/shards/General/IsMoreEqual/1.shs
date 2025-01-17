@@ -1,0 +1,8 @@
+; string comparison
+"z" | IsMoreEqual("a") | Assert.Is(true Break: true)
+
+; integer comparison
+5 | IsMoreEqual(2) | Assert.Is(true Break: true)
+
+; float comparison
+9.0 | IsMoreEqual(2.0) | Assert.Is(true Break: true)

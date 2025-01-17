@@ -1,0 +1,11 @@
+; drop last element from a local sequence
+[10 20 30 40] >= seq           ; create a local sequence
+Get(seq) | Log                ; local sequence => [10, 20, 30, 40]
+Drop(Name: seq)               ; drops the last element i.e., 40
+Get(seq) | Log                ; updated sequence => [10, 20, 30]
+
+; drop last element from a same-name global sequence
+[11 21 31 41] | Set(seq Global: true)  ; create global sequence
+Get(seq Global: true) | Log   ; global sequence => [11, 21, 31, 41]
+Drop(Name: seq Global: true)  ; drops the last element i.e., 41
+Get(seq Global: true) | Log   ; updated sequence => [11, 21, 31]

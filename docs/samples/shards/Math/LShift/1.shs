@@ -1,0 +1,2 @@
+4 | Math.LShift(2) | Log
+Assert.Is(16 Break: true)

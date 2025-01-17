@@ -1,11 +1,18 @@
-@wire(sample-launcher {
+; run like this: shards new docs/samples/run-sample.shs file:shards/UI/Area/1.shs looped:true
+
+@wire(sample-launcher-looped {
   WireRunner(sample-wire)
   When(Is("END") Stop)
 } Looped: true StackSize: #(4 | Math.Multiply(1024) | Math.Multiply(1024)))
 
+@wire(sample-launcher {
+  WireRunner(sample-wire)
+  When(Is("END") Stop)
+} Looped: false StackSize: #(4 | Math.Multiply(1024) | Math.Multiply(1024)))
+
 @wire(open-sample {
   #(@file | FS.Read | Shards.Read) | Await(Shards.Distill("sample-wire")) = sample-wire
-  Detach(sample-launcher)
+  If({@looped | Is("true")} Detach(sample-launcher-looped) Detach(sample-launcher))
 })
 
 @mesh(main)
@@ -14,4 +21,4 @@
 })
 
 @schedule(main main-wire)
-@run(main FPS: 60 Iterations:10)
+@run(main FPS: 60 Iterations: 60)

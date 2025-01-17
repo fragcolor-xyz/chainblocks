@@ -1,0 +1,2 @@
+2 | BigInt = expected
+4 | BigInt | BigInt.Sqrt | BigInt.Is(expected) | Assert.Is(true Break: true)

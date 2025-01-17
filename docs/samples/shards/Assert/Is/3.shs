@@ -1,0 +1,3 @@
+; :Break = `false`, assertion true
+; => log no errors and dont abort program
+8 | Assert.Is(8 Break: false)

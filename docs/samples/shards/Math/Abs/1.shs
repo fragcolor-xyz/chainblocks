@@ -1,0 +1,2 @@
+[-0.1 -0.2 0.4] | Math.Abs | Log
+Assert.Is([0.1 0.2 0.4] Break: true)

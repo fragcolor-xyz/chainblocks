@@ -1,0 +1,6 @@
+@wire(hello {
+  Msg("Hello")
+})
+
+Detach(Wire: hello)
+Step(Wire: hello)

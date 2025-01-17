@@ -1,0 +1,3 @@
+7 | BigInt = expected
+4 | BigInt = operand
+7 | BigInt | BigInt.Max(Operand: operand) | BigInt.Is(expected) | Assert.Is(true Break: true)

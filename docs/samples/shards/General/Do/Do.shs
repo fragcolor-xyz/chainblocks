@@ -1,0 +1,6 @@
+@wire(dologic {
+  IsMore(10) | Or | IsLess(0)
+})
+
+-10 | Do(dologic) | Assert.Is(true Break: true)
+5 | Do("dologic") | Assert.IsNot(true Break: true)

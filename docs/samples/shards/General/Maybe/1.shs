@@ -1,0 +1,12 @@
+[1 2] | Maybe({
+  Take(3)
+} {
+  Take(0)
+} Silent: true) | Log("result")
+
+[1 2] | Maybe({
+  Take(3)
+} {
+  Msg("Invalid, default to 42" Level: LogLevel.Warning)
+  42
+} Silent: true) | Log("result")

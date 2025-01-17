@@ -1,0 +1,3 @@
+@f3(-1.0 0.0 1.0) | Math.Tanh | Log
+Math.Subtract(@f3(-0.76159416 0.0 0.76159416)) | Math.Abs
+IsLess(@f3(1e-05 1e-05 1e-05)) | Assert.Is(true Break: true)

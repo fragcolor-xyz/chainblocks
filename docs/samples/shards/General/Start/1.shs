@@ -1,0 +1,5 @@
+@wire(hello {
+   Msg("Hello")
+})
+
+SwitchTo(hello)

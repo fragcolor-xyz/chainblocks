@@ -1,0 +1,4 @@
+10.0 >= mutable
+Math.Inc(Value: mutable)
+mutable | Log
+Assert.Is(11.0 Break: true)

@@ -1,0 +1,12 @@
+; ForEach on a sequence: processes every element in seq order
+[2 4 8 10] | ForEach({
+  {Math.Multiply(10) | Log}  ; => 20, 40, 80, 100
+  {Math.Multiply(100) | Log} ; => 200, 400, 800, 1000
+})
+
+; ForEach on a table: processes every key in alphabetic order
+{Name: "Universe" Age: "13.8B Yrs"} | ForEach({
+  ; receives each key/value pair as a sequence in alphabetic order of key
+  {Slice(0 1 1) | Log}  ; => ["Age"], ["Name"]
+  {Slice(1 2 1) | Log}  ; => ["13.8 B Yrs"], ["Universe"]
+})

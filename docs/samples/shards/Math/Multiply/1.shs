@@ -1,0 +1,27 @@
+; Multiply integers
+5 | Log ; prints input => 5
+  | Math.Multiply(2) | Log ; prints input * operand => 10
+  | Assert.Is(10 Break: true) ; expect: (5 * 2) => 10
+
+; Multiply floats
+5.3 | Log ; prints input => 5.3
+    | Math.Multiply(2.1) | Log ; prints input * operand => 11.13
+    | Assert.Is(11.13 Break: true) ; expect: (5.3 * 2.1) => 11.13
+
+; Multiply equal-sized sequences
+[4 5.1 6.4] | Log ; prints input => [4 5.1 6.4]
+            | Math.Multiply([3 4.0 2.2]) ; input seq elements compute with corresponding operand seq elements
+            | Log ; prints input * operand => [12 20.4 14.08]
+            | Assert.IsAlmost([12 20.4 14.08] Break: true) ; expect: [(4 * 3) (5.1 * 4.0) (6.4 * 2.2)] => [12 20.4 14.08]
+
+; Multiply unequal-sized sequences (input size < operand size)
+[4.0] | Log ; prints input => [4.0]
+      | Math.Multiply([3.0 4.0 2.2]) ; input seq elements compute with corresponding operand seq elements
+      | Log ; prints input * operand => [12.0]
+      | Assert.Is([12.0] Break: true) ; expect: [(4.0 * 3.0) ... ...] => [12.0]
+
+; Multiply unequal-sized sequences (input size > operand size)
+[4 2 1 5 8] | Log ; prints input => [4 2 1 5 8]
+            | Math.Multiply([6 4]) ; input seq elements compute with corresponding operand seq elements
+            | Log ; prints input * operand => [24 8 6 20 48]
+            | Assert.Is([24 8 6 20 48] Break: true) ; expect: [(4 * 6) (2 * 4) (1 * 6) (5 * 4) (8 * 6)] => [24 8 6 20 48]

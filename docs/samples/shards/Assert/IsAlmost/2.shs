@@ -1,0 +1,5 @@
+; :Break = `true`, assertion false
+; => abort the program
+7.0 | Maybe({
+  Assert.IsAlmost(8.0 Break: true)
+})

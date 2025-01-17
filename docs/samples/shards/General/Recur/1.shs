@@ -1,0 +1,15 @@
+@wire(fibo {
+  n >= n
+  n | If(
+    {IsLess(2)}
+    {Pass}
+    {
+      n | Math.Subtract(2) | Recur >= a
+      n | Math.Subtract(1) | Recur >= b
+      a | Math.Add(b)
+    }
+  )
+})
+
+16 | Do(fibo) | Log
+Assert.Is(987 Break: true)

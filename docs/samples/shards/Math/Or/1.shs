@@ -1,0 +1,2 @@
+@i4(0 2 4 8) | Math.Or(Operand: @i4(3 3 3 3)) | Log
+Assert.Is(@i4(3 3 7 11) Break: true)

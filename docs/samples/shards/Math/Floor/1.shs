@@ -1,0 +1,2 @@
+@f3(-0.95 4.0 7.54) | Math.Floor | Log
+Assert.Is(@f3(-1.0 4.0 7.0) Break: true)
