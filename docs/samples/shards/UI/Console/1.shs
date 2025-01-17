@@ -1,0 +1,21 @@
+; Simple console
+GFX.MainWindow(Contents: {
+  ; Setup
+  GFX.DrawQueue = ui-draw-queue
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Button("Say Hello" {Msg("Hello!")})
+      CaptureLog(
+        Size: 24
+        MinLevel: "info"
+        Pattern: "%^[%l]%$ [%Y-%m-%d %T.%e] %v"
+      ) | String.Join | UI.Console
+    })
+  })
+
+  UI.Render(ui-draw-queue)
+  GFX.Render(Steps: render-steps)
+})

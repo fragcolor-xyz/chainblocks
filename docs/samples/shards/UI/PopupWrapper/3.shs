@@ -1,0 +1,63 @@
+; Double PopupWrapper with mix of Button and ImageButton widget and contents
+GFX.MainWindow(
+  Contents: {
+    Once({
+      GFX.DrawQueue >= ui-draw-queue
+      GFX.UIPass(ui-draw-queue) >> render-steps
+    })
+    UI(
+      UI.CentralPanel({
+        Once({
+          LoadImage("../../assets/ShardsLogo.png") = image
+        })
+        UI.PopupWrapper(
+          MinWidth: 200.0
+          Widget: {
+            image | UI.ImageButton(
+              Scale: @f2(0.1)
+              Action: {
+                "Message sent!" | Log
+              }
+            )
+          }
+          Contents: {
+            UI.Button(
+              Label: "Receive message"
+              Action: {
+                "Message received!" | Log
+              }
+            )
+          }
+        )
+        UI.PopupWrapper(
+          MinWidth: 300.0 ; Changes the minimum width of the popup to be 200.0 instead of the width of the button
+          AboveOrBelow: PopupLocation::Above
+          Widget: {
+            UI.Button(
+              Label: "Send message"
+              Action: {
+                "Message sent!" | Log
+              }
+            )
+          }
+          Contents: {
+            image | UI.ImageButton(
+              Scale: @f2(0.1)
+              Action: {
+                "Message received!" | Log
+              }
+            )
+            UI.Button(
+              Label: "Receive message"
+              Action: {
+                "Message received!" | Log
+              }
+            )
+          }
+        )
+      })
+    ) | UI.Render(ui-draw-queue)
+    
+    GFX.Render(Steps: render-steps)
+  }
+)

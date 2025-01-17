@@ -1,0 +1,15 @@
+(GFX.MainWindow
+ :Contents
+ (->
+  (Setup
+   (GFX.DrawQueue) >= .ui-draw-queue
+   (GFX.UIPass .ui-draw-queue) >> .render-steps)
+  (UI
+   (UI.CentralPanel
+    (->
+     (UI.Float2Slider
+      :Variable .float2
+      :Min (float2 0) :Max (float2 1))
+     (ExpectFloat2))))
+
+  (GFX.Render :Steps .render-steps)))

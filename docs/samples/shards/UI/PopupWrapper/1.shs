@@ -1,0 +1,51 @@
+; Single PopupWrapper with Button widget and contents
+GFX.MainWindow(
+  Contents: {
+    Once({
+      GFX.DrawQueue >= ui-draw-queue
+      GFX.UIPass(ui-draw-queue) >> render-steps
+    })
+    UI(
+      UI.CentralPanel({
+        UI.PopupWrapper(
+          Widget: {
+            UI.Button(
+              Label: "Send message"
+              Action: {
+                "Message sent!" | Log
+              }
+            )
+          }
+          Contents: {
+            UI.Button(
+              Label: "Receive message"
+              Action: {
+                "Message received!" | Log
+              }
+            )
+          }
+        )
+        UI.PopupWrapper(
+          Widget: {
+            UI.Button(
+              Label: "Send message"
+              Action: {
+                "Message sent!" | Log
+              }
+            )
+          }
+          Contents: {
+            UI.Button(
+              Label: "Receive message"
+              Action: {
+                "Message received!" | Log
+              }
+            )
+          }
+        )
+      })
+    ) | UI.Render(ui-draw-queue)
+    
+    GFX.Render(Steps: render-steps)
+  }
+)

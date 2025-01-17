@@ -1,0 +1,12 @@
+(GFX.MainWindow
+ :Contents
+ (->
+  (Setup
+   (GFX.DrawQueue) >= .ui-draw-queue
+   (GFX.UIPass .ui-draw-queue) >> .render-steps)
+  (UI
+   (UI.CentralPanel
+    :Contents
+    (->
+     (UI.Property UIProperty.RemainingSpace)
+     (Once (Log)))))))
