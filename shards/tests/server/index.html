@@ -126,6 +126,14 @@
     import ShardsModule from "./bin/shards-mt.js";
     const bpath = "./bin/shards-mt.wasm";
 
+    async function updatePreloadedFiles() {
+      const response = await fetch('/preload-files');
+      const payload = await response.text();
+      const payloadPtr = mod.stringToNewUTF8(payload);
+      mod._shardsPreloadFiles(payloadPtr, payload.length);
+      mod._free(payloadPtr);
+    }
+
     async function loadShards() {
       const response = await fetch(bpath);
       if (!response.ok) {
@@ -157,35 +165,20 @@
 
       mod._shardsInit();
 
-      var mountedTestFS = mod.stringToNewUTF8(window.location.origin + "/tfs/");
-      var str0 = mod.stringToNewUTF8("/tfs");
-      mod._shardsFSMountHTTP(str0, mountedTestFS);
-
-      // const tfsUrl = window.location.origin + "/tfs/";
-      // fs.mount(mod.FETCHFS, { base_url: tfsUrl }, "/tfs");
-
-      // Maybe?
-      await sleep(100);
-      mod._emscripten_current_thread_process_queued_calls();
-
-      const fs = mod.FS;
-      while (true) {
-        try {
-          const file = fs.open("/tfs/README.md", "r");
-          fs.close(file);
-          log("Shards test file system mounted on /tfs");
-          break;
-        } catch (e) {
-          await sleep(100);
-          mod._emscripten_current_thread_process_queued_calls();
-          log(`Waiting for test file system to mount... (${e})`);
-        }
+      // Mount the test file system
+      const shardsFSMountHTTP = await mod.cwrap('shardsFSMountHTTP', 'void', ['string', 'string']);
+      shardsFSMountHTTP("/tfs", `${window.location.origin}/tfs/`);
+      while (!mod._shardsFetchBackendReady()) {
+        await sleep(100);
       }
     }
 
     log("Loading shards...");
     await loadShards();
     const mod = instance.module;
+
+    // Load initial list of preloaded files
+    await updatePreloadedFiles();
 
     // Add log polling function
     const countPtr = mod._malloc(4);
@@ -225,45 +218,50 @@
       } finally {
         mod._shardsUnlockLogBuffer();
       }
-      setTimeout(pollLogs, 100);
+      setTimeout(pollLogs, 5000);
     }
     pollLogs();
 
     async function runAction(action) {
-      const mod = instance.module;
-      const dstFile = `/tfs/${action.data}`;
+      if (action.action == "update-preloaded") {
+        await updatePreloadedFiles();
+      } else if (action.action == "run") {
+        const mod = instance.module;
+        const dstFile = `/tfs/${action.data}`;
 
-      const code = await fetch(dstFile).then(r => r.text());
+        const code = await fetch(dstFile).then(r => r.text());
+        const codePtr = mod.stringToNewUTF8(code);
 
-      const codePtr = mod.stringToNewUTF8(code);
-      const basePathPtr = mod.stringToNewUTF8("/tfs/");
-      try {
-        mod._shardsLoadScript(returnValuePtr, codePtr, basePathPtr);
-        const inst = mod.HEAP32[returnValuePtr >> 2];
-
-        if (!inst) {
-          throw new Error("Failed to load script");
-        }
-        const err = mod._shardsGetError(inst);
-        if (err) {
-          throw new Error(mod.UTF8ToString(err));
-        }
+        const basePathPtr = mod.stringToNewUTF8("/tfs/");
         try {
-          var run = true;
-          while (run) {
-            mod._shardsTick(inst, returnValuePtr);
-            run = Boolean(mod.HEAP32[returnValuePtr >> 2]);
-            const err = mod._shardsGetError(inst);
-            if (err) {
-              throw new Error(mod.UTF8ToString(err));
+          mod._shardsLoadScript(returnValuePtr, codePtr, basePathPtr);
+          const inst = mod.HEAP32[returnValuePtr >> 2];
+
+          if (!inst) {
+            throw new Error("Failed to load script");
+          }
+          const err = mod._shardsGetError(inst);
+          if (err) {
+            throw new Error(mod.UTF8ToString(err));
+          }
+          try {
+            var run = true;
+            while (run) {
+              mod._shardsTick(inst, returnValuePtr);
+              run = Boolean(mod.HEAP32[returnValuePtr >> 2]);
+              const err = mod._shardsGetError(inst);
+              if (err) {
+                throw new Error(mod.UTF8ToString(err));
+              }
+              await sleep(0);
             }
+          } finally {
+            mod._shardsFreeInstance(inst);
           }
         } finally {
-          mod._shardsFreeInstance(inst);
+          mod._free(codePtr);
+          mod._free(basePathPtr);
         }
-      } finally {
-        mod._free(codePtr);
-        mod._free(basePathPtr);
       }
     }
 

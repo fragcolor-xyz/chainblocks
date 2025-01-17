@@ -2,13 +2,19 @@
 @define(action none IgnoreRedefined: true)
 @define(data none IgnoreRedefined: true)
 
+[@host "/control"] | String.Join = control-url
+{"Content-Type": "application/json"} = hdrs
 @action | Match([
+  ; Command to run a given shards script
   "run" {
-    {"Content-Type": "application/json"} = hdrs
-    {action: @action data: @data} | ToJson | Http.Put(
-      URL: ([@host "/control"] | String.Join)
-      Headers: hdrs
-    )
+    {action: @action data: @data}
+    ToJson | Http.Put(URL: control-url Headers: hdrs)
+  }
+  ; Command to preload a given folder, which is required for it to be available in the file system
+  "preload-files" {
+    @data | ExpectString = path
+    {path: path}
+    ToJson | Http.Post(URL: ([@host "/preload-files"] | String.Join) Headers: hdrs)
   }
   none {
     Log("Unrecognized action")

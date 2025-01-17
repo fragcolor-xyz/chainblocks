@@ -1,4 +1,5 @@
 @include("http-server-shared.shs")
+@include("config.shs")
 
 @mesh(root)
 
@@ -25,13 +26,13 @@
   )
 } Looped: true)
 
-
-
 @wire(web-server {
   Once({
     Sequence(handler/action-queue Global: true Type: @type([@action-type]))
+    Sequence(handler/preloaded-files Global: true Type: @type([Type::String]))
+    Table(handler/preloaded-files-set Global: true Type: @type({none: Type::String}))
   })
-  Http.Server(web-handler-proxy Port: 3000)
+  Http.Server(web-handler-proxy Port: @port)
 } Looped: true)
 
 @schedule(root web-server)

@@ -3,9 +3,12 @@
 #include <shards/modules/langffi/bindings.h>
 #include <boost/core/span.hpp>
 #include <emscripten/wasmfs.h>
+#include <emscripten/threading.h>
 #include <emscripten/console.h>
 #include <shards/core/em_proxy.hpp>
 #include <spdlog/sinks/base_sink.h>
+#include <boost/filesystem.hpp>
+#include <nlohmann/json.hpp>
 
 #include <shards/log/log.hpp>
 
@@ -174,19 +177,49 @@ EMSCRIPTEN_KEEPALIVE void shardsInit() {
 // Needs to be polled on the main thread for audio and other stuff that needs to be run on the main browser thread
 EMSCRIPTEN_KEEPALIVE void shardsPollMainProxy() { emMainProxy.poll(); }
 
+static backend_t fetchBackend{};
+static std::atomic_bool fetchBackendReady{false};
 EMSCRIPTEN_KEEPALIVE void shardsFSMountHTTP(const char *target_, const char *baseUrl_) {
   std::string target{target_};
   std::string baseUrl{baseUrl_};
   asyncRunner.post([target, baseUrl]() {
     SPDLOG_INFO("Mounting HTTP FS at {} with base URL {}", target, baseUrl);
-    auto backend = wasmfs_create_fetch_backend(baseUrl.c_str());
-    wasmfs_create_directory(target.c_str(), 0777, backend);
+    fetchBackend = wasmfs_create_fetch_backend(baseUrl.c_str());
+    int r = wasmfs_create_directory(target.c_str(), 0777, fetchBackend);
+    if (r != 0) {
+      SPDLOG_ERROR("Failed to mount HTTP FS at {} with base URL {} ({})", target, baseUrl, r);
+    }
+    fetchBackendReady = true;
   });
 }
 
-EMSCRIPTEN_KEEPALIVE void shardsPollMainThread() {
-  // emscripten_current_thread_process_queued_calls
+EMSCRIPTEN_KEEPALIVE bool shardsFetchBackendReady() { return fetchBackendReady; }
+
+EMSCRIPTEN_KEEPALIVE void shardsPreloadFiles(const char *payload, size_t length) {
+  using path = boost::filesystem::path;
+
+  path root = "/tfs";
+
+  auto json = nlohmann::json::parse(payload, payload + length);
+  if (!json.is_array()) {
+    SPDLOG_ERROR("Payload is not an array");
+    return;
+  }
+  SPDLOG_INFO("Preloading {} files", json.size());
+  for (size_t i = 0; i < json.size(); i++) {
+    auto &elem = json[i];
+    if (!elem.is_string()) {
+      SPDLOG_ERROR("Element is not a string");
+      continue;
+    }
+    auto p0 = (root / elem.get<std::string>()).string();
+    SPDLOG_INFO("Preloading file {}", p0);
+    int fd = wasmfs_create_file(p0.c_str(), 0777, fetchBackend);
+    close(fd);
+  }
 }
+
+EMSCRIPTEN_KEEPALIVE void shardsPollMainThread() { emscripten_current_thread_process_queued_calls(); }
 
 EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *code, const char *base_path) {
   shards::logging::setupDefaultLoggerConditional("");
@@ -213,16 +246,13 @@ EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *c
     if (astRes.error) {
       SPDLOG_ERROR("Failed to read code: {}", astRes.error->message);
     }
-    shards::OwnedVar ast(astRes.ast);
-    auto err = shards_eval_env(env, &ast);
-    if (err) {
-      SPDLOG_ERROR("Failed to eval script at {}:{}: {}", err->line, err->column, err->message);
-      instance->error = err->message;
-      shards_free_error(err);
-      return;
+
+    auto astRes = shards_read("script"_swl, toSWL(code), toSWL(base_path), includeDirs.data(), includeDirs.size());
+    if (astRes.error) {
+      SPDLOG_ERROR("Failed to read code: {}", astRes.error->message);
     }
 
-    SHLWire shlwire = shards_eval(&ast, "script"_swl);
+    SHLWire shlwire = shards_eval(&astRes.ast, "script"_swl);
     DEFER(shards_free_wire(shlwire));
     if (shlwire.error) {
       SPDLOG_ERROR("Failed to evaluate script at {}:{}: {}", shlwire.error->line, shlwire.error->column, shlwire.error->message);
@@ -239,19 +269,14 @@ EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *c
     SPDLOG_ERROR("Unhandled exception in shardsLoadScript: {}", ex.what());
     instance->error = ex.what();
   }
-
-  // BUG: Fixes return value
-  // see https://github.com/emscripten-core/emscripten/issues/13302
-  // emscripten_sleep(0);
-  // return instance;
 }
 
 EMSCRIPTEN_KEEPALIVE void shardsTick(Instance *instance, bool *result) {
   bool r = instance->mesh->tick();
-
-  // BUG: Fixes return value
-  // see https://github.com/emscripten-core/emscripten/issues/13302
-  // emscripten_sleep(0);
+  if (instance->mesh->empty()) {
+    r = false;
+    return;
+  }
 
   if (result)
     *result = r;

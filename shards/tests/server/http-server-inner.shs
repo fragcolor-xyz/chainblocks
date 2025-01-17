@@ -1,7 +1,5 @@
 @include("http-server-shared.shs")
-@define(root-path "../../..")
-@define(web-path "./")
-@define(binaries-path "../../../build/emscripten-mt/release")
+@include("config.shs")
 
 @define(headers {
   "Cross-Origin-Opener-Policy": "same-origin"
@@ -11,7 +9,17 @@
 })
 
 @template(srv-log [msg] {
-  Log(msg Name: "http-server-inner" Level: LogLevel::Debug)
+  Log(msg Name: "http" Level: LogLevel::Debug)
+})
+
+@define(fs-abs {
+  FS.Absolute
+  If(String.Starts("\\\\?\\") {
+      Slice(4)
+    } {
+      Pass
+    }
+  )
 })
 
 @template(send-as-json [] {
@@ -24,10 +32,6 @@
 Http.Read = request
 {Take("target") >= target-raw}
 {Take("method") >= method}
-
-; ; filter out query params
-; target | Regex.Search("""(.*)\?""") = matches
-; Count(matches) | When(Is(2) {matches | Take(1) > target})
 
 target-raw | String.Split("?") | Take(0) = target
 target | @srv-log("request")
@@ -57,6 +61,43 @@ Cond([
       }
       {true} {
         "Method not allowed" | Http.Response(Status: 405 ContentType: "text/plain")
+      }])
+  }
+  {Is("/preload-files")} {
+    method | Cond([
+      {Is("POST")} {
+        request | Take("body") | FromJson | ExpectTable
+        @srv-log("Preload files request")
+        {Take("path") | ExpectString | @fs-abs Log("Preload files root path") = path}
+        
+        #(@root-path | @fs-abs) = root-abs
+        
+        path | When(FS.IsFile {
+          FS.RelativeTo(root-abs) = rel-path
+          preloaded-files-set | Take(rel-path) | When(Is(none) {
+            rel-path >> preloaded-files
+            @srv-log("Adding preloaded file")
+            Set(preloaded-files-set rel-path)
+          })
+        })
+        When(FS.IsDirectory {
+          FS.Iterate(Recursive: true)
+          ForEach({
+            FS.RelativeTo(root-abs) = rel-path
+            preloaded-files-set | Take(rel-path) | When(Is(none) {
+              rel-path >> preloaded-files
+              @srv-log("Adding preloaded file")
+              Set(preloaded-files-set rel-path)
+            })
+          })
+        })
+        
+        ; Insert update preloaded into action queue
+        {action: "update-preloaded" data: none} >> action-queue
+        "" | Http.Response(Status: 200)
+      }
+      {Is("GET")} {
+        preloaded-files | @send-as-json()
       }])
   }
   {Is("/error")} {
