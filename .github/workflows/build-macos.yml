@@ -176,7 +176,7 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           cd docs/samples
-          for i in $(find shards -name '*.edn' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
+          for i in $(find shards -name '*.edn' \( ! -path '*UI*' ! -path '*GFX*' \));
           do
             echo "Running sample $i";
             ../../build/shards run-sample.edn --file "$i";
