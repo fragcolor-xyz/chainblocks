@@ -1,0 +1,16 @@
+#!/bin/bash
+
+echo "Running"
+
+script_dir=$(dirname $0)
+root_dir=$(realpath $script_dir/../..)
+
+function control() {
+  $shards new $script_dir/server/control.shs ${@}
+}
+
+set -ex
+control action:preload-files data:"$(cygpath -w $root_dir/assets)"
+control action:preload-files data:"$(cygpath -w $root_dir/shards/tests/data)"
+# control action:run data:"$script_dir/gfx-cube.shs"
+control action:run data:"$script_dir/gfx-texture.shs"

@@ -160,13 +160,14 @@ protected:
   void flush_() override {}
 };
 
+SHCore* core{};
 extern "C" {
 EMSCRIPTEN_KEEPALIVE void shardsInit() {
   // Add log buffer sink
   shards::logging::setupDefaultLoggerConditional("shards.log");
   shards::logging::getDistSink()->add_sink(std::make_shared<LogBufferSink>());
 
-  auto core = shardsInterface(SHARDS_CURRENT_ABI);
+  core = shardsInterface(SHARDS_CURRENT_ABI);
   shards_init(core); // to init rust things
   asyncRunner.start();
   shards::EmMainProxy::instance = &emMainProxy;
@@ -247,10 +248,7 @@ EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *c
       SPDLOG_ERROR("Failed to read code: {}", astRes.error->message);
     }
 
-    auto astRes = shards_read("script"_swl, toSWL(code), toSWL(base_path), includeDirs.data(), includeDirs.size());
-    if (astRes.error) {
-      SPDLOG_ERROR("Failed to read code: {}", astRes.error->message);
-    }
+    core->setRootPath(base_path);
 
     SHLWire shlwire = shards_eval(&astRes.ast, "script"_swl);
     DEFER(shards_free_wire(shlwire));
@@ -265,6 +263,7 @@ EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *c
     instance->wire = wire;
     instance->mesh->schedule(wire);
     instance->error.reset();
+
   } catch (std::exception &ex) {
     SPDLOG_ERROR("Unhandled exception in shardsLoadScript: {}", ex.what());
     instance->error = ex.what();
