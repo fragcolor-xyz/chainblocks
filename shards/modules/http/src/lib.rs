@@ -50,6 +50,15 @@ use std::collections::HashMap;
 
 use std::sync::{Arc, Mutex};
 
+fn print_error(e: &dyn std::error::Error) {
+  println!("Error: {}", e);
+  let mut source = e.source();
+  while let Some(e) = source {
+      println!("Caused by: {}", e);
+      source = e.source();
+  }
+}
+
 lazy_static! {
   static ref TOKIO_RUNTIME: Arc<Mutex<tokio::runtime::Runtime>> = Arc::new(Mutex::new(
     tokio::runtime::Builder::new_multi_thread()
@@ -286,7 +295,7 @@ impl RequestBase {
           .timeout(Duration::from_secs(self.timeout))
           .build()
           .map_err(|e| {
-            shlog!("Failure details: {}", e);
+            print_error(&e);
             "Failed to create client"
           })?,
       );
@@ -350,14 +359,14 @@ impl RequestBase {
         let runtime = runtime.lock().unwrap();
         runtime.spawn(async move {
           let response = request.send().await.map_err(|e| {
-            shlog_error!("Failure details: {}", e);
+            print_error(&e);
             "Failed to send the request"
           })?;
 
           if !full_response && !response.status().is_success() {
             shlog_error!("Request failed with status {}", response.status());
             let err_text = response.text().await.map_err(|e| {
-              shlog!("Failure details: {}", e);
+              print_error(&e);
               "Failed to decode the failure response"
             })?;
             let err_text = if err_text.len() > 128 {
@@ -393,7 +402,7 @@ impl RequestBase {
             for (key, value) in response.headers() {
               let key = Var::ephemeral_string(key.as_str());
               let value = Var::ephemeral_string(value.to_str().map_err(|e| {
-                shlog!("Failure details: {}", e);
+                print_error(&e);
                 "Failed to decode the response"
               })?);
               headers.insert_fast(key, &value);
@@ -402,7 +411,7 @@ impl RequestBase {
 
           if as_bytes {
             let bytes = response.bytes().await.map_err(|e| {
-              shlog!("Failure details: {}", e);
+              print_error(&e);
               "Failed to decode the response"
             })?;
 
@@ -411,7 +420,7 @@ impl RequestBase {
               .insert_fast_static("body", &bytes.as_ref().into());
           } else {
             let str = response.text().await.map_err(|e| {
-              shlog!("Failure details: {}", e);
+              print_error(&e);
               "Failed to decode the response"
             })?;
 
@@ -436,7 +445,7 @@ impl RequestBase {
 
       // Await the spawned task outside the lock
       task.await.map_err(|e| {
-        shlog_error!("Task join error: {}", e);
+        print_error(&e);
         "Failed to join task"
       })?
     })?;
@@ -882,7 +891,7 @@ impl Shard for HttpStreamShard {
             .chunk()
             .await
             .map_err(|e| {
-              shlog_error!("Failed to read from stream: {}", e);
+              print_error(&e);
               "Failed to read from stream"
             })?;
           if let Some(bytes) = bytes {
@@ -894,7 +903,7 @@ impl Shard for HttpStreamShard {
       };
       // Await the spawned task outside the lock
       task.await.map_err(|e| {
-        shlog_error!("Task join error: {}", e);
+        print_error(&e);
         "Failed to join task"
       })?
     })?;
