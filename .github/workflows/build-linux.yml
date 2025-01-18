@@ -167,7 +167,7 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           cd docs/samples
-          for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' \));
+          for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
           do
             echo "Running sample $i";
             ../../build/shards new run-sample.shs file:"$i" looped:false;

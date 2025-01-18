@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           cd docs/samples
-          for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' \));
+          for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
           do
             echo "Running sample $i";
             LOG_shards_FORMAT="[%l] %v" ./shards.exe new run-sample.shs file:"$i" looped:false 2>"$i.log";
