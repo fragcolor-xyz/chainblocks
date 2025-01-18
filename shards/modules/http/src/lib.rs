@@ -51,10 +51,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 fn print_error(e: &dyn std::error::Error) {
-  println!("Error: {}", e);
+  shlog_error!("Error: {}", e);
   let mut source = e.source();
   while let Some(e) = source {
-      println!("Caused by: {}", e);
+      shlog_error!("Caused by: {}", e);
       source = e.source();
   }
 }
