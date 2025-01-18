@@ -36,7 +36,7 @@ jobs:
           for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' \));
           do
             echo "Running sample $i";
-            LOG_shards_FORMAT="[%l] %v" ./shards.exe new run-sample.shs file:"$i" 2>"$i.log";
+            LOG_shards_FORMAT="[%l] %v" ./shards.exe new run-sample.shs file:"$i" looped:false 2>"$i.log";
           done
           for i in $(find shards -name '*.shs' \( -path '*UI*' -or -path '*GFX*' \));
           do

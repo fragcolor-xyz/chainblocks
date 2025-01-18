@@ -142,15 +142,15 @@ jobs:
           set -e
 
           cd docs/samples
-          for i in $(find shards -name '*.edn' \( -path '*UI*' -or -path '*GFX*' \));
+          for i in $(find shards -name '*.shs' \( -path '*UI*' -or -path '*GFX*' \));
           do
             echo "Running sample $i";
-            ../../build/shards run-sample.edn --looped true --file "$i";
+            ../../build/shards run-sample.shs looped:true file:"$i";
           done
           for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' \));
           do
             echo "Running sample $i";
-            ../../build/shards new run-sample.shs file:"$i";
+            ../../build/shards new run-sample.shs file:"$i" looped:false;
           done
       - name: Coverage (Debug)
         if: ${{ steps.setup.outputs.build-type == 'Debug' }}
