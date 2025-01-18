@@ -300,7 +300,7 @@ jobs:
           for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' \));
           do
             echo "Running sample $i";
-            ../../build/shards.exe run-sample.shs file:"$i" looped:false;
+            ../../build/shards.exe new run-sample.shs file:"$i" looped:false;
           done
       - name: Test doc samples (GFX)
         env:
@@ -312,7 +312,7 @@ jobs:
           for i in $(find shards -name '*.shs' \( -path '*UI*' -or -path '*GFX*' \));
           do
             echo "Running sample $i";
-            ../../build/shards.exe run-sample.shs looped:true file:"$i";
+            ../../build/shards.exe new run-sample.shs looped:true file:"$i";
           done
           for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' \));
           do
