@@ -564,6 +564,11 @@ class OwnedVar {
         set(bool: bool)
     }
 
+    init(int: Int) {
+        v = SHVar()
+        set(int: int)
+    }
+
     deinit {
         withUnsafeMutablePointer(to: &v) { ptr in
             G.Core.pointee.destroyVar(ptr)
