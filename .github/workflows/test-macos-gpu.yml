@@ -69,8 +69,6 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           set -e
-          export DISPLAY=:1
-          Xvfb "$DISPLAY" &
 
           export LOG_GFX=debug
 
@@ -134,8 +132,6 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           set -e
-          export DISPLAY=:1
-          Xvfb "$DISPLAY" &
 
           echo "Running physics"
           build/shards new shards/tests/physics.shs
@@ -144,8 +140,6 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           set -e
-          export DISPLAY=:1
-          Xvfb "$DISPLAY" &
 
           cd docs/samples
           for i in $(find shards -name '*.edn' \( -path '*UI*' -or -path '*GFX*' \));
