@@ -53,7 +53,8 @@ jobs:
           genhtml \
             coverage/coverage.linux.info \
             coverage/coverage-macos-gpu.info \
-            --ignore-errors source \
+            --ignore-errors inconsistent,source,unmapped \
+            --synthesize-missing \
             --output-directory coverage/output
       - name: Upload report
         if: ${{ steps.setup.outputs.html-report == 'true' }}

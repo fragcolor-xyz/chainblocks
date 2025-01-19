@@ -51,6 +51,9 @@ struct PlaneGenerator : public GeneratorBase {
   float height = 1;
   size_t widthSegments = 1;
   size_t heightSegments = 1;
+  // Flip to match UI space (where Y is down, X is right)
+  // otherwise it's Y up, X right
+  bool flipTextureVertically = false;
 
   void generate();
 };

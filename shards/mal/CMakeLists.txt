@@ -15,11 +15,13 @@ function(setup_shards_target TARGET)
   if(NOT EMSCRIPTEN)
     target_link_libraries(${TARGET} Boost::process)
   endif()
+
   if(APPLE)
     target_link_libraries(${TARGET} replxx shards-core shards_core_swift)
   else()
     target_link_libraries(${TARGET} replxx shards-core)
   endif()
+
   set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)
 
   # Need the lang-ffi bindings
@@ -64,7 +66,7 @@ endif()
 if(APPLE)
   add_library(shards-framework SHARED ${shards_SOURCES})
   setup_shards_target(shards-framework)
-  
+
   # Framework specific settings
   set_target_properties(shards-framework PROPERTIES
     FRAMEWORK TRUE
@@ -77,6 +79,7 @@ if(APPLE)
     XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
     XCODE_ATTRIBUTE_SWIFT_INSTALL_OBJC_HEADER "NO"
     OUTPUT_NAME "Shards"
+
     # Debug symbols generation
     XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
     XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS "YES"
@@ -93,7 +96,7 @@ if(APPLE)
       INSTALL_RPATH "@executable_path/../Frameworks"
       BUILD_WITH_INSTALL_RPATH TRUE
     )
-    
+
     # Link Swift runtime for MacOS
     target_link_libraries(shards-framework
       "-framework Foundation"
