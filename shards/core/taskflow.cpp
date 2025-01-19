@@ -6,7 +6,7 @@ namespace shards {
 struct TaskFlowDebugInterface : tf::WorkerInterface {
   std::string debugName;
 #if SH_DEBUG_THREAD_NAMES
-  std::list<std::string> debugThreadNameStack;
+  std::list<NativeString> debugThreadNameStack;
 #endif
 
   TaskFlowDebugInterface(std::string debugName) : debugName(debugName) {}

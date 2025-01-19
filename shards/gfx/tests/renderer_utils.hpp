@@ -63,7 +63,7 @@ inline MeshPtr createSphereMesh() {
 }
 
 inline MeshPtr createPlaneMesh() {
-  geom::PlaneGenerator gen;
+  geom::PlaneGenerator gen{.flipTextureVertically = true};
   gen.generate();
   return createMesh(gen.vertices, gen.indices);
 }

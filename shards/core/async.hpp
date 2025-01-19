@@ -76,11 +76,12 @@ struct TidePool {
     Worker(boost::lockfree::queue<Work *> &queue, std::atomic_size_t &counter, std::mutex &condMutex,
            std::condition_variable &cond)
         : _queue(queue), _counter(counter), _condMutex(condMutex), _cond(cond) {
+      using namespace shards::literals;
       _running = true;
       boost::thread::attributes attrs;
       attrs.set_stack_size(SH_STACK_SIZE);
       _thread = boost::thread(attrs, [this]() {
-        pushThreadName("TidePool worker");
+        pushThreadName("TidePool worker"_ns);
         while (_running) {
           Work *work{};
           if (_queue.pop(work)) {
@@ -142,7 +143,9 @@ struct TidePool {
   }
 
   void controllerWorker() {
-    pushThreadName("TidePool controller");
+    using namespace shards::literals;
+    
+    pushThreadName("TidePool controller"_ns);
 
     // spawn workers first
     for (size_t i = 0; i < NumWorkers; ++i) {
