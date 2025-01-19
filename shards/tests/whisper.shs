@@ -1,5 +1,5 @@
-Audio.ReadFile("data/samples_jfk.wav" SampleRate: 16000 Channels: 1 Samples: #(16000 | Mul(15)))
-ML.AudioToMel = jfk-mel
+"data/samples_jfk.wav" | Audio.ReadFileBytes(SampleRate: 16000 Channels: 1)
+ML.AudioToMel(GPU: false) = jfk-mel
 Tensor.ToString
 Log
 
@@ -14,7 +14,7 @@ FS.Read | FromJson | ExpectTable = config | Log
 "data/whisper-model.safetensors"
 ; "data/GIST-all-MiniLM-L6-v2.safetensors"
 FS.Read(Bytes: true)
-ML.Model(Model: MLModels::Whisper Format: MLFormats::SafeTensor Configuration: config) = whisper-model
+ML.Model(Model: MLModels::Whisper Format: MLFormats::SafeTensor Configuration: config GPU: false) = whisper-model
 
 jfk-mel | ML.SpeechToText(Model: whisper-model Tokenizer: tokenizer Language: "en" Task: "transcribe") = jfk-transcript
 Log

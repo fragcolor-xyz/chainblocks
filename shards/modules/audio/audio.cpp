@@ -1003,6 +1003,106 @@ struct ReadFile {
   }
 };
 
+struct ReadFileBytes {
+  ma_decoder _decoder;
+  bool _initialized{false};
+  std::vector<float> _buffer;
+  ma_uint32 _channels{2};
+  ma_uint32 _sampleRate{44100};
+
+  static SHOptionalString help() {
+    return SHCCSTR(
+        "This shard reads an entire audio file into bytes. Unlike Audio.ReadFile, this shard reads the complete file at once "
+        "and outputs it as bytes, without the uint16_t sample count limitation of SHAudio. This is useful when you need to "
+        "process large audio files in their entirety.");
+  }
+
+  static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
+  static SHOptionalString inputHelp() { return SHCCSTR("The path to the audio file to read."); }
+  static SHTypesInfo outputTypes() { return CoreInfo::BytesType; }
+  static SHOptionalString outputHelp() { return SHCCSTR("The complete audio file contents as raw PCM float32 samples."); }
+
+  static inline Parameters params{
+      {"Channels", SHCCSTR("An int representing the number of desired output audio channels."), {CoreInfo::IntType}},
+      {"SampleRate", SHCCSTR("An int representing the desired output sampling rate."), {CoreInfo::IntType}}};
+
+  static SHParametersInfo parameters() { return params; }
+
+  void setParam(int index, const SHVar &value) {
+    switch (index) {
+    case 0:
+      _channels = ma_uint32(value.payload.intValue);
+      break;
+    case 1:
+      _sampleRate = ma_uint32(value.payload.intValue);
+      break;
+    default:
+      throw InvalidParameterIndex();
+    }
+  }
+
+  SHVar getParam(int index) {
+    switch (index) {
+    case 0:
+      return Var(_channels);
+    case 1:
+      return Var(_sampleRate);
+    default:
+      throw InvalidParameterIndex();
+    }
+  }
+
+  void cleanup(SHContext *context) {
+    if (_initialized) {
+      ma_decoder_uninit(&_decoder);
+      _initialized = false;
+    }
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    OwnedVar file = input; // ensure null termination
+
+    if (_initialized) {
+      ma_decoder_uninit(&_decoder);
+      _initialized = false;
+    }
+
+    ma_decoder_config config = ma_decoder_config_init(ma_format_f32, _channels, _sampleRate);
+    ma_result res = ma_decoder_init_file(file.payload.stringValue, &config, &_decoder);
+    if (res != MA_SUCCESS) {
+      throw ActivationError("Failed to open audio file");
+    }
+    _initialized = true;
+
+    ma_uint64 totalFrames;
+    res = ma_decoder_get_length_in_pcm_frames(&_decoder, &totalFrames);
+    if (res != MA_SUCCESS) {
+      cleanup(context);
+      throw ActivationError("Failed to get audio file length");
+    }
+
+    auto channels = _decoder.outputChannels;
+    _buffer.resize(totalFrames * channels);
+
+    ma_uint64 framesRead;
+    res = ma_decoder_read_pcm_frames(&_decoder, _buffer.data(), totalFrames, &framesRead);
+    if (res != MA_SUCCESS) {
+      cleanup(context);
+      throw ActivationError("Failed to read audio file");
+    }
+
+    // Create bytes var with the raw PCM data
+    SHVar output;
+    output.valueType = SHType::Bytes;
+    output.payload.bytesSize = _buffer.size() * sizeof(float);
+    output.payload.bytesValue = static_cast<uint8_t *>(malloc(output.payload.bytesSize));
+    memcpy(output.payload.bytesValue, _buffer.data(), output.payload.bytesSize);
+
+    cleanup(context);
+    return output;
+  }
+};
+
 struct WriteFile {
   ma_encoder _encoder;
   bool _initialized{false};
@@ -1712,6 +1812,7 @@ SHARDS_REGISTER_FN(audio) {
   REGISTER_SHARD("Audio.Channel", shards::Audio::Channel);
   REGISTER_SHARD("Audio.Oscillator", shards::Audio::Oscillator);
   REGISTER_SHARD("Audio.ReadFile", shards::Audio::ReadFile);
+  REGISTER_SHARD("Audio.ReadFileBytes", shards::Audio::ReadFileBytes);
   REGISTER_SHARD("Audio.WriteFile", shards::Audio::WriteFile);
 
   REGISTER_SHARD("Audio.Engine", shards::Audio::Engine);

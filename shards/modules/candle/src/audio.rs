@@ -4,7 +4,7 @@ use shards::shard::Shard;
 use shards::shardsc::SHAudio;
 use shards::shlog_error;
 use shards::types::{common_type, ClonedVar, Context, Type, Types, Var};
-use shards::types::{ExposedTypes, InstanceData, AUDIO_TYPES};
+use shards::types::{ExposedTypes, InstanceData, BYTES_TYPES};
 
 use crate::{get_global_device, Tensor, TENSOR_TYPE, TENSOR_TYPE_VEC};
 
@@ -47,7 +47,7 @@ impl Default for MLAudioToMel {
 #[shards::shard_impl]
 impl Shard for MLAudioToMel {
   fn input_types(&mut self) -> &Types {
-    &AUDIO_TYPES
+    &BYTES_TYPES
   }
 
   fn output_types(&mut self) -> &Types {
@@ -71,16 +71,13 @@ impl Shard for MLAudioToMel {
   }
 
   fn activate(&mut self, _context: &Context, input: &Var) -> Result<Option<Var>, &str> {
-    let audio: SHAudio = input.try_into().map_err(|_| "Expected SHAudio input")?;
-
-    // Check sample rate
-    if audio.sampleRate != SAMPLE_RATE as u32 {
-      return Err("input audio must have a 16kHz sampling rate");
-    }
+    let audio: &[u8] = input
+      .try_into()
+      .map_err(|_| "Expected raw pcm bytes (16kHz, 1 channel) input")?;
 
     // Get audio samples
-    let n = audio.nsamples as usize;
-    let samples_slice = unsafe { std::slice::from_raw_parts(audio.samples, n) };
+    let n = audio.len() / 4;
+    let samples_slice = unsafe { std::slice::from_raw_parts(audio.as_ptr() as *const f32, n) };
 
     // Process audio in chunks
     let mut all_mel_features = Vec::new();
