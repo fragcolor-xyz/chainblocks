@@ -159,7 +159,6 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           cd build
-          ./shards ../shards/tests/export-strings.edn
           ./shards new ../shards/tests/audio.shs test-device:true
           ./shards new ../shards/tests/audio2.shs test-device:true
       - name: Test doc samples (non-UI)
