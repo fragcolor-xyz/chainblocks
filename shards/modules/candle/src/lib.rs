@@ -7,6 +7,7 @@ use shards::{fourCharacterCode, ref_counted_object_type_impl};
 
 use candle_core::{DType, Device, Tensor as CandleTensor};
 
+mod audio;
 mod model;
 mod tensor;
 mod tokenizer;
@@ -102,10 +103,14 @@ pub extern "C" fn shardsRegister_ml_rust(core: *mut shards::shardsc::SHCore) {
     shards::core::Core = core;
   }
 
+  register_enum::<TensorType>();
+
   register_shard::<tokenizer::MLTokenizer>();
   register_shard::<tokenizer::MLDetokenizer>();
   register_shard::<tokenizer::TokensShard>();
-  register_enum::<TensorType>();
+  register_shard::<tokenizer::MLTimestampDetokenizer>();
+  register_shard::<tokenizer::PrepareAudioTokensShard>();
+
   register_shard::<tensor::MLTensorToStringShard>();
   register_shard::<tensor::TensorShard>();
   register_shard::<model::ModelShard>();
@@ -113,6 +118,7 @@ pub extern "C" fn shardsRegister_ml_rust(core: *mut shards::shardsc::SHCore) {
   register_enum::<model::Formats>();
   register_shard::<tensor::TensorZerosLikeShard>();
   register_shard::<model::ForwardShard>();
+
   register_shard::<tensor::TensorMulShard>();
   register_shard::<tensor::TensorSubShard>();
   register_shard::<tensor::TensorAddShard>();
@@ -129,6 +135,8 @@ pub extern "C" fn shardsRegister_ml_rust(core: *mut shards::shardsc::SHCore) {
   register_shard::<tensor::TensorSliceShard>();
   register_shard::<tensor::TensorToIntsShard>();
   register_shard::<tensor::TensorToFloatsShard>();
+
+  register_shard::<audio::MLAudioToMel>();
 
   register_object_type::<Tensor>(FRAG_CC, fourCharacterCode(*b"cTEN"));
   register_object_type::<tokenizer::Tokenizer>(FRAG_CC, fourCharacterCode(*b"TOKn"));

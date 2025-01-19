@@ -2391,6 +2391,18 @@ impl From<&[u8; 16]> for Var {
   }
 }
 
+impl TryFrom<&Var> for SHAudio {
+  type Error = &'static str;
+
+  fn try_from(v: &Var) -> Result<Self, Self::Error> {
+    if v.valueType != SHType_Audio {
+      return Err("Invalid type");
+    }
+    let audio = unsafe { v.payload.__bindgen_anon_1.audioValue };
+    Ok(audio)
+  }
+}
+
 impl TryFrom<&Var> for [i8; 16] {
   type Error = &'static str;
 

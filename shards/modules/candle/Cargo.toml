@@ -20,6 +20,7 @@ tokenizers = { version = "0.21.0", default-features = false, features = [
 candle-core = { version = "0.8.2" }
 candle-transformers = { version = "0.8.2" }
 candle-nn = { version = "0.8.2" }
+tempfile = "3.10.1"
 # candle-core = { version = "0.6.0", git = "https://github.com/sinkingsugar/candle-wgpu.git", rev = "c8f4701f83d523b40c70075fabbd10028e04d049" }
 # candle-transformers = { version = "0.6.0", git = "https://github.com/sinkingsugar/candle-wgpu.git", rev = "c8f4701f83d523b40c70075fabbd10028e04d049" }
 # candle-nn = { version = "0.6.0", git = "https://github.com/sinkingsugar/candle-wgpu.git", rev = "c8f4701f83d523b40c70075fabbd10028e04d049" }
