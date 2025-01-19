@@ -12,7 +12,9 @@
 #include <shards/core/serialization.hpp>
 #include <shards/linalg_shim.hpp>
 #include <shards/wire_dsl.hpp>
-#include "shards/core/wire_doppelganger_pool.hpp"
+#include <shards/core/wire_doppelganger_pool.hpp>
+
+using namespace shards::literals;
 
 #undef CHECK
 
@@ -1714,7 +1716,7 @@ TEST_CASE("shards-lang") {
 }
 
 TEST_CASE("meshThreadTask") {
-  shards::pushThreadName("Main Thread");
+  shards::pushThreadName("Main Thread"_ns);
   auto mesh = SHMesh::make();
 
   auto currentThreadId = std::this_thread::get_id();
@@ -1803,7 +1805,7 @@ TEST_CASE("meshThreadTask") {
 }
 
 TEST_CASE("meshThreadTask-looped") {
-  shards::pushThreadName("Main Thread");
+  shards::pushThreadName("Main Thread"_ns);
   auto mesh = SHMesh::make();
 
   auto currentThreadId = std::this_thread::get_id();

@@ -23,7 +23,6 @@ using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 #include <cctype>
 #include <deque>
-#include <iomanip>
 #include <sstream>
 #include <string>
 #else
@@ -31,6 +30,7 @@ using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 #include <emscripten/fetch.h>
 #endif
 
+#include <iomanip>
 #include <shards/core/shared.hpp>
 #include <shards/core/wire_doppelganger_pool.hpp>
 
@@ -1301,6 +1301,10 @@ struct SendFile {
     while (!done) {
       SH_SUSPEND(context, 0.0);
     }
+
+    _response.body().close();
+    _response.clear();
+    _404_response.clear();
 
     return input;
   }
