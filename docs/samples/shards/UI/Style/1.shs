@@ -1,20 +1,51 @@
 GFX.MainWindow(Contents: {
-  ; Setup
-  GFX.DrawQueue = ui-draw-queue
-  GFX.UIPass(ui-draw-queue) >> render-steps
+  Once({
+    GFX.DrawQueue = ui-draw-queue
+    GFX.UIPass(ui-draw-queue) >> render-steps
+  })
 
   ; UI
   UI({
     UI.CentralPanel({
       UI.Style(
-        Style: {color: @color(255 255 0)}
+        TextStyles: {
+          MyStyle: {
+            Size: 36.0
+            Family: FontFamily::Monospace
+          }
+        }
         Contents: {
-          "Hello" | UI.Label
+          "Hello Shards!" | UI.Label
+        }
+      )
+
+      UI.Style(
+        TextStyles: {
+          MyStyle: {
+            Size: 16.0
+            Family: FontFamily::Monospace
+          }
+        }
+        Contents: {
+          "Hello Shards!" | UI.Label
+        }
+      )
+
+      UI.Style(
+        TextStyles: {
+          MyStyle: {
+            Size: 20.0
+            Family: FontFamily::Proportional
+          }
+        }
+        Contents: {
+          "Hello Shards!" | UI.Label
         }
       )
     })
   })
 
+  ; Render
   UI.Render(ui-draw-queue)
   GFX.Render(Steps: render-steps)
 })
