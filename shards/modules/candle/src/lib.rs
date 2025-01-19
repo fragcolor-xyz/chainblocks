@@ -118,6 +118,7 @@ pub extern "C" fn shardsRegister_ml_rust(core: *mut shards::shardsc::SHCore) {
   register_enum::<model::Formats>();
   register_shard::<tensor::TensorZerosLikeShard>();
   register_shard::<model::ForwardShard>();
+  register_shard::<model::SpeechToTextShard>();
 
   register_shard::<tensor::TensorMulShard>();
   register_shard::<tensor::TensorSubShard>();

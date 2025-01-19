@@ -6343,6 +6343,7 @@ lazy_static! {
   pub static ref FLOAT4_TYPES: Vec<Type> = vec![common_type::float4];
   pub static ref BOOL_TYPES: Vec<Type> = vec![common_type::bool];
   pub static ref BYTES_TYPES: Vec<Type> = vec![common_type::bytes];
+  pub static ref AUDIO_TYPES: Vec<Type> = vec![common_type::audio];
   pub static ref BYTES_OR_STRING_TYPES: Vec<Type> = vec![common_type::bytes, common_type::string];
   pub static ref FLOAT4X4_TYPE: Type = {
     let mut t = common_type::float4s;

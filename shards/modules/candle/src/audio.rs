@@ -4,15 +4,14 @@ use shards::shard::Shard;
 use shards::shardsc::SHAudio;
 use shards::shlog_error;
 use shards::types::{common_type, ClonedVar, Context, Type, Types, Var};
-use shards::types::{ExposedTypes, InstanceData, BYTES_TYPES};
+use shards::types::{ExposedTypes, InstanceData, AUDIO_TYPES};
 
-use crate::{get_global_device, Tensor, TENSOR_TYPE};
+use crate::{get_global_device, Tensor, TENSOR_TYPE, TENSOR_TYPE_VEC};
 
-const SAMPLE_RATE: u32 = 16000;
-const CHUNK_LENGTH: usize = 30;
-const N_SAMPLES: usize = CHUNK_LENGTH * SAMPLE_RATE as usize;
+const SAMPLE_RATE: usize = 16000;
+const N_SAMPLES: usize = SAMPLE_RATE * 30; // 30 seconds of audio
 
-// Include the mel filters data
+// Include mel filter bytes
 const MEL_FILTERS_80: &[u8] = include_bytes!("melfilters.bytes");
 const MEL_FILTERS_128: &[u8] = include_bytes!("melfilters128.bytes");
 
@@ -32,7 +31,6 @@ pub(crate) struct MLAudioToMel {
   num_mel_bins: ClonedVar,
 
   output: ClonedVar,
-  output_types: Types,
 }
 
 impl Default for MLAudioToMel {
@@ -42,7 +40,6 @@ impl Default for MLAudioToMel {
       gpu: false.into(),
       num_mel_bins: 80i64.into(),
       output: ClonedVar::default(),
-      output_types: vec![*TENSOR_TYPE],
     }
   }
 }
@@ -50,11 +47,11 @@ impl Default for MLAudioToMel {
 #[shards::shard_impl]
 impl Shard for MLAudioToMel {
   fn input_types(&mut self) -> &Types {
-    &BYTES_TYPES
+    &AUDIO_TYPES
   }
 
   fn output_types(&mut self) -> &Types {
-    &self.output_types
+    &TENSOR_TYPE_VEC
   }
 
   fn warmup(&mut self, ctx: &Context) -> Result<(), &str> {
@@ -76,61 +73,82 @@ impl Shard for MLAudioToMel {
   fn activate(&mut self, _context: &Context, input: &Var) -> Result<Option<Var>, &str> {
     let audio: SHAudio = input.try_into().map_err(|_| "Expected SHAudio input")?;
 
-    // Pad or truncate to N_SAMPLES
-    let mut pcm = vec![0f32; N_SAMPLES];
-    let n = audio.nsamples as usize;
-    if n > 0 {
-      let samples_slice = unsafe { std::slice::from_raw_parts(audio.samples, n) };
-      let copy_len = n.min(N_SAMPLES);
-      pcm[..copy_len].copy_from_slice(&samples_slice[..copy_len]);
-    }
-
     // Check sample rate
-    if audio.sampleRate != SAMPLE_RATE {
+    if audio.sampleRate != SAMPLE_RATE as u32 {
       return Err("input audio must have a 16kHz sampling rate");
     }
 
-    let device = if self.gpu.as_ref().try_into()? {
+    // Get audio samples
+    let n = audio.nsamples as usize;
+    let samples_slice = unsafe { std::slice::from_raw_parts(audio.samples, n) };
+
+    // Process audio in chunks
+    let mut all_mel_features = Vec::new();
+    let mut seek = 0;
+
+    while seek < n {
+      // Calculate chunk size
+      let chunk_size = n.min(seek + N_SAMPLES) - seek;
+
+      // Create chunk buffer and copy samples
+      let mut chunk = vec![0f32; N_SAMPLES];
+      let copy_len = chunk_size;
+      chunk[..copy_len].copy_from_slice(&samples_slice[seek..seek + copy_len]);
+
+      // Load mel filters based on num_mel_bins
+      let num_mel_bins = i64::try_from(self.num_mel_bins.as_ref())?;
+      let mel_bytes = match num_mel_bins {
+        80 => MEL_FILTERS_80,
+        128 => MEL_FILTERS_128,
+        _ => return Err("num_mel_bins must be either 80 or 128"),
+      };
+
+      // Convert bytes to f32 mel filters
+      let mut mel_filters = vec![0f32; mel_bytes.len() / 4];
+      for i in 0..mel_filters.len() {
+        let bytes = &mel_bytes[i * 4..(i + 1) * 4];
+        mel_filters[i] = f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+      }
+
+      // Create config for this chunk
+      let config = whisper::Config {
+        num_mel_bins: num_mel_bins as usize,
+        max_source_positions: 1500,
+        max_target_positions: 448,
+        d_model: 384,
+        encoder_attention_heads: 6,
+        encoder_layers: 6,
+        decoder_attention_heads: 6,
+        decoder_layers: 6,
+        suppress_tokens: vec![],
+        vocab_size: 51865,
+      };
+
+      // Convert chunk to mel spectrogram
+      let mel = whisper::audio::pcm_to_mel(&config, &chunk, &mel_filters);
+      all_mel_features.extend(mel);
+
+      seek += chunk_size;
+    }
+
+    // Calculate final dimensions
+    let n_frames = all_mel_features.len() / i64::try_from(self.num_mel_bins.as_ref())? as usize;
+
+    // Create device
+    let device = if bool::try_from(self.gpu.as_ref())? {
       get_global_device()
     } else {
       &Device::Cpu
     };
 
-    // Load mel filters based on num_mel_bins
-    let num_mel_bins: i64 = self.num_mel_bins.as_ref().try_into()?;
-    let mel_bytes = match num_mel_bins {
-      80 => MEL_FILTERS_80,
-      128 => MEL_FILTERS_128,
-      _ => return Err("num_mel_bins must be either 80 or 128"),
-    };
-
-    // Convert bytes to f32 mel filters
-    let mut mel_filters = vec![0f32; mel_bytes.len() / 4];
-    for i in 0..mel_filters.len() {
-      let bytes = &mel_bytes[i * 4..(i + 1) * 4];
-      mel_filters[i] = f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-    }
-
-    // Convert to mel spectrogram
-    let config = whisper::Config {
-      d_model: 384,
-      encoder_attention_heads: 6,
-      encoder_layers: 6,
-      decoder_attention_heads: 6,
-      decoder_layers: 6,
-      suppress_tokens: vec![],
-      num_mel_bins: num_mel_bins as usize,
-      max_source_positions: 1500,
-      max_target_positions: 448,
-      vocab_size: 51865,
-    };
-
-    let mel = whisper::audio::pcm_to_mel(&config, &pcm, &mel_filters);
-    let mel_len = mel.len();
-
-    let mel = CandleTensor::from_vec(
-      mel,
-      (1, num_mel_bins as usize, mel_len / num_mel_bins as usize),
+    // Create final tensor
+    let mel_tensor = CandleTensor::from_vec(
+      all_mel_features,
+      (
+        1,
+        i64::try_from(self.num_mel_bins.as_ref())? as usize,
+        n_frames,
+      ),
       device,
     )
     .map_err(|e| {
@@ -138,7 +156,8 @@ impl Shard for MLAudioToMel {
       "Failed to create mel spectrogram tensor"
     })?;
 
-    self.output = Var::new_ref_counted(Tensor(mel), &*TENSOR_TYPE).into();
+    // Store output
+    self.output = Var::new_ref_counted(Tensor(mel_tensor), &*TENSOR_TYPE).into();
     Ok(Some(self.output.0))
   }
 }
