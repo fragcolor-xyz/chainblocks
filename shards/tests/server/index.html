@@ -143,7 +143,7 @@
       const wasmBytes = await response.arrayBuffer();
       const mod = instance.module = await ShardsModule({
         wasmBinary: new Uint8Array(wasmBytes),
-        INITIAL_MEMORY: 134217728,
+        // INITIAL_MEMORY: 134217728,
       });
       log("Module loaded");
 
