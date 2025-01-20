@@ -162,14 +162,14 @@ jobs:
           ./shards new ../shards/tests/hello.shs
       - name: Checkout glTF-Sample-Assets
         # Match with test step below
-        if: ${{ steps.setup.outputs.runtime-tests == 'true' && steps.setup.outputs.build-type == 'Debug' }}
+        if: ${{ steps.setup.outputs.build-type == 'Debug' }}
         uses: actions/checkout@v3
         with:
           repository: shards-lang/glTF-Sample-Assets
           path: external/glTF-Sample-Assets
           fetch-depth: 1
       - name: Test graphics (Debug)
-        if: ${{ steps.setup.outputs.runtime-tests == 'true' && steps.setup.outputs.build-type == 'Debug' }}
+        if: ${{ steps.setup.outputs.build-type == 'Debug' }}
         env:
           RUST_BACKTRACE: full
         shell: bash

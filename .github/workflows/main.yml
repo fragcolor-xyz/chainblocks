@@ -76,7 +76,6 @@ jobs:
     secrets: inherit
     with:
       build-type: Debug
-      runtime-tests: true
       run-tests: true
   Windows-Release:
     needs: Setup
@@ -105,7 +104,6 @@ jobs:
     secrets: inherit
     with:
       build-type: Debug
-      runtime-tests: true
       run-tests: true
   macOS-Release:
     needs: Setup
@@ -113,7 +111,6 @@ jobs:
     secrets: inherit
     with:
       build-type: Release
-      runtime-tests: true
       run-tests: true
 
   #

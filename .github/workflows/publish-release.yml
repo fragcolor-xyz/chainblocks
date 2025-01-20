@@ -36,7 +36,6 @@ jobs:
     secrets: inherit
     with:
       build-type: Release
-      runtime-tests: false
       run-tests: false
 
   Publish:
