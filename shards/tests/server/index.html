@@ -143,6 +143,7 @@
       const wasmBytes = await response.arrayBuffer();
       const mod = instance.module = await ShardsModule({
         wasmBinary: new Uint8Array(wasmBytes),
+        INITIAL_MEMORY: 134217728,
       });
       log("Module loaded");
 
@@ -151,19 +152,19 @@
         mod._shardsSetLoggerLevel(tmpStr, level);
         mod._free(tmpStr);
       };
-      if (urlQuery["trace"] !== "1") {
-        instance.setLoggerLevel("gfx", SPDLOG_LEVEL_TRACE);
-        instance.setLoggerLevel("wgpu", SPDLOG_LEVEL_TRACE);
-        instance.setLoggerLevel("shards", SPDLOG_LEVEL_TRACE);
-        instance.setLoggerLevel("http", SPDLOG_LEVEL_TRACE);
-      }
-      instance.setLoggerLevel("audio", SPDLOG_LEVEL_DEBUG);
+      // if (urlQuery["trace"] !== "1") {
 
       // Set the canvas to use for input and graphics
       mod["canvas"] = canvas;
       mod.gfxSetup(canvasContainer, canvas);
 
       mod._shardsInit();
+
+      instance.setLoggerLevel("gfx", SPDLOG_LEVEL_TRACE);
+      // instance.setLoggerLevel("wgpu", SPDLOG_LEVEL_TRACE);
+      instance.setLoggerLevel("shards", SPDLOG_LEVEL_TRACE);
+      // instance.setLoggerLevel("http", SPDLOG_LEVEL_TRACE);
+      // instance.setLoggerLevel("audio", SPDLOG_LEVEL_DEBUG);
 
       // Mount the test file system
       const shardsFSMountHTTP = await mod.cwrap('shardsFSMountHTTP', 'void', ['string', 'string']);
@@ -222,6 +223,11 @@
     }
     pollLogs();
 
+    const fdir = mod.cwrap('shardsCWDAndList', 'void', ['string', 'string'], { async: false });
+    const ffile = mod.cwrap('shardsCWDAndTryLoad', 'void', ['string', 'string'], { async: false });
+    // fdir("/tfs/shards/tests", "data");
+    // ffile("/tfs", "main.cpp");
+
     async function runAction(action) {
       if (action.action == "update-preloaded") {
         await updatePreloadedFiles();
@@ -232,7 +238,10 @@
         const code = await fetch(dstFile).then(r => r.text());
         const codePtr = mod.stringToNewUTF8(code);
 
-        const basePathPtr = mod.stringToNewUTF8("/tfs/");
+        const lastSlash = action.data.lastIndexOf('/');
+        const basePath = lastSlash >= 0 ? `/tfs/${action.data.substring(0, lastSlash+1)}` : '/tfs/';
+        console.log("basePath", basePath);
+        const basePathPtr = mod.stringToNewUTF8(basePath);
         try {
           mod._shardsLoadScript(returnValuePtr, codePtr, basePathPtr);
           const inst = mod.HEAP32[returnValuePtr >> 2];
@@ -245,10 +254,10 @@
             throw new Error(mod.UTF8ToString(err));
           }
           try {
-            var run = true;
-            while (run) {
+            var result = 1;
+            while (result > 0) {
               mod._shardsTick(inst, returnValuePtr);
-              run = Boolean(mod.HEAP32[returnValuePtr >> 2]);
+              result = mod.HEAP32[returnValuePtr >> 2];
               const err = mod._shardsGetError(inst);
               if (err) {
                 throw new Error(mod.UTF8ToString(err));

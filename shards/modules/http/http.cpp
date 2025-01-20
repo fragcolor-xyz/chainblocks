@@ -1270,6 +1270,10 @@ struct SendFile {
       _response.result(http::status::ok);
       _response.set(http::field::content_type, mime_type(SHSTRVIEW(input)));
       _response.body() = std::move(file);
+      DEFER({
+        _response.body().close();
+        _response.clear();
+      });
 
       // add custom headers
       if (_headers.get().valueType == SHType::Table) {
@@ -1301,10 +1305,6 @@ struct SendFile {
     while (!done) {
       SH_SUSPEND(context, 0.0);
     }
-
-    _response.body().close();
-    _response.clear();
-    _404_response.clear();
 
     return input;
   }

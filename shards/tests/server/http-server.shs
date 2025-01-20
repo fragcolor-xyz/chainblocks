@@ -29,7 +29,7 @@
 @wire(web-server {
   Once({
     Sequence(handler/action-queue Global: true Type: @type([@action-type]))
-    Sequence(handler/preloaded-files Global: true Type: @type([Type::String]))
+    Sequence(handler/preloaded-files Global: true Type: @type([{none: Type::String}]))
     Table(handler/preloaded-files-set Global: true Type: @type({none: Type::String}))
   })
   Http.Server(web-handler-proxy Port: @port)

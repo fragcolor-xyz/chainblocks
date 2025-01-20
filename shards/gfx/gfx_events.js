@@ -35,17 +35,26 @@ var LibraryGFXEvents = {
       }
     })();
   },
-  $gfxSetup__deps: ["$Browser"],
+  $gfxSetup__deps: ["$Browser", "$Asyncify"],
   $gfxSetup(canvasContainer, canvas) {
     const eh = this.getEventHandler();
     this.eventHandlerSetCanvas(eh, canvas.id, canvasContainer.id);
 
     canvasContainer.onmousemove = (e) => {
       e.type_ = 0;
+
+      // HACK: FORCE THIS TO RUN NON-ASYNC
+      let t = Asyncify.currData;
+      Asyncify.currData = 0;
       this.eventHandlerPostMouseEvent(eh, e);
+      Asyncify.currData = t;
     };
     const handleMouseEvent = (e) => {
+      // HACK: FORCE THIS TO RUN NON-ASYNC
+      let t = Asyncify.currData;
+      Asyncify.currData = 0;
       this.eventHandlerPostMouseEvent(eh, e);
+      Asyncify.currData = t;
     };
     canvasContainer.onmousedown = (e) => {
       e.type_ = 1;
@@ -75,7 +84,11 @@ var LibraryGFXEvents = {
         event.key_ = 0;
       }
 
+      // HACK: FORCE THIS TO RUN NON-ASYNC
+      let t = Asyncify.currData;
+      Asyncify.currData = 0;
       this.eventHandlerPostKeyEvent(eh, event);
+      Asyncify.currData = t;
     };
     window.addEventListener('keydown', (event) => {
       if (trapKeyEvents(event.code)) {
@@ -100,7 +113,11 @@ var LibraryGFXEvents = {
       // Quantize to integer so that minimum scroll is at least +/- 1.
       deltaY = (deltaY == 0) ? 0 : (deltaY > 0 ? Math.max(deltaY, 1) : Math.min(deltaY, -1));
 
+      // HACK: FORCE THIS TO RUN NON-ASYNC
+      let t = Asyncify.currData;
+      Asyncify.currData = 0;  
       this.eventHandlerPostWheelEvent(eh, { deltaY: deltaY });
+      Asyncify.currData = t;
     });
 
     (async function resizeCanvasLoop() {
@@ -112,7 +129,11 @@ var LibraryGFXEvents = {
         if (lastW !== rect.width || lastH !== rect.height || lastPixelRatio !== pixelRatio) {
           let canvasWidth = rect.width * pixelRatio;
           let canvasHeight = rect.height * pixelRatio;
+          // HACK: FORCE THIS TO RUN NON-ASYNC
+          let t = Asyncify.currData;
+          Asyncify.currData = 0;  
           this.eventHandlerPostDisplayFormat(eh, rect.width, rect.height, canvasWidth, canvasHeight, pixelRatio);
+          Asyncify.currData = t;
           lastW = rect.width;
           lastH = rect.height;
           lastPixelRatio = pixelRatio;

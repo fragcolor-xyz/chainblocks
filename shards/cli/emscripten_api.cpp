@@ -16,6 +16,9 @@ struct Instance {
   std::shared_ptr<SHMesh> mesh{};
   std::shared_ptr<SHWire> wire{};
   std::optional<std::string> error;
+  ~Instance() {
+    mesh->terminate();
+  }
 };
 
 struct Message {
@@ -160,7 +163,7 @@ protected:
   void flush_() override {}
 };
 
-SHCore* core{};
+SHCore *core{};
 extern "C" {
 EMSCRIPTEN_KEEPALIVE void shardsInit() {
   // Add log buffer sink
@@ -209,15 +212,71 @@ EMSCRIPTEN_KEEPALIVE void shardsPreloadFiles(const char *payload, size_t length)
   SPDLOG_INFO("Preloading {} files", json.size());
   for (size_t i = 0; i < json.size(); i++) {
     auto &elem = json[i];
-    if (!elem.is_string()) {
-      SPDLOG_ERROR("Element is not a string");
+    if (!elem.is_object()) {
+      SPDLOG_ERROR("Element is not an object");
       continue;
     }
-    auto p0 = (root / elem.get<std::string>()).string();
-    SPDLOG_INFO("Preloading file {}", p0);
-    int fd = wasmfs_create_file(p0.c_str(), 0777, fetchBackend);
-    close(fd);
+    auto f = elem.find("f");
+    if (f != elem.end() && f->is_string()) {
+      // Add file
+      auto p0 = f->get<std::string>();
+      std::replace(p0.begin(), p0.end(), '\\', '/');
+      auto p1 = (root / p0).lexically_normal().string();
+      SPDLOG_INFO("Preloading file {}", p1);
+      int fd = wasmfs_create_file(p1.c_str(), 0777, fetchBackend);
+      close(fd);
+    }
+    auto d = elem.find("d");
+    if (d != elem.end() && d->is_string()) {
+      // Add directory
+      auto p0 = d->get<std::string>();
+      std::replace(p0.begin(), p0.end(), '\\', '/');
+      auto p1 = (root / p0).lexically_normal().string();
+      SPDLOG_INFO("Preloading directory {}", p1);
+      int fd = wasmfs_create_directory(p1.c_str(), 0777, fetchBackend);
+      close(fd);
+    }
   }
+}
+
+EMSCRIPTEN_KEEPALIVE void shardsCWDAndList(const char *cwd, const char *dirPath) {
+  using path = boost::filesystem::path;
+  using namespace boost::filesystem;
+  path p0 = cwd;
+  current_path(p0);
+  path p = current_path();
+  SPDLOG_INFO("Current path: {}", p.string());
+
+  path dst = dirPath;
+  boost::filesystem::directory_iterator it(dst);
+  while (it != boost::filesystem::directory_iterator()) {
+    SPDLOG_INFO("Dirent: {}", it->path().string());
+    ++it;
+  }
+}
+
+EMSCRIPTEN_KEEPALIVE void shardsCWDAndTryLoad(const char *cwd, const char *filePath) {
+  using path = boost::filesystem::path;
+  using namespace boost::filesystem;
+  path p0 = cwd;
+  current_path(p0);
+  path p = current_path();
+  SPDLOG_INFO("Current path: {}", p.string());
+
+  FILE *f = fopen(filePath, "rb");
+  if (!f) {
+    SPDLOG_ERROR("Failed to open file {}", filePath);
+    return;
+  }
+  fseek(f, 0, SEEK_END);
+  size_t size = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  std::vector<char> buf(size);
+  fread(buf.data(), 1, size, f);
+  fclose(f);
+
+  SPDLOG_INFO("File size: {}", size);
+  SPDLOG_INFO("File content: {}", std::string(buf.data(), size));
 }
 
 EMSCRIPTEN_KEEPALIVE void shardsPollMainThread() { emscripten_current_thread_process_queued_calls(); }
@@ -270,15 +329,16 @@ EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *c
   }
 }
 
-EMSCRIPTEN_KEEPALIVE void shardsTick(Instance *instance, bool *result) {
-  bool r = instance->mesh->tick();
+EMSCRIPTEN_KEEPALIVE void shardsTick(Instance *instance, uint32_t *resultPtr) {
+  uint32_t result = instance->mesh->tick() ? 1 : 0;
   if (instance->mesh->empty()) {
-    r = false;
-    return;
+    SPDLOG_DEBUG("Mesh is empty");
+    result = 0;
   }
 
-  if (result)
-    *result = r;
+  if (resultPtr) {
+    *resultPtr = result;
+  }
 }
 
 EMSCRIPTEN_KEEPALIVE const char *shardsGetError(Instance *instance) {

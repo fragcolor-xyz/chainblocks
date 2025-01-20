@@ -1,6 +1,8 @@
-@define(host "http://localhost:3000" IgnoreRedefined: true)
+@include("config.shs")
+@define(host #(["http://localhost:" @port] | String.Format) IgnoreRedefined: true)
 @define(action none IgnoreRedefined: true)
 @define(data none IgnoreRedefined: true)
+@define(exclude "" IgnoreRedefined: true)
 
 [@host "/control"] | String.Join = control-url
 {"Content-Type": "application/json"} = hdrs
@@ -13,7 +15,7 @@
   ; Command to preload a given folder, which is required for it to be available in the file system
   "preload-files" {
     @data | ExpectString = path
-    {path: path}
+    {path: path exclude: @exclude}
     ToJson | Http.Post(URL: ([@host "/preload-files"] | String.Join) Headers: hdrs)
   }
   none {

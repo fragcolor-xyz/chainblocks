@@ -39,15 +39,20 @@ struct Run {
   static SHTypesInfo outputTypes() { return shards::CoreInfo::BoolType; }
 
   PARAM_PARAMVAR(_mesh, "Mesh", "The mesh to run", {SHMesh::MeshType});
+  PARAM_PARAMVAR(_tickTime, "TickTime", "Time per frame",
+                 {shards::CoreInfo::NoneType, shards::CoreInfo::FloatType, shards::CoreInfo::FloatVarType});
   PARAM_PARAMVAR(_fps, "FPS", "Frames per second",
                  {shards::CoreInfo::NoneType, shards::CoreInfo::IntType, shards::CoreInfo::IntVarType});
   PARAM_PARAMVAR(_iterations, "Iterations", "Number of iterations",
                  {shards::CoreInfo::NoneType, shards::CoreInfo::IntType, shards::CoreInfo::IntVarType});
-  PARAM_IMPL(PARAM_IMPL_FOR(_mesh), PARAM_IMPL_FOR(_fps), PARAM_IMPL_FOR(_iterations));
+  PARAM_IMPL(PARAM_IMPL_FOR(_mesh), PARAM_IMPL_FOR(_tickTime), PARAM_IMPL_FOR(_fps), PARAM_IMPL_FOR(_iterations));
 
   PARAM_REQUIRED_VARIABLES()
   SHTypeInfo compose(const SHInstanceData &data) {
     PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    if (!_tickTime.isNone() && !_fps.isNone()) {
+      throw std::runtime_error("Run: run requires either a TickTime or FPS parameter");
+    }
     return data.inputType;
   }
   void warmup(SHContext *context) { PARAM_WARMUP(context); }
@@ -56,6 +61,7 @@ struct Run {
   SHVar activate(SHContext *context, const SHVar &input) {
     std::function<void()> delay;
     auto &fpsVar = (Var &)_fps.get();
+    auto &tickTimeVar = (Var &)_tickTime.get();
     auto &mesh = *reinterpret_cast<std::shared_ptr<SHMesh> *>(_mesh->payload.objectValue);
     auto &iterationsVar = (Var &)_iterations.get();
 
@@ -66,28 +72,49 @@ struct Run {
     size_t iteration = 0;
     bool noErrors = true;
 
-    if (!fpsVar.isNone()) {
-      double sleepDuration = 1.0f / float(fpsVar.payload.intValue);
+    if (!tickTimeVar.isNone()) {
+      double sleepDuration = tickTimeVar.payload.floatValue;
       while (!mesh->empty()) {
-        if(!mesh->tick()) {
+        if (!mesh->tick()) {
           noErrors = false;
         }
         SH_SUSPEND(context, sleepDuration);
+        if (mesh->empty())
+          break;
+        if (numIterations != ~0 && ++iteration >= numIterations) {
+          break;
+        }
+      }
+    } else if (!fpsVar.isNone()) {
+      double sleepDuration = 1.0f / float(fpsVar.payload.intValue);
+      while (!mesh->empty()) {
+        if (!mesh->tick()) {
+          noErrors = false;
+        }
+        SH_SUSPEND(context, sleepDuration);
+        if (mesh->empty())
+          break;
         if (numIterations != ~0 && ++iteration >= numIterations) {
           break;
         }
       }
     } else {
       while (!mesh->empty()) {
-        if(!mesh->tick()) {
+        if (!mesh->tick()) {
           noErrors = false;
         }
         SH_SUSPEND(context, 0);
+        if (mesh->empty())
+          break;
         if (numIterations != ~0 && ++iteration >= numIterations) {
           break;
         }
       }
     }
+
+    // Terminate the mesh
+    SPDLOG_TRACE("Mesh is done, terminating, without errors: {}", noErrors);
+    mesh->terminate();
 
     return Var(noErrors);
   }

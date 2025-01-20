@@ -22,6 +22,39 @@
   )
 })
 
+@template(fs-abs-from-root [] {
+  If(FS.IsAbsolute Pass {
+    = in
+    [@root-path in] | FS.Join
+  }) | FS.Normalize
+})
+
+@define(root-abs #(@root-path | @fs-abs))
+
+@define(fs-make-relative {
+  If(FS.IsAbsolute FS.RelativeTo(@root-abs) Pass) | FS.Normalize
+})
+
+@template(add-directory [dir] {
+  dir | @fs-make-relative >= p0
+  Sequence(queue Type: @type([Type::String]))
+  Repeat({
+    p0 | When(IsNot(".") {
+      >> queue
+    })
+    FS.Parent > p0
+  } Until: {p0 | Is("")})
+  
+  Repeat({
+    Pop(queue) >= p0
+    handler/preloaded-files-set | Take(p0) | When(Is(none) {
+      {d: p0} >> handler/preloaded-files
+      @srv-log("Adding preloaded directory")
+      Set(handler/preloaded-files-set p0)
+    })
+  } Until: {Count(queue) | Is(0)})
+})
+
 @template(send-as-json [] {
   ToJson = json-data
   @srv-log("Response")
@@ -68,28 +101,60 @@ Cond([
       {Is("POST")} {
         request | Take("body") | FromJson | ExpectTable
         @srv-log("Preload files request")
-        {Take("path") | ExpectString | @fs-abs Log("Preload files root path") = path}
-        
-        #(@root-path | @fs-abs) = root-abs
+        {Take("path") | ExpectString | @fs-abs-from-root() | @srv-log("Preload files root path") = path}
+        {Take("exclude") | ExpectString
+          If(Is("") {[]} {
+            String.Split(",") | Map(@fs-abs-from-root())
+          }) | Expect(@type([Type::String]))
+          @srv-log("Exclude path") = excluded
+        }
         
         path | When(FS.IsFile {
-          FS.RelativeTo(root-abs) = rel-path
+          @srv-log("IsFile")
+          @fs-make-relative = rel-path
+          @srv-log("relIsVfile")
           preloaded-files-set | Take(rel-path) | When(Is(none) {
-            rel-path >> preloaded-files
+            rel-path | FS.Parent = dir-path
+            @add-directory(dir-path)
+            
+            {f: rel-path} >> preloaded-files
             @srv-log("Adding preloaded file")
             Set(preloaded-files-set rel-path)
           })
         })
+        
         When(FS.IsDirectory {
-          FS.Iterate(Recursive: true)
-          ForEach({
-            FS.RelativeTo(root-abs) = rel-path
-            preloaded-files-set | Take(rel-path) | When(Is(none) {
-              rel-path >> preloaded-files
-              @srv-log("Adding preloaded file")
-              Set(preloaded-files-set rel-path)
+          >> queue
+          
+          Repeat({
+            Pop(queue) >= scan-path
+            @srv-log("Scanning directory")
+            {@add-directory(scan-path)}
+            FS.Iterate(Recursive: false)
+            ForEach({
+              = it
+              Log("Iter")
+              @fs-make-relative = rel-path
+              excluded | If(FS.IsAny(rel-path) {
+                  rel-path | @srv-log("Excluded")
+                } {
+                  it | Cond([
+                    FS.IsDirectory {
+                      @srv-log("Queueing child directory")
+                      >> queue
+                    }
+                    FS.IsFile {
+                      preloaded-files-set | Take(rel-path) | When(Is(none) {
+                        {f: rel-path} >> preloaded-files
+                        @srv-log("Adding preloaded file")
+                        Set(preloaded-files-set rel-path)
+                      })
+                    } ;
+                    {true} {["Path does not exist:" it] | String.Format | Log}])
+                }
+              )
             })
-          })
+          } Until: {Count(queue) | Is(0)})
         })
         
         ; Insert update preloaded into action queue
