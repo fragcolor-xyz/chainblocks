@@ -2148,3 +2148,23 @@ TEST_CASE("Mesh restart wire") {
   mesh.reset();
 }
 #endif
+
+TEST_CASE("Test-All-Shards-Constructors") {
+  auto &shards = GetGlobals().ShardsRegister;
+  for (auto &[name, _] : shards) {
+    auto shard = shards::createShard(name);
+    shard->setup(shard);
+    // add coverage for parameters setting
+    auto params = shard->parameters(shard);
+    for (uint32_t i = 0; i < params.len; i++) {
+      auto param = params.elements[i];
+      auto val = shard->getParam(shard, i);
+      auto res = shard->setParam(shard, i, &val);
+      if (res.code != 0) {
+        SHLOG_ERROR("Debug validation failed to set parameter: {} code: {} shard: {}", param.name, res.code, shard->name(shard));
+        REQUIRE(false);
+      }
+    }
+    shard->destroy(shard);
+  }
+}
