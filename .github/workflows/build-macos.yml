@@ -78,6 +78,7 @@ jobs:
           cd build
           cmake -G Ninja -DSPDLOG_ACTIVE_LEVEL="SPDLOG_LEVEL_DEBUG" -DSHARDS_DEFAULT_LOG_LEVEL="SPDLOG_LEVEL_DEBUG" -DSKIP_HEAVY_INLINE=1 -DWITH_SQLITE_VEC=ON -DCMAKE_BUILD_TYPE=${{ steps.setup.outputs.build-type }} -DSHARDS_THREAD_FIBER=ON -DUSE_ASAN=ON -DTRACY_ENABLE=ON -DTRACY_TIMER_FALLBACK=ON ..
           ninja shards
+          ninja test-runtime
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
@@ -117,7 +118,6 @@ jobs:
           cd build
           chmod +x shards
           # Run test-runtime
-          ninja test-runtime
           ./test-runtime
           # Run other tests
           ./shards new ../shards/tests/general.shs
