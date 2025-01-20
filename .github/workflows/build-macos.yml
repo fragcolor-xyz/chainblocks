@@ -83,7 +83,9 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: shards-macos ${{ steps.setup.outputs.build-type }}
-          path: build/shards
+          path: |
+            build/shards
+            build/test-runtime
           if-no-files-found: error
           retention-days: 1
 
