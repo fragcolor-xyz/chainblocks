@@ -1193,13 +1193,13 @@ struct AudioToBytes {
 
   std::vector<uint8_t> _output;
 
-  size_t audioDeriveDataLength(const SHAudio &audio) {
-    return audio.nsamples * audio.channels * sizeof(float);
-  }
+  size_t audioDeriveDataLength(const SHAudio &audio) { return audio.nsamples * audio.channels * sizeof(float); }
 
   SHVar activate(SHContext *context, const SHVar &input) {
     auto &audio = input.payload.audioValue;
     uint32_t audioDataLength = audioDeriveDataLength(audio);
+    _output.resize(audioDataLength);
+    memcpy(_output.data(), audio.samples, audioDataLength);
     return Var(_output.data(), audioDataLength);
   }
 };
@@ -1366,6 +1366,7 @@ SHARDS_REGISTER_FN(casting) {
   REGISTER_SHARD("IntsToBytes", IntsToBytes);
   REGISTER_SHARD("StringToBytes", StringToBytes);
   REGISTER_SHARD("ImageToBytes", ImageToBytes);
+  REGISTER_SHARD("AudioToBytes", AudioToBytes);
 
   REGISTER_SHARD("ToBase64", ToBase64);
   REGISTER_SHARD("FromBase64", FromBase64);

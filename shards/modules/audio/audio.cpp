@@ -530,9 +530,10 @@ struct Channel {
     // this is triggered by populating requiredVariables variable
     auto dataCopy = data;
     dataCopy.requiredVariables = &data.wire->requirements; // this ensures we get the right requirements deep
+    dataCopy.inputType = CoreInfo::AudioType;
 
     _vars.clear();
-    auto res = _data.shards.compose(data);
+    auto res = _data.shards.compose(dataCopy);
     for (SHExposedTypeInfo &req : res.requiredInfo) {
       // Capture if not global as we need to copy it!
       SHLOG_TRACE("Audio.Channel: adding variable to requirements: {}", req.name);
