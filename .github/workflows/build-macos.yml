@@ -119,6 +119,7 @@ jobs:
         run: |
           cd build
           chmod +x shards
+          chmod +x test-runtime
           # Run test-runtime
           ./test-runtime
           # Run other tests
