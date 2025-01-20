@@ -6,7 +6,9 @@
 @mesh(main)
 
 @wire(play-files {
-  Audio.ReadFile("./data/Ode_to_Joy.ogg" From: 1.0 To: 2.0) | Log
+  Audio.ReadFile("./data/Ode_to_Joy.ogg" From: 1.0 To: 4.0) | Log
+  Audio.Resample(OutRate: 16000) | Log
+  Audio.WriteFile("example-resampled.wav" SampleRate: 16000)
 } Looped: true)
 
 @schedule(main play-files)

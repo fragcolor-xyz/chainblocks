@@ -1182,6 +1182,28 @@ struct ImageToBytes {
   }
 };
 
+struct AudioToBytes {
+  static SHTypesInfo inputTypes() { return CoreInfo::AudioType; }
+  static SHOptionalString inputHelp() { return SHCCSTR("Accepts an audio buffer as input."); }
+
+  static SHTypesInfo outputTypes() { return CoreInfo::BytesType; }
+  static SHOptionalString outputHelp() { return SHCCSTR("The input audio buffer represented as a byte array."); }
+
+  static SHOptionalString help() { return SHCCSTR("Converts an audio buffer into a byte array."); }
+
+  std::vector<uint8_t> _output;
+
+  size_t audioDeriveDataLength(const SHAudio &audio) {
+    return audio.nsamples * audio.channels * sizeof(float);
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    auto &audio = input.payload.audioValue;
+    uint32_t audioDataLength = audioDeriveDataLength(audio);
+    return Var(_output.data(), audioDataLength);
+  }
+};
+
 SHARDS_REGISTER_FN(casting) {
   REGISTER_SHARD("ToInt", ToNumber<SHType::Int>);
   REGISTER_SHARD("ToInt2", ToNumber<SHType::Int2>);

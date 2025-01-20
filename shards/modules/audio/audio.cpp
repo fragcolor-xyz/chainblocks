@@ -1203,6 +1203,117 @@ struct WriteFile {
   }
 };
 
+struct Resample {
+  ma_resampler _resampler;
+  bool _initialized{false};
+
+  static SHOptionalString help() { return SHCCSTR("This shard resamples audio data."); }
+
+  static SHTypesInfo inputTypes() { return CoreInfo::AudioType; }
+  static SHOptionalString inputHelp() {
+    return SHCCSTR("Accepts audio data as an Audio chunk, containing the sample rate, number of samples, "
+                   "number of channels, and the audio samples.");
+  }
+  static SHTypesInfo outputTypes() { return CoreInfo::AudioType; }
+  static SHOptionalString outputHelp() { return SHCCSTR("Outputs the resampled audio data."); }
+
+  static const SHTable *properties() { return &experimental.payload.tableValue; }
+
+  PARAM_PARAMVAR(_outRate, "OutRate", "The output sample rate.", {CoreInfo::IntType, CoreInfo::IntVarType});
+
+  PARAM_IMPL(PARAM_IMPL_FOR(_outRate));
+
+  PARAM_REQUIRED_VARIABLES()
+  SHTypeInfo compose(SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return outputTypes().elements[0];
+  }
+
+  void warmup(SHContext *context) {
+    PARAM_WARMUP(context);
+    _leftoverSamples.clear();
+  }
+
+  void cleanup(SHContext *context) {
+    if (_initialized) {
+      ma_resampler_uninit(&_resampler, NULL);
+      _initialized = false;
+    }
+
+    PARAM_CLEANUP(context);
+  }
+
+  std::vector<float> _buffer;
+  std::vector<float> _leftoverSamples;
+  std::vector<float> _combinedInput;
+  ma_uint32 _inSampleRate{0};
+  ma_uint32 _outSampleRate{0};
+  ma_uint32 _channels{0};
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    if (!_initialized) {
+      ma_resampler_config config =
+          ma_resampler_config_init(ma_format_f32, input.payload.audioValue.channels, input.payload.audioValue.sampleRate,
+                                   _outRate.get().payload.intValue, ma_resample_algorithm_linear);
+      ma_result res = ma_resampler_init(&config, NULL, &_resampler);
+      if (res != MA_SUCCESS) {
+        throw ActivationError("Failed to initialize resampler");
+      }
+      _initialized = true;
+      _inSampleRate = input.payload.audioValue.sampleRate;
+      _outSampleRate = _outRate.get().payload.intValue;
+      _channels = input.payload.audioValue.channels;
+    }
+
+    if (input.payload.audioValue.sampleRate != _inSampleRate) {
+      throw ActivationError("Input sample rate does not match initialized sample rate");
+    }
+
+    // Prepare combined input buffer with leftover samples and new input
+    _combinedInput.clear();
+    if (!_leftoverSamples.empty()) {
+      _combinedInput.insert(_combinedInput.end(), _leftoverSamples.begin(), _leftoverSamples.end());
+    }
+
+    // Add new input samples
+    _combinedInput.insert(_combinedInput.end(), input.payload.audioValue.samples,
+                          input.payload.audioValue.samples + (input.payload.audioValue.nsamples * _channels));
+
+    ma_uint64 totalFramesIn = _combinedInput.size() / _channels;
+    ma_uint64 frameCountIn = totalFramesIn;
+    ma_uint64 frameCountOut = 0;
+
+    // Get expected output frame count
+    ma_result res = ma_resampler_get_expected_output_frame_count(&_resampler, frameCountIn, &frameCountOut);
+    if (res != MA_SUCCESS) {
+      throw ActivationError("Failed to get expected output frame count");
+    }
+
+    _buffer.resize(frameCountOut * _channels);
+    res = ma_resampler_process_pcm_frames(&_resampler, _combinedInput.data(), &frameCountIn, _buffer.data(), &frameCountOut);
+
+    if (res != MA_SUCCESS) {
+      SHLOG_ERROR("Failed to resample audio: {} {}", res, frameCountIn);
+      throw ActivationError("Failed to resample audio");
+    }
+
+    // Store unconsumed samples for next iteration
+    if (frameCountIn < totalFramesIn) {
+      size_t unconsumedSamples = (totalFramesIn - frameCountIn) * _channels;
+      _leftoverSamples.assign(_combinedInput.end() - unconsumedSamples, _combinedInput.end());
+    } else {
+      _leftoverSamples.clear();
+    }
+
+    SHVar output = input;
+    output.payload.audioValue.nsamples = frameCountOut;
+    output.payload.audioValue.samples = _buffer.data();
+    output.payload.audioValue.sampleRate = _outSampleRate;
+
+    return output;
+  }
+};
+
 struct Engine {
   static inline shards::logging::Logger Logger = shards::logging::getOrCreate("audio");
   static constexpr uint32_t EngineCC = 'snde';
@@ -1814,6 +1925,7 @@ SHARDS_REGISTER_FN(audio) {
   REGISTER_SHARD("Audio.ReadFile", shards::Audio::ReadFile);
   REGISTER_SHARD("Audio.ReadFileBytes", shards::Audio::ReadFileBytes);
   REGISTER_SHARD("Audio.WriteFile", shards::Audio::WriteFile);
+  REGISTER_SHARD("Audio.Resample", shards::Audio::Resample);
 
   REGISTER_SHARD("Audio.Engine", shards::Audio::Engine);
 
