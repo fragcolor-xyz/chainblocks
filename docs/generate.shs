@@ -575,7 +575,7 @@
       })
     }
     
-    Log("Documented shard")
+    shard-doc:name | Log("Documented shard")
     
     ""
   })

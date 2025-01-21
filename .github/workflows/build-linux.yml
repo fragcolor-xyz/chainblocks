@@ -169,7 +169,9 @@ jobs:
         env:
           RUST_BACKTRACE: full
         run: |
-          cd docs/samples
+          cd docs
+          ../build/shards new docs/generate.shs
+          cd samples
           for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
           do
             echo "Running sample $i";

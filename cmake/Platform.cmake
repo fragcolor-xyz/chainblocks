@@ -36,16 +36,16 @@ if(APPLE)
   message(STATUS "CMAKE_OSX_DEPLOYMENT_TARGET: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
   message(STATUS "Swift deployment target flag: ${deployment_target_flag}")
 
-  if(CMAKE_OSX_SYSROOT)
-    string(REGEX MATCH ".*simulator.*" IS_SIMULATOR ${CMAKE_OSX_SYSROOT})
+  if(XCODE_SDK)
+    string(REGEX MATCH "simulator" IS_SIMULATOR ${XCODE_SDK})
     if(IS_SIMULATOR)
-      message(STATUS "Building for simulator: ${CMAKE_OSX_SYSROOT}")
+      message(STATUS "Building for simulator: ${XCODE_SDK}")
       # Generic simulator settings here
       
       # Optionally detect specific simulator type
-      if(CMAKE_OSX_SYSROOT MATCHES ".*iphonesimulator.*")
+      if(XCODE_SDK MATCHES "iphonesimulator")
         message(STATUS "iOS Simulator detected")
-      elseif(CMAKE_OSX_SYSROOT MATCHES ".*xrsimulator.*")
+      elseif(XCODE_SDK MATCHES "xrsimulator")
         message(STATUS "visionOS Simulator detected")
       endif()
     endif()
