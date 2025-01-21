@@ -3,22 +3,21 @@ GFX.MainWindow(Contents: {
     GFX.DrawQueue = ui-draw-queue
     GFX.UIPass(ui-draw-queue) >> render-steps
   })
-
+  
   ; UI
   UI({
     UI.CentralPanel({
       UI.Style(
+        OverrideTextStyle: "MyStyle"
         TextStyles: {
           MyStyle: {
             Size: 36.0
             Family: FontFamily::Monospace
           }
         }
-        Contents: {
-          "Hello Shards!" | UI.Label
-        }
       )
-
+      "Hello Shards!" | UI.Label
+      
       UI.Style(
         TextStyles: {
           MyStyle: {
@@ -26,11 +25,9 @@ GFX.MainWindow(Contents: {
             Family: FontFamily::Monospace
           }
         }
-        Contents: {
-          "Hello Shards!" | UI.Label
-        }
       )
-
+      "Hello Shards!" | UI.Label
+      
       UI.Style(
         TextStyles: {
           MyStyle: {
@@ -38,13 +35,11 @@ GFX.MainWindow(Contents: {
             Family: FontFamily::Proportional
           }
         }
-        Contents: {
-          "Hello Shards!" | UI.Label
-        }
       )
+      "Hello Shards!" | UI.Label
     })
   })
-
+  
   ; Render
   UI.Render(ui-draw-queue)
   GFX.Render(Steps: render-steps)

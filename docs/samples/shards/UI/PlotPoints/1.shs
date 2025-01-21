@@ -2,14 +2,14 @@ GFX.MainWindow(Contents: {
   ; Setup
   GFX.DrawQueue = ui-draw-queue
   GFX.UIPass(ui-draw-queue) >> render-steps
-
+  
   ; UI
   UI({
     UI.CentralPanel({
       UI.Plot(Legend: true Contents: {
         [] >= sin
         ForRange(-32 32 {
-          ToFloat | Math.Divide(32 | Math.Divide(3.1415926535)) >= x
+          ToFloat | Math.Divide((32.0 | Math.Divide(3.1415926535))) >= x
           x | Math.Sin >= y
           [x y] | ToFloat2 >> sin
         })
@@ -21,7 +21,7 @@ GFX.MainWindow(Contents: {
       })
     })
   })
-
+  
   UI.Render(ui-draw-queue)
   GFX.Render(Steps: render-steps)
 })
