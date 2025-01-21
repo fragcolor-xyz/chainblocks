@@ -1,6 +1,8 @@
 # Platform-specific features
 if(APPLE)
-  list(APPEND ML_RUST_FEATURES "metal") # In reality this will only work on macOS unless metal is initialized before (e.g. Formabble app)
+  if(NOT DISABLE_CANDLE_METAL)
+    list(APPEND ML_RUST_FEATURES "metal") # In reality this will only work on macOS unless metal is initialized before (e.g. Formabble app)
+  endif()
   list(APPEND ML_RUST_FEATURES "accelerate")
 endif()
 
