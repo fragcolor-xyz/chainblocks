@@ -170,7 +170,7 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           cd docs
-          ../build/shards new docs/generate.shs
+          ../build/shards new generate.shs
           cd samples
           for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
           do
