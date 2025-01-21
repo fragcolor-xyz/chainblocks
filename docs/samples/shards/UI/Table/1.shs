@@ -1,27 +1,42 @@
-GFX.MainWindow(Contents: {
-  ; Setup
-  GFX.DrawQueue = ui-draw-queue
-  GFX.UIPass(ui-draw-queue) >> render-steps
-
-  ; UI
-  UI({
-    UI.CentralPanel({
-      UI.Table(Contents: {
-        "Col 1" | UI.Label
-        "Col 2" | UI.Label
-        "Col 3" | UI.Label
-        UI.NextRow
-        "Hello" | UI.Label
-        "shards" | UI.Label
-        "!" | UI.Label
-        UI.NextRow
-        "Lorem ipsum dolor sit amet" | UI.Label
-        "consectetur adipiscing elit" | UI.Label
-        "sed do eiusmod tempor" | UI.Label
-      })
+GFX.MainWindow(
+  Contents: {
+    Once({
+      GFX.DrawQueue >= ui-draw-queue
+      GFX.UIPass(ui-draw-queue) >> render-steps
     })
-  })
-
-  UI.Render(ui-draw-queue)
-  GFX.Render(Steps: render-steps)
-})
+    UI(
+      UI.CentralPanel(
+        Contents: {
+          [
+            {Name: "Doe" Surname: "John"}
+            {Name: "Dough" Surname: "Jane"}
+            {Name: "Smith" Surname: "Dick"}] | UI.Table(
+            Resizable: true
+            Striped: true
+            RowIndex: index
+            Columns: [
+              {Initial: 20.0}
+              {
+                Header: "Surname"
+                Initial: 100.0
+                AtLeast: 60.0
+                AtMost: 160.0
+              }
+              {
+                Header: "Name"
+                Initial: 80.0
+                AtLeast: 60.0
+                AtMost: 160.0
+              }]
+            Builder: [
+              {index | ToString | UI.Label}
+              {Take("Surname") | UI.Label}
+              {Take("Name") | UI.Label}]
+          )
+        }
+      )
+    ) | UI.Render(ui-draw-queue)
+    
+    GFX.Render(Steps: render-steps)
+  }
+)

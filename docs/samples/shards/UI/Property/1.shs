@@ -6,7 +6,7 @@ GFX.MainWindow(Contents: {
   ; UI
   UI({
     UI.CentralPanel(Contents: {
-      UI.Property(UIProperty.RemainingSpace)
+      UI.Property(UIProperty::RemainingSpace)
       Once({Log})
     })
   })
