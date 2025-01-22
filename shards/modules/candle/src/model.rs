@@ -743,6 +743,9 @@ pub(crate) struct SpeechToTextShard {
   #[shard_param("BeamSize", "Beam size for decoding (default: 5).", [common_type::int])]
   beam_size: ClonedVar,
 
+  #[shard_param("SilenceThreshold", "Energy threshold below which a chunk is considered silence (default: 0.01).", [common_type::float])]
+  silence_threshold: ClonedVar,
+
   output: ClonedVar,
 }
 
@@ -756,6 +759,7 @@ impl Default for SpeechToTextShard {
       task: ParamVar::default(),
       timestamps: false.into(),
       beam_size: 5i64.into(),
+      silence_threshold: 0.01f32.into(),
       output: ClonedVar::default(),
     }
   }
@@ -823,9 +827,13 @@ impl Shard for SpeechToTextShard {
     // Maximum length the encoder can handle (30 seconds of audio)
     const MAX_SOURCE_LEN: usize = 1500;
 
+    // Get silence threshold
+    let silence_threshold: f32 = self.silence_threshold.as_ref().try_into()?;
+
     // If sequence is too long, we need to process it in chunks
     let mut final_text = String::new();
     let mut final_timestamps = Vec::new();
+    let mut last_non_silent_end = 0f32;
 
     for chunk_start in (0..seq_len).step_by(MAX_SOURCE_LEN) {
       let chunk_size = (seq_len - chunk_start).min(MAX_SOURCE_LEN);
@@ -833,6 +841,22 @@ impl Shard for SpeechToTextShard {
         shlog_error!("Failed to get audio chunk: {}", e);
         "Failed to get audio chunk"
       })?;
+
+      // Calculate mean energy of the chunk
+      let chunk_mean = chunk.mean_all().map_err(|e| {
+        shlog_error!("Failed to calculate chunk mean: {}", e);
+        "Failed to calculate chunk mean"
+      })?;
+
+      let chunk_energy = chunk_mean.to_scalar::<f32>().map_err(|e| {
+        shlog_error!("Failed to get chunk energy: {}", e);
+        "Failed to get chunk energy"
+      })?;
+
+      // Skip chunk if it's below silence threshold
+      if chunk_energy < silence_threshold {
+        continue;
+      }
 
       // Get language token if specified, otherwise detect language
       let language_token = if !self.language.get().is_none() {
@@ -924,9 +948,13 @@ impl Shard for SpeechToTextShard {
                 shlog_error!("Failed to decode timestamps: {}", e);
                 "Failed to decode timestamps"
               })?;
-            // Adjust timestamps for chunk position
+            // Adjust timestamps for chunk position and gaps
+            let chunk_start_time = (chunk_start as f32 * 30.0) / MAX_SOURCE_LEN as f32;
             for (time, _) in segments.iter_mut() {
-              *time += (chunk_start as f32 * 30.0) / MAX_SOURCE_LEN as f32;
+              *time = (*time + chunk_start_time).max(last_non_silent_end);
+            }
+            if !segments.is_empty() {
+              last_non_silent_end = segments.last().unwrap().0;
             }
             final_timestamps.extend(segments);
             (result.text, true)
@@ -949,9 +977,13 @@ impl Shard for SpeechToTextShard {
                 shlog_error!("Failed to decode timestamps: {}", e);
                 "Failed to decode timestamps"
               })?;
-            // Adjust timestamps for chunk position
+            // Adjust timestamps for chunk position and gaps
+            let chunk_start_time = (chunk_start as f32 * 30.0) / MAX_SOURCE_LEN as f32;
             for (time, _) in segments.iter_mut() {
-              *time += (chunk_start as f32 * 30.0) / MAX_SOURCE_LEN as f32;
+              *time = (*time + chunk_start_time).max(last_non_silent_end);
+            }
+            if !segments.is_empty() {
+              last_non_silent_end = segments.last().unwrap().0;
             }
             final_timestamps.extend(segments);
             (result.text, true)
@@ -962,11 +994,13 @@ impl Shard for SpeechToTextShard {
         _ => return Err("Model must be a Whisper model"),
       };
 
-      // Append chunk text
-      if !final_text.is_empty() {
-        final_text.push(' ');
+      // Only append non-empty chunk text
+      if !chunk_text.trim().is_empty() {
+        if !final_text.is_empty() {
+          final_text.push(' ');
+        }
+        final_text.push_str(&chunk_text);
       }
-      final_text.push_str(&chunk_text);
     }
 
     // Return text with timestamps if requested
