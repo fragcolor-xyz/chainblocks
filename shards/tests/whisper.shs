@@ -4,15 +4,12 @@
   = mel-input
 
   "data/whisper-tokenizer.json"
-  ; "data/GIST-all-MiniLM-L6-v2-tokenizer.json"
   FS.Read | ML.Tokenizer = tokenizer
   
   "data/whisper-config.json"
-  ; "data/GIST-all-MiniLM-L6-v2-config.json"
   FS.Read | FromJson | ExpectTable = config | Log
   
   "data/whisper-model.safetensors"
-  ; "data/GIST-all-MiniLM-L6-v2.safetensors"
   FS.Read(Bytes: true)
   ML.Model(Model: MLModels::Whisper Format: MLFormats::SafeTensor Configuration: config GPU: #(@use-gpu | Is("true"))) = whisper-model
   
@@ -32,9 +29,12 @@
   "0x" | HexToBytes >= audio-bytes
   Detach(device-test)
   
+  Msg("Recording started")
   Repeat({
     Consume("W.Audio" @type(Type::Audio)) | AudioToBytes | AppendTo(audio-bytes)
   } Times: 500)
+  audio-bytes | Log("Recording stopped")
+  Stop(device-test)
   
   audio-bytes | ML.AudioToMel(GPU: #(@use-gpu | Is("true"))) = me-mel
   Tensor.ToString | Log
@@ -43,9 +43,9 @@
 })
 
 @wire(device-test {
-  Audio.Device(InputChannels: 1)
+  Audio.Device(InputChannels: 1 OutputChannels:0 SampleRate: 16000)
   Audio.Channel(Shards: {
-    {Audio.Resample(16000) | Produce("W.Audio")} ; make sure we passthrough the audio data
+    Produce("W.Audio") ; make sure we passthrough the audio data
   })
 } Looped: true)
 
