@@ -10,7 +10,7 @@
     "./data/Ode_to_Joy.ogg" | Audio.ReadFileBytes | Log
   })
   Audio.ReadFile("./data/Ode_to_Joy.ogg" From: 1.0 To: 4.0) | Log
-  Audio.Resample(OutRate: 16000) | Log
+  Audio.Resample(SampleRate: 16000) | Log
   {
     AudioToBytes | Log
     BytesToAudio(SampleRate: 16000 Channels: 2) | Log

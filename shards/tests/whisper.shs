@@ -31,10 +31,12 @@
   
   Msg("Recording started")
   Repeat({
-    Consume("W.Audio" @type(Type::Audio))
-    {AudioToBytes | AppendTo(audio-bytes)}
+    Consume("W.Audio" @type(Type::Audio)) | Audio.Resample(SampleRate: 16000)
+    AudioToBytes | AppendTo(audio-bytes)
+    ; for testing purposes, we write the audio to a file
+    BytesToAudio(SampleRate: 16000 Channels: 1)
     Audio.WriteFile("test-whisper.wav" SampleRate: 16000 Channels: 1)
-  } Times: 500)
+  } Times: 1000)
   audio-bytes | Log("Recording stopped")
   Stop(device-test)
   
@@ -45,7 +47,7 @@
 })
 
 @wire(device-test {
-  Audio.Device(InputChannels: 1 OutputChannels:0 SampleRate: 16000)
+  Audio.Device(InputChannels: 1 OutputChannels: 0)
   Audio.Channel(Shards: {
     Produce("W.Audio") ; make sure we passthrough the audio data
   })

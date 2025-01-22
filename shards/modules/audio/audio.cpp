@@ -1220,7 +1220,7 @@ struct Resample {
 
   static const SHTable *properties() { return &experimental.payload.tableValue; }
 
-  PARAM_PARAMVAR(_outRate, "OutRate", "The output sample rate.", {CoreInfo::IntType, CoreInfo::IntVarType});
+  PARAM_PARAMVAR(_outRate, "SampleRate", "The output sample rate.", {CoreInfo::IntType, CoreInfo::IntVarType});
 
   PARAM_IMPL(PARAM_IMPL_FOR(_outRate));
 
