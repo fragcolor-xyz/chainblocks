@@ -31,7 +31,9 @@
   
   Msg("Recording started")
   Repeat({
-    Consume("W.Audio" @type(Type::Audio)) | AudioToBytes | AppendTo(audio-bytes)
+    Consume("W.Audio" @type(Type::Audio))
+    {AudioToBytes | AppendTo(audio-bytes)}
+    Audio.WriteFile("test-whisper.wav" SampleRate: 16000 Channels: 1)
   } Times: 500)
   audio-bytes | Log("Recording stopped")
   Stop(device-test)
