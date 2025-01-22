@@ -530,9 +530,10 @@ struct Channel {
     // this is triggered by populating requiredVariables variable
     auto dataCopy = data;
     dataCopy.requiredVariables = &data.wire->requirements; // this ensures we get the right requirements deep
+    dataCopy.inputType = CoreInfo::AudioType;
 
     _vars.clear();
-    auto res = _data.shards.compose(data);
+    auto res = _data.shards.compose(dataCopy);
     for (SHExposedTypeInfo &req : res.requiredInfo) {
       // Capture if not global as we need to copy it!
       SHLOG_TRACE("Audio.Channel: adding variable to requirements: {}", req.name);
@@ -1003,6 +1004,106 @@ struct ReadFile {
   }
 };
 
+struct ReadFileBytes {
+  ma_decoder _decoder;
+  bool _initialized{false};
+  std::vector<float> _buffer;
+  ma_uint32 _channels{2};
+  ma_uint32 _sampleRate{44100};
+
+  static SHOptionalString help() {
+    return SHCCSTR(
+        "This shard reads an entire audio file into bytes. Unlike Audio.ReadFile, this shard reads the complete file at once "
+        "and outputs it as bytes, without the uint16_t sample count limitation of SHAudio. This is useful when you need to "
+        "process large audio files in their entirety.");
+  }
+
+  static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
+  static SHOptionalString inputHelp() { return SHCCSTR("The path to the audio file to read."); }
+  static SHTypesInfo outputTypes() { return CoreInfo::BytesType; }
+  static SHOptionalString outputHelp() { return SHCCSTR("The complete audio file contents as raw PCM float32 samples."); }
+
+  static inline Parameters params{
+      {"Channels", SHCCSTR("An int representing the number of desired output audio channels."), {CoreInfo::IntType}},
+      {"SampleRate", SHCCSTR("An int representing the desired output sampling rate."), {CoreInfo::IntType}}};
+
+  static SHParametersInfo parameters() { return params; }
+
+  void setParam(int index, const SHVar &value) {
+    switch (index) {
+    case 0:
+      _channels = ma_uint32(value.payload.intValue);
+      break;
+    case 1:
+      _sampleRate = ma_uint32(value.payload.intValue);
+      break;
+    default:
+      throw InvalidParameterIndex();
+    }
+  }
+
+  SHVar getParam(int index) {
+    switch (index) {
+    case 0:
+      return Var(_channels);
+    case 1:
+      return Var(_sampleRate);
+    default:
+      throw InvalidParameterIndex();
+    }
+  }
+
+  void cleanup(SHContext *context) {
+    if (_initialized) {
+      ma_decoder_uninit(&_decoder);
+      _initialized = false;
+    }
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    OwnedVar file = input; // ensure null termination
+
+    if (_initialized) {
+      ma_decoder_uninit(&_decoder);
+      _initialized = false;
+    }
+
+    ma_decoder_config config = ma_decoder_config_init(ma_format_f32, _channels, _sampleRate);
+    ma_result res = ma_decoder_init_file(file.payload.stringValue, &config, &_decoder);
+    if (res != MA_SUCCESS) {
+      throw ActivationError("Failed to open audio file");
+    }
+    _initialized = true;
+
+    ma_uint64 totalFrames;
+    res = ma_decoder_get_length_in_pcm_frames(&_decoder, &totalFrames);
+    if (res != MA_SUCCESS) {
+      cleanup(context);
+      throw ActivationError("Failed to get audio file length");
+    }
+
+    auto channels = _decoder.outputChannels;
+    _buffer.resize(totalFrames * channels);
+
+    ma_uint64 framesRead;
+    res = ma_decoder_read_pcm_frames(&_decoder, _buffer.data(), totalFrames, &framesRead);
+    if (res != MA_SUCCESS) {
+      cleanup(context);
+      throw ActivationError("Failed to read audio file");
+    }
+
+    // Create bytes var with the raw PCM data
+    SHVar output;
+    output.valueType = SHType::Bytes;
+    output.payload.bytesSize = _buffer.size() * sizeof(float);
+    output.payload.bytesValue = static_cast<uint8_t *>(malloc(output.payload.bytesSize));
+    memcpy(output.payload.bytesValue, _buffer.data(), output.payload.bytesSize);
+
+    cleanup(context);
+    return output;
+  }
+};
+
 struct WriteFile {
   ma_encoder _encoder;
   bool _initialized{false};
@@ -1100,6 +1201,117 @@ struct WriteFile {
     }
     ma_encoder_write_pcm_frames(&_encoder, input.payload.audioValue.samples, input.payload.audioValue.nsamples, NULL);
     return input;
+  }
+};
+
+struct Resample {
+  ma_resampler _resampler;
+  bool _initialized{false};
+
+  static SHOptionalString help() { return SHCCSTR("This shard resamples audio data."); }
+
+  static SHTypesInfo inputTypes() { return CoreInfo::AudioType; }
+  static SHOptionalString inputHelp() {
+    return SHCCSTR("Accepts audio data as an Audio chunk, containing the sample rate, number of samples, "
+                   "number of channels, and the audio samples.");
+  }
+  static SHTypesInfo outputTypes() { return CoreInfo::AudioType; }
+  static SHOptionalString outputHelp() { return SHCCSTR("Outputs the resampled audio data."); }
+
+  static const SHTable *properties() { return &experimental.payload.tableValue; }
+
+  PARAM_PARAMVAR(_outRate, "SampleRate", "The output sample rate.", {CoreInfo::IntType, CoreInfo::IntVarType});
+
+  PARAM_IMPL(PARAM_IMPL_FOR(_outRate));
+
+  PARAM_REQUIRED_VARIABLES()
+  SHTypeInfo compose(SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return outputTypes().elements[0];
+  }
+
+  void warmup(SHContext *context) {
+    PARAM_WARMUP(context);
+    _leftoverSamples.clear();
+  }
+
+  void cleanup(SHContext *context) {
+    if (_initialized) {
+      ma_resampler_uninit(&_resampler, NULL);
+      _initialized = false;
+    }
+
+    PARAM_CLEANUP(context);
+  }
+
+  std::vector<float> _buffer;
+  std::vector<float> _leftoverSamples;
+  std::vector<float> _combinedInput;
+  ma_uint32 _inSampleRate{0};
+  ma_uint32 _outSampleRate{0};
+  ma_uint32 _channels{0};
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    if (!_initialized) {
+      ma_resampler_config config =
+          ma_resampler_config_init(ma_format_f32, input.payload.audioValue.channels, input.payload.audioValue.sampleRate,
+                                   _outRate.get().payload.intValue, ma_resample_algorithm_linear);
+      ma_result res = ma_resampler_init(&config, NULL, &_resampler);
+      if (res != MA_SUCCESS) {
+        throw ActivationError("Failed to initialize resampler");
+      }
+      _initialized = true;
+      _inSampleRate = input.payload.audioValue.sampleRate;
+      _outSampleRate = _outRate.get().payload.intValue;
+      _channels = input.payload.audioValue.channels;
+    }
+
+    if (input.payload.audioValue.sampleRate != _inSampleRate) {
+      throw ActivationError("Input sample rate does not match initialized sample rate");
+    }
+
+    // Prepare combined input buffer with leftover samples and new input
+    _combinedInput.clear();
+    if (!_leftoverSamples.empty()) {
+      _combinedInput.insert(_combinedInput.end(), _leftoverSamples.begin(), _leftoverSamples.end());
+    }
+
+    // Add new input samples
+    _combinedInput.insert(_combinedInput.end(), input.payload.audioValue.samples,
+                          input.payload.audioValue.samples + (input.payload.audioValue.nsamples * _channels));
+
+    ma_uint64 totalFramesIn = _combinedInput.size() / _channels;
+    ma_uint64 frameCountIn = totalFramesIn;
+    ma_uint64 frameCountOut = 0;
+
+    // Get expected output frame count
+    ma_result res = ma_resampler_get_expected_output_frame_count(&_resampler, frameCountIn, &frameCountOut);
+    if (res != MA_SUCCESS) {
+      throw ActivationError("Failed to get expected output frame count");
+    }
+
+    _buffer.resize(frameCountOut * _channels);
+    res = ma_resampler_process_pcm_frames(&_resampler, _combinedInput.data(), &frameCountIn, _buffer.data(), &frameCountOut);
+
+    if (res != MA_SUCCESS) {
+      SHLOG_ERROR("Failed to resample audio: {} {}", res, frameCountIn);
+      throw ActivationError("Failed to resample audio");
+    }
+
+    // Store unconsumed samples for next iteration
+    if (frameCountIn < totalFramesIn) {
+      size_t unconsumedSamples = (totalFramesIn - frameCountIn) * _channels;
+      _leftoverSamples.assign(_combinedInput.end() - unconsumedSamples, _combinedInput.end());
+    } else {
+      _leftoverSamples.clear();
+    }
+
+    SHVar output = input;
+    output.payload.audioValue.nsamples = frameCountOut;
+    output.payload.audioValue.samples = _buffer.data();
+    output.payload.audioValue.sampleRate = _outSampleRate;
+
+    return output;
   }
 };
 
@@ -1712,7 +1924,9 @@ SHARDS_REGISTER_FN(audio) {
   REGISTER_SHARD("Audio.Channel", shards::Audio::Channel);
   REGISTER_SHARD("Audio.Oscillator", shards::Audio::Oscillator);
   REGISTER_SHARD("Audio.ReadFile", shards::Audio::ReadFile);
+  REGISTER_SHARD("Audio.ReadFileBytes", shards::Audio::ReadFileBytes);
   REGISTER_SHARD("Audio.WriteFile", shards::Audio::WriteFile);
+  REGISTER_SHARD("Audio.Resample", shards::Audio::Resample);
 
   REGISTER_SHARD("Audio.Engine", shards::Audio::Engine);
 

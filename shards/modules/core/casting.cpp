@@ -787,7 +787,10 @@ struct Expect {
   void warmup(SHContext *context) { PARAM_WARMUP(context); }
   void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
 
+  PARAM_REQUIRED_VARIABLES()
   SHTypeInfo compose(const SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+
     if (_type->valueType != SHType::Type) {
       throw std::logic_error("Expect shard type parameter must be a set");
     }
@@ -851,7 +854,10 @@ struct ExpectLike {
 
   void cleanup(SHContext *context) { _typeOf.cleanup(context); }
 
+  PARAM_REQUIRED_VARIABLES()
   SHTypeInfo compose(const SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+
     bool haveOutputOf = _outputOf.shards().len > 0;
     if (_typeOf.isNotNullConstant() && haveOutputOf) {
       throw ComposeError("Only one of TypeOf or OutputOf is allowed");
@@ -905,7 +911,10 @@ struct TypeOf {
   void warmup(SHContext *context) { PARAM_WARMUP(context); }
   void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
 
+  PARAM_REQUIRED_VARIABLES()
   SHTypeInfo compose(const SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+
     _expectedType = _outputOf.compose(data).outputType;
     return outputTypes().elements[0];
   }
@@ -1182,6 +1191,80 @@ struct ImageToBytes {
   }
 };
 
+struct AudioToBytes {
+  static SHTypesInfo inputTypes() { return CoreInfo::AudioType; }
+  static SHOptionalString inputHelp() { return SHCCSTR("Accepts an audio buffer as input."); }
+
+  static SHTypesInfo outputTypes() { return CoreInfo::BytesType; }
+  static SHOptionalString outputHelp() { return SHCCSTR("The input audio buffer represented as a byte array."); }
+
+  static SHOptionalString help() { return SHCCSTR("Converts an audio buffer into a byte array."); }
+
+  std::vector<uint8_t> _output;
+
+  size_t audioDeriveDataLength(const SHAudio &audio) { return audio.nsamples * audio.channels * sizeof(float); }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    auto &audio = input.payload.audioValue;
+    uint32_t audioDataLength = audioDeriveDataLength(audio);
+    _output.resize(audioDataLength);
+    memcpy(_output.data(), audio.samples, audioDataLength);
+    return Var(_output.data(), audioDataLength);
+  }
+};
+
+struct BytesToAudio {
+  PARAM_PARAMVAR(_channels, "Channels", "The number of channels.", {CoreInfo::IntType});
+  PARAM_PARAMVAR(_sampleRate, "SampleRate", "The sample rate in Hz.", {CoreInfo::IntType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_channels), PARAM_IMPL_FOR(_sampleRate));
+
+  void warmup(SHContext *context) { PARAM_WARMUP(context); }
+  void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
+
+  PARAM_REQUIRED_VARIABLES()
+  SHTypeInfo compose(const SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return outputTypes().elements[0];
+  }
+
+  static SHTypesInfo inputTypes() { return CoreInfo::BytesType; }
+  static SHOptionalString inputHelp() { return SHCCSTR("Accepts a byte array containing float samples."); }
+
+  static SHTypesInfo outputTypes() { return CoreInfo::AudioType; }
+  static SHOptionalString outputHelp() { return SHCCSTR("Returns the constructed audio buffer."); }
+
+  static SHOptionalString help() { return SHCCSTR("Converts a byte array containing float samples back into an audio buffer."); }
+
+  std::vector<float> _samples;
+
+  BytesToAudio() {
+    _channels = Var(1);
+    _sampleRate = Var(44100);
+  }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    auto channels = uint32_t(_channels.get().payload.intValue);
+    auto sampleRate = uint32_t(_sampleRate.get().payload.intValue);
+    size_t dataLen = input.payload.bytesSize / sizeof(float);
+    size_t nsamples = dataLen / channels;
+
+    if (nsamples > UINT16_MAX) {
+      throw ActivationError("Audio data exceeds the maximum number of samples (65535)");
+    }
+
+    _samples.resize(dataLen);
+    memcpy(_samples.data(), input.payload.bytesValue, input.payload.bytesSize);
+
+    SHAudio outAudio;
+    outAudio.channels = channels;
+    outAudio.nsamples = nsamples;
+    outAudio.sampleRate = sampleRate;
+    outAudio.samples = _samples.data();
+
+    return Var(outAudio);
+  }
+};
+
 SHARDS_REGISTER_FN(casting) {
   REGISTER_SHARD("ToInt", ToNumber<SHType::Int>);
   REGISTER_SHARD("ToInt2", ToNumber<SHType::Int2>);
@@ -1344,6 +1427,8 @@ SHARDS_REGISTER_FN(casting) {
   REGISTER_SHARD("IntsToBytes", IntsToBytes);
   REGISTER_SHARD("StringToBytes", StringToBytes);
   REGISTER_SHARD("ImageToBytes", ImageToBytes);
+  REGISTER_SHARD("AudioToBytes", AudioToBytes);
+  REGISTER_SHARD("BytesToAudio", BytesToAudio);
 
   REGISTER_SHARD("ToBase64", ToBase64);
   REGISTER_SHARD("FromBase64", FromBase64);

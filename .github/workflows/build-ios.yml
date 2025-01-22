@@ -80,6 +80,6 @@ jobs:
         if: ${{ steps.setup.outputs.rust-cache == 'true' }}
       - name: Build visionOS
         run: |
-          cmake -Bbuild_visionos_reldeb_frmwk -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=xros
+          cmake -Bbuild_visionos_reldeb_frmwk -GXcode -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DXCODE_SDK=xros -DDISABLE_CANDLE_METAL=ON
           cd build_visionos_reldeb_frmwk
           xcodebuild -scheme shards-framework -configuration RelWithDebInfo -destination "generic/platform=visionOS" build

@@ -1,0 +1,60 @@
+@define(use-gpu "false" IgnoreRedefined: true)
+
+@wire(whisper-it {
+  = mel-input
+
+  "data/whisper-tokenizer.json"
+  FS.Read | ML.Tokenizer = tokenizer
+  
+  "data/whisper-config.json"
+  FS.Read | FromJson | ExpectTable = config | Log
+  
+  "data/whisper-model.safetensors"
+  FS.Read(Bytes: true)
+  ML.Model(Model: MLModels::Whisper Format: MLFormats::SafeTensor Configuration: config GPU: #(@use-gpu | Is("true"))) = whisper-model
+  
+  mel-input | ML.SpeechToText(Model: whisper-model Tokenizer: tokenizer Language: "en" Task: "transcribe") = jfk-transcript
+  Log
+})
+
+@wire(basic-test {
+  "test-whisper.wav" | Audio.ReadFileBytes(SampleRate: 16000 Channels: 1)
+  ; "data/samples_jfk.wav" | Audio.ReadFileBytes(SampleRate: 16000 Channels: 1)
+  ML.AudioToMel(GPU: #(@use-gpu | Is("true"))) = mel
+  Tensor.ToString | Log
+  
+  mel | Do(whisper-it)
+})
+
+@wire(audio-data-receiver {
+  "0x" | HexToBytes >= audio-bytes
+  Detach(device-test)
+  
+  Msg("Recording started")
+  Repeat({
+    Consume("W.Audio" @type(Type::Audio)) | Audio.Resample(SampleRate: 16000)
+    AudioToBytes | AppendTo(audio-bytes)
+    ; for testing purposes, we write the audio to a file
+    BytesToAudio(SampleRate: 16000 Channels: 1)
+    Audio.WriteFile("test-whisper.wav" SampleRate: 16000 Channels: 1)
+  } Times: 1000)
+  audio-bytes | Log("Recording stopped")
+  Stop(device-test)
+  
+  audio-bytes | ML.AudioToMel(GPU: #(@use-gpu | Is("true"))) = me-mel
+  Tensor.ToString | Log
+
+  me-mel | Do(whisper-it)
+})
+
+@wire(device-test {
+  Audio.Device(InputChannels: 1 OutputChannels: 0)
+  Audio.Channel(Shards: {
+    Produce("W.Audio") ; make sure we passthrough the audio data
+  })
+} Looped: true)
+
+@mesh(root)
+; @schedule(root audio-data-receiver)
+@schedule(root basic-test)
+@run(root 0.01) | Assert.Is(true)
