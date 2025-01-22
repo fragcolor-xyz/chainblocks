@@ -19,10 +19,11 @@
 
 @wire(basic-test {
   "test-whisper.wav" | Audio.ReadFileBytes(SampleRate: 16000 Channels: 1)
-  ML.AudioToMel(GPU: #(@use-gpu | Is("true"))) = jfk-mel
+  ; "data/samples_jfk.wav" | Audio.ReadFileBytes(SampleRate: 16000 Channels: 1)
+  ML.AudioToMel(GPU: #(@use-gpu | Is("true"))) = mel
   Tensor.ToString | Log
   
-  jfk-mel | Do(whisper-it)
+  mel | Do(whisper-it)
 })
 
 @wire(audio-data-receiver {

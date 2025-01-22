@@ -796,202 +796,82 @@ impl Shard for SpeechToTextShard {
   }
 
   fn activate(&mut self, _context: &Context, input: &Var) -> Result<Option<Var>, &str> {
-    let model =
-      unsafe { &mut *Var::from_ref_counted_object::<Model>(&self.model.get(), &*MODEL_TYPE)? };
+    let model_var = self.model.get();
+    let model = unsafe { &mut *Var::from_ref_counted_object::<Model>(&model_var, &*MODEL_TYPE)? };
 
-    let tokenizer = unsafe {
-      &mut *Var::from_ref_counted_object::<Tokenizer>(&self.tokenizer.get(), &*TOKENIZER_TYPE)?
-    };
+    let tokenizer_var = self.tokenizer.get();
+    let tokenizer = unsafe { &mut *Var::from_ref_counted_object::<crate::tokenizer::Tokenizer>(&tokenizer_var, &*TOKENIZER_TYPE)? };
 
     let mel_tensor = unsafe { &*Var::from_ref_counted_object::<Tensor>(input, &*TENSOR_TYPE)? };
 
     // Convert to f32 before processing
-    let mel_tensor = mel_tensor
-      .0
-      .to_dtype(candle_core::DType::F32)
-      .map_err(|e| {
-        shlog_error!("Failed to convert tensor to f32: {}", e);
-        "Failed to convert tensor to f32"
-      })?;
-
-    // Get the dimensions of the input mel spectrogram
-    let (batch_size, n_mels, seq_len) = mel_tensor.dims3().map_err(|e| {
-      shlog_error!("Failed to get tensor dimensions: {}", e);
-      "Failed to get tensor dimensions"
+    let mel_tensor = mel_tensor.0.to_dtype(candle_core::DType::F32).map_err(|e| {
+      shlog_error!("Failed to convert tensor to f32: {}", e);
+      "Failed to convert tensor to f32"
     })?;
 
-    // Maximum length the encoder can handle (30 seconds of audio)
-    const MAX_SOURCE_LEN: usize = 1500;
-
-    // If sequence is too long, we need to process it in chunks
-    let mut final_text = String::new();
-    let mut final_timestamps = Vec::new();
-    let mut last_non_silent_end = 0f32;
-
-    for chunk_start in (0..seq_len).step_by(MAX_SOURCE_LEN) {
-      let chunk_size = (seq_len - chunk_start).min(MAX_SOURCE_LEN);
-      let chunk = mel_tensor.narrow(2, chunk_start, chunk_size).map_err(|e| {
-        shlog_error!("Failed to get audio chunk: {}", e);
-        "Failed to get audio chunk"
-      })?;
-
-      // Get language token if specified, otherwise detect language
-      let language_token = if !self.language.get().is_none() {
-        let lang: &str = self.language.get().as_ref().try_into()?;
-        tokenizer.get_language_token(lang).map_err(|e| {
-          shlog_error!("Failed to get language token: {}", e);
-          "Failed to get language token"
-        })?
-      } else {
-        // Auto-detect language from audio (only need to do this for first chunk)
-        if chunk_start == 0 {
-          match model {
-            Model::Whisper(model) => model.detect_language(&chunk, tokenizer).map_err(|e| {
-              shlog_error!("Failed to detect language: {}", e);
-              "Failed to detect language"
-            })?,
-            Model::WhisperQuantized(model) => {
-              model.detect_language(&chunk, tokenizer).map_err(|e| {
-                shlog_error!("Failed to detect language: {}", e);
-                "Failed to detect language"
-              })?
-            }
-            _ => return Err("Model must be a Whisper model"),
-          }
-        } else {
-          // Use same language token for subsequent chunks
-          tokenizer.get_token("<|startoftranscript|>").map_err(|e| {
-            shlog_error!("Failed to get SOT token: {}", e);
-            "Failed to get SOT token"
-          })?
-        }
-      };
-
-      // Get task type if specified
-      let task_token = if !self.task.get().is_none() {
-        let task_str: &str = self.task.get().as_ref().try_into()?;
-        match task_str {
-          "translate" => Some(tokenizer.get_translate_token().map_err(|e| {
-            shlog_error!("Failed to get translate token: {}", e);
-            "Failed to get translate token"
-          })?),
-          "transcribe" => Some(tokenizer.get_transcribe_token().map_err(|e| {
-            shlog_error!("Failed to get transcribe token: {}", e);
-            "Failed to get transcribe token"
-          })?),
-          _ => return Err("Invalid task type"),
-        }
-      } else {
-        None
-      };
-
-      // Prepare initial tokens
-      let timestamps: bool = self.timestamps.as_ref().try_into()?;
-      let mut initial_tokens = tokenizer
-        .prepare_audio_tokens(
-          None, // Language is handled separately
-          None, // Task is handled separately
-          timestamps,
-        )
-        .map_err(|e| {
-          shlog_error!("Failed to prepare audio tokens: {}", e);
-          "Failed to prepare audio tokens"
-        })?;
-
-      // Add language token if present
-      initial_tokens.insert(1, language_token);
-
-      // Add task token if present
-      if let Some(token) = task_token {
-        initial_tokens.push(token);
-      }
-
-      let beam_size: i64 = self.beam_size.as_ref().try_into()?;
-
-      // Perform inference on chunk
-      let (chunk_text, chunk_timestamps) = match model {
-        Model::Whisper(model) => {
-          let result = model
-            .decode(&chunk, tokenizer, &initial_tokens, beam_size as usize)
-            .map_err(|e| {
-              shlog_error!("Failed to decode audio: {}", e);
-              "Failed to decode audio"
-            })?;
-
-          if timestamps {
-            let mut segments = tokenizer
-              .decode_with_timestamps(&result.tokens)
-              .map_err(|e| {
-                shlog_error!("Failed to decode timestamps: {}", e);
-                "Failed to decode timestamps"
-              })?;
-            // Adjust timestamps for chunk position and gaps
-            let chunk_start_time = (chunk_start as f32 * 30.0) / MAX_SOURCE_LEN as f32;
-            for (time, _) in segments.iter_mut() {
-              *time = (*time + chunk_start_time).max(last_non_silent_end);
-            }
-            if !segments.is_empty() {
-              last_non_silent_end = segments.last().unwrap().0;
-            }
-            final_timestamps.extend(segments);
-            (result.text, true)
-          } else {
-            (result.text, false)
-          }
-        }
-        Model::WhisperQuantized(model) => {
-          let result = model
-            .decode(&chunk, tokenizer, &initial_tokens, beam_size as usize)
-            .map_err(|e| {
-              shlog_error!("Failed to decode audio: {}", e);
-              "Failed to decode audio"
-            })?;
-
-          if timestamps {
-            let mut segments = tokenizer
-              .decode_with_timestamps(&result.tokens)
-              .map_err(|e| {
-                shlog_error!("Failed to decode timestamps: {}", e);
-                "Failed to decode timestamps"
-              })?;
-            // Adjust timestamps for chunk position and gaps
-            let chunk_start_time = (chunk_start as f32 * 30.0) / MAX_SOURCE_LEN as f32;
-            for (time, _) in segments.iter_mut() {
-              *time = (*time + chunk_start_time).max(last_non_silent_end);
-            }
-            if !segments.is_empty() {
-              last_non_silent_end = segments.last().unwrap().0;
-            }
-            final_timestamps.extend(segments);
-            (result.text, true)
-          } else {
-            (result.text, false)
-          }
-        }
-        _ => return Err("Model must be a Whisper model"),
-      };
-
-      // Only append non-empty chunk text
-      if !chunk_text.trim().is_empty() {
-        if !final_text.is_empty() {
-          final_text.push(' ');
-        }
-        final_text.push_str(&chunk_text);
-      }
-    }
-
-    // Return text with timestamps if requested
-    self.output = if !final_timestamps.is_empty() {
-      let json = serde_json::to_string(&final_timestamps).map_err(|e| {
-        shlog_error!("Failed to serialize timestamps: {}", e);
-        "Failed to serialize timestamps"
-      })?;
-      format!("{}\nTimestamps: {}", final_text, json)
+    // Get language token if specified
+    let language_token = if !self.language.get().is_none() {
+      let lang: &str = self.language.get().as_ref().try_into()?;
+      Some(tokenizer.get_language_token(lang)?)
     } else {
-      final_text
-    }
-    .into();
+      None
+    };
 
+    // Get task type if specified
+    let task = if !self.task.get().is_none() {
+      let task_str: &str = self.task.get().as_ref().try_into()?;
+      match task_str {
+        "translate" => Some(crate::whisper::Task::Translate),
+        "transcribe" => Some(crate::whisper::Task::Transcribe),
+        _ => return Err("Invalid task type"),
+      }
+    } else {
+      None
+    };
+
+    let timestamps: bool = self.timestamps.as_ref().try_into()?;
+
+    // Extract the underlying TokenizerPure from our Tokenizer enum
+    let tokenizer_pure = match tokenizer {
+      crate::tokenizer::Tokenizer::Normal(t) | crate::tokenizer::Tokenizer::Quantized(t) => t,
+    };
+
+    // Create decoder
+    let mut decoder = crate::whisper::Decoder::new(
+      match model {
+        Model::Whisper(m) => crate::whisper::Model::Normal(m.clone()),
+        Model::WhisperQuantized(m) => crate::whisper::Model::Quantized(m.clone()),
+        _ => return Err("Model must be a Whisper model"),
+      },
+      tokenizer_pure.clone(),
+      299792458, // Fixed seed
+      mel_tensor.device(),
+      language_token,
+      task,
+      timestamps,
+      false, // verbose
+    ).map_err(|e| {
+      shlog_error!("Failed to create decoder: {}", e);
+      "Failed to create decoder"
+    })?;
+
+    // Run the decoder
+    let segments = decoder.run(&mel_tensor).map_err(|e| {
+      shlog_error!("Failed to run decoder: {}", e);
+      "Failed to run decoder"
+    })?;
+
+    // Collect all text segments
+    let mut final_text = String::new();
+    for segment in segments {
+      if !final_text.is_empty() {
+        final_text.push(' ');
+      }
+      final_text.push_str(&segment.dr.text);
+    }
+
+    self.output = final_text.into();
     Ok(Some(self.output.0))
   }
 }

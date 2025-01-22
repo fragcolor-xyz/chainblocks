@@ -11,6 +11,7 @@ mod audio;
 mod model;
 mod tensor;
 mod tokenizer;
+mod whisper;
 
 use once_cell::sync::OnceCell;
 

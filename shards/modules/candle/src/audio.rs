@@ -79,57 +79,41 @@ impl Shard for MLAudioToMel {
     let n = audio.len() / 4;
     let samples_slice = unsafe { std::slice::from_raw_parts(audio.as_ptr() as *const f32, n) };
 
-    // Process audio in chunks
-    let mut all_mel_features = Vec::new();
-    let mut seek = 0;
+    // Load mel filters based on num_mel_bins
+    let num_mel_bins = i64::try_from(self.num_mel_bins.as_ref())?;
+    let mel_bytes = match num_mel_bins {
+      80 => MEL_FILTERS_80,
+      128 => MEL_FILTERS_128,
+      _ => return Err("num_mel_bins must be either 80 or 128"),
+    };
 
-    while seek < n {
-      // Calculate chunk size
-      let chunk_size = n.min(seek + N_SAMPLES) - seek;
-
-      // Create chunk buffer and copy samples
-      let mut chunk = vec![0f32; N_SAMPLES];
-      let copy_len = chunk_size;
-      chunk[..copy_len].copy_from_slice(&samples_slice[seek..seek + copy_len]);
-
-      // Load mel filters based on num_mel_bins
-      let num_mel_bins = i64::try_from(self.num_mel_bins.as_ref())?;
-      let mel_bytes = match num_mel_bins {
-        80 => MEL_FILTERS_80,
-        128 => MEL_FILTERS_128,
-        _ => return Err("num_mel_bins must be either 80 or 128"),
-      };
-
-      // Convert bytes to f32 mel filters
-      let mut mel_filters = vec![0f32; mel_bytes.len() / 4];
-      for i in 0..mel_filters.len() {
-        let bytes = &mel_bytes[i * 4..(i + 1) * 4];
-        mel_filters[i] = f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-      }
-
-      // Create config for this chunk
-      let config = whisper::Config {
-        num_mel_bins: num_mel_bins as usize,
-        max_source_positions: 1500,
-        max_target_positions: 448,
-        d_model: 384,
-        encoder_attention_heads: 6,
-        encoder_layers: 6,
-        decoder_attention_heads: 6,
-        decoder_layers: 6,
-        suppress_tokens: vec![],
-        vocab_size: 51865,
-      };
-
-      // Convert chunk to mel spectrogram
-      let mel = whisper::audio::pcm_to_mel(&config, &chunk, &mel_filters);
-      all_mel_features.extend(mel);
-
-      seek += chunk_size;
+    // Convert bytes to f32 mel filters
+    let mut mel_filters = vec![0f32; mel_bytes.len() / 4];
+    for i in 0..mel_filters.len() {
+      let bytes = &mel_bytes[i * 4..(i + 1) * 4];
+      mel_filters[i] = f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
     }
 
+    // Create config for this chunk
+    let mut config = whisper::Config {
+      num_mel_bins: num_mel_bins as usize,
+      max_source_positions: 1500,
+      max_target_positions: 448,
+      d_model: 384,
+      encoder_attention_heads: 6,
+      encoder_layers: 6,
+      decoder_attention_heads: 6,
+      decoder_layers: 6,
+      suppress_tokens: vec![],
+      vocab_size: 51865,
+    };
+
+    config.num_mel_bins = num_mel_bins as usize; // that's all we need here
+                                                 // Convert chunk to mel spectrogram
+    let mel = whisper::audio::pcm_to_mel(&config, &samples_slice, &mel_filters);
+
     // Calculate final dimensions
-    let n_frames = all_mel_features.len() / i64::try_from(self.num_mel_bins.as_ref())? as usize;
+    let n_frames = mel.len() / i64::try_from(self.num_mel_bins.as_ref())? as usize;
 
     // Create device
     let device = if bool::try_from(self.gpu.as_ref())? {
@@ -140,7 +124,7 @@ impl Shard for MLAudioToMel {
 
     // Create final tensor
     let mel_tensor = CandleTensor::from_vec(
-      all_mel_features,
+      mel,
       (
         1,
         i64::try_from(self.num_mel_bins.as_ref())? as usize,

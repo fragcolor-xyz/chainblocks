@@ -21,6 +21,8 @@ candle-core = { version = "0.8.2", git = "https://github.com/huggingface/candle"
 candle-transformers = { version = "0.8.2", git = "https://github.com/huggingface/candle", rev = "17cbbe4286f25934197db79a244fd0694259c899" }
 candle-nn = { version = "0.8.2", git = "https://github.com/huggingface/candle", rev = "17cbbe4286f25934197db79a244fd0694259c899" }
 tempfile = "3.10.1"
+rand = "0.8"
+anyhow = "1.0.80"
 # candle-core = { version = "0.6.0", git = "https://github.com/sinkingsugar/candle-wgpu.git", rev = "c8f4701f83d523b40c70075fabbd10028e04d049" }
 # candle-transformers = { version = "0.6.0", git = "https://github.com/sinkingsugar/candle-wgpu.git", rev = "c8f4701f83d523b40c70075fabbd10028e04d049" }
 # candle-nn = { version = "0.6.0", git = "https://github.com/sinkingsugar/candle-wgpu.git", rev = "c8f4701f83d523b40c70075fabbd10028e04d049" }
