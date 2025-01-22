@@ -36,7 +36,7 @@
     ; for testing purposes, we write the audio to a file
     BytesToAudio(SampleRate: 16000 Channels: 1)
     Audio.WriteFile("test-whisper.wav" SampleRate: 16000 Channels: 1)
-  } Times: 500)
+  } Times: 1000)
   audio-bytes | Log("Recording stopped")
   Stop(device-test)
   
@@ -54,6 +54,6 @@
 } Looped: true)
 
 @mesh(root)
-@schedule(root audio-data-receiver)
-; @schedule(root basic-test)
+; @schedule(root audio-data-receiver)
+@schedule(root basic-test)
 @run(root 0.01) | Assert.Is(true)
