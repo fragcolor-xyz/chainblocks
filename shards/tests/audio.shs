@@ -11,6 +11,7 @@
   })
   Audio.ReadFile("./data/Ode_to_Joy.ogg" From: 1.0 To: 4.0) | Log
   Audio.Resample(OutRate: 16000) | Log
+  {AudioToBytes | Log}
   Audio.WriteFile("example-resampled.wav" SampleRate: 16000)
 } Looped: true)
 

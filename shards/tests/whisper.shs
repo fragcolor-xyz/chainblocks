@@ -1,3 +1,5 @@
+@define(use-gpu "false" IgnoreRedefined: true)
+
 @wire(whisper-it {
   = mel-input
 
@@ -12,7 +14,7 @@
   "data/whisper-model.safetensors"
   ; "data/GIST-all-MiniLM-L6-v2.safetensors"
   FS.Read(Bytes: true)
-  ML.Model(Model: MLModels::Whisper Format: MLFormats::SafeTensor Configuration: config GPU: false) = whisper-model
+  ML.Model(Model: MLModels::Whisper Format: MLFormats::SafeTensor Configuration: config GPU: #(@use-gpu | Is("true"))) = whisper-model
   
   mel-input | ML.SpeechToText(Model: whisper-model Tokenizer: tokenizer Language: "en" Task: "transcribe") = jfk-transcript
   Log
@@ -20,7 +22,7 @@
 
 @wire(basic-test {
   "data/samples_jfk.wav" | Audio.ReadFileBytes(SampleRate: 16000 Channels: 1)
-  ML.AudioToMel(GPU: false) = jfk-mel
+  ML.AudioToMel(GPU: #(@use-gpu | Is("true"))) = jfk-mel
   Tensor.ToString | Log
   
   jfk-mel | Do(whisper-it)
@@ -34,7 +36,7 @@
     Consume("W.Audio" @type(Type::Audio)) | AudioToBytes | AppendTo(audio-bytes)
   } Times: 500)
   
-  audio-bytes | ML.AudioToMel(GPU: false) = me-mel
+  audio-bytes | ML.AudioToMel(GPU: #(@use-gpu | Is("true"))) = me-mel
   Tensor.ToString | Log
 
   me-mel | Do(whisper-it)
@@ -49,4 +51,5 @@
 
 @mesh(root)
 @schedule(root audio-data-receiver)
+; @schedule(root basic-test)
 @run(root 0.01) | Assert.Is(true)
