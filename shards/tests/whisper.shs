@@ -18,7 +18,7 @@
 })
 
 @wire(basic-test {
-  "data/samples_jfk.wav" | Audio.ReadFileBytes(SampleRate: 16000 Channels: 1)
+  "test-whisper.wav" | Audio.ReadFileBytes(SampleRate: 16000 Channels: 1)
   ML.AudioToMel(GPU: #(@use-gpu | Is("true"))) = jfk-mel
   Tensor.ToString | Log
   
@@ -36,7 +36,7 @@
     ; for testing purposes, we write the audio to a file
     BytesToAudio(SampleRate: 16000 Channels: 1)
     Audio.WriteFile("test-whisper.wav" SampleRate: 16000 Channels: 1)
-  } Times: 1000)
+  } Times: 500)
   audio-bytes | Log("Recording stopped")
   Stop(device-test)
   
