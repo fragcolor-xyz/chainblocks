@@ -1,0 +1,5 @@
+5 | If(
+  {IsLess(2)}
+  {Msg("lesser than 2")}
+  {Msg("equal or greater than 2")}
+)

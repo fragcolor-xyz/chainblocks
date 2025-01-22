@@ -5,10 +5,10 @@ license: CC-BY-SA-4.0
 
 # Documenting the API
 
-*Note that as of 2021/10/25, the **API Documentation** for the shards is extracted from the shards binary using the generate.edn script.*
+*Note that as of 2021/10/25, the **API Documentation** for the shards is extracted from the shards binary using the generate.shs script.*
 
 ```
-./src/build/shards docs/generate.edn
+./src/build/shards new docs/generate.shs
 ```
 
 If you wish to contribute, you can check out our guide on [how to start documenting](./start-documenting.md).

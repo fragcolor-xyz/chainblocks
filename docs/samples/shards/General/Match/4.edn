@@ -1,7 +1,0 @@
-;; no matches + nil match in the middle + with passthrough
-1
-(Match [2 (-> (Msg "Matched 2"))         ;; case processed, match not found
-        nil (-> (Msg "Matched nil"))     ;; case processed, match found
-        3 (-> (Msg "Matched 3"))]        ;; case ignored
-       :Passthrough true)                ;; passthrough --
-(Assert.Is 1 true)                       ;; -- so input to `Match` is also its output

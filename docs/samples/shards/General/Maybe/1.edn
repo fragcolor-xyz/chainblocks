@@ -1,9 +1,0 @@
-[1 2]
-(Maybe
- ;:Shards
- (Take 3)
- ;:Else
- (Take 0)
- ;:Silent
- true)
-(Log "result")

@@ -1,0 +1,3 @@
+5 | BigInt = expected
+2 | BigInt = operand
+7 | BigInt | BigInt.Subtract(Operand: operand) | BigInt.Is(expected) | Assert.Is(true Break: true)

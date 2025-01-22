@@ -1,0 +1,2 @@
+0.0 | Math.Expm1 | Log
+Assert.Is(0.0 Break: true)

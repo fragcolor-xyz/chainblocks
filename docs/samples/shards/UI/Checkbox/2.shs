@@ -1,0 +1,21 @@
+; Styled checkbox
+GFX.MainWindow(Contents: {
+  ; Setup
+  GFX.DrawQueue = ui-draw-queue
+  GFX.UIPass(ui-draw-queue) >> render-steps
+  
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Checkbox(
+        Label: "Checked"
+        Style: {color: @color(255 0 255) italics: true}
+        Variable: checked
+      )
+    })
+  })
+  
+  UI.Render(ui-draw-queue)
+  
+  GFX.Render(Steps: render-steps)
+})

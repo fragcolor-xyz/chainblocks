@@ -1,0 +1,1 @@
+3 | BigInt | BigInt.ToFloat(ShiftedBy: 1) | Assert.Is(30.0 Break: true)

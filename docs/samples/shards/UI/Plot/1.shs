@@ -1,0 +1,17 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  GFX.DrawQueue = ui-draw-queue
+  GFX.UIPass(ui-draw-queue) >> render-steps
+  
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Plot({
+        [@f2(-1 0) @f2(0 0) @f2(1 0)] | UI.PlotLine
+      })
+    })
+  })
+  
+  UI.Render(ui-draw-queue)
+  GFX.Render(Steps: render-steps)
+})

@@ -1,9 +1,0 @@
-0.5
-(Cond
- [(-> (IsMore 0.7)) (-> "fast")
-  (-> (IsLess 0.3)) (-> "slow")
-  ; last case acts as default
-  (-> true) (-> "normal")]
- ;:Passthrough
- false)
-(Assert.Is "normal" true)

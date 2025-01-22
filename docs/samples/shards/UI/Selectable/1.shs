@@ -18,19 +18,19 @@ GFX.MainWindow(
       UI.CentralPanel(
         Contents: {
           UI.Selectable(
-            Contents: { UI.Button("Select Button 1" { "Select Button 1 Clicked" | Log }) }
-            IsSelected: { @is-selected(1) }
-            Clicked: { @select(1) }
+            Contents: {UI.Button("Select Button 1" {"Select Button 1 Clicked" | Log})}
+            IsSelected: {@is-selected(1)}
+            Clicked: {@select(1)}
           )
           UI.Selectable(
             Contents: {
-              UI.Button("Select Button 2" { "Select Button 2 Clicked" | Log })
+              UI.Button("Select Button 2" {"Select Button 2 Clicked" | Log})
               "Another part of the same selectable as Select Button 2" | UI.Label(Wrap: TextWrap::Extend)
             }
-            IsSelected: { @is-selected(2) }
-            Clicked: { @select(2) }
+            IsSelected: {@is-selected(2)}
+            Clicked: {@select(2)}
           )
-
+          
           currently-selected | ToString > currently-selected-str
           [
             "Currently selected: "
@@ -38,9 +38,8 @@ GFX.MainWindow(
           ] | String.Join | UI.Label
         }
       )
-    ) | UI.Render(ui-draw-queue
-)
-
+    ) | UI.Render(ui-draw-queue)
+    
     GFX.Render(Steps: render-steps)
   }
 )

@@ -7,28 +7,25 @@ GFX.MainWindow(
     UI(
       UI.CentralPanel(
         Contents: {
-          [ 
-            @i2(0) @i2(0 1) @i2(1) @i2(1 0) 
-          ] | UI.Table(
+          [
+            @i2(0) @i2(0 1) @i2(1) @i2(1 0)] | UI.Table(
             Columns: [
-              { Header: "A" }
-              { Header: "B" }
-              { Header: "A xor B" }
-            ]
+              {Header: "A"}
+              {Header: "B"}
+              {Header: "A xor B"}]
             Builder: [
-              { Take(0) | ToString | UI.Label }
-              { Take(1) | ToString | UI.Label }
-              { 
-                | (Take(0) >= a)
-                | (Take(1) >= b)
+              {Take(0) | ToString | UI.Label}
+              {Take(1) | ToString | UI.Label}
+              {
+                {Take(0) >= a}
+                {Take(1) >= b}
                 a | Math.Xor(b) | ToString | UI.Label
-              }
-            ]
+              }]
           )
         }
       )
-    ) | UI.Render(ui-draw-queue)
-
+    ) | UI.Render(ui-draw-queue)
+    
     GFX.Render(Steps: render-steps)
   }
 )

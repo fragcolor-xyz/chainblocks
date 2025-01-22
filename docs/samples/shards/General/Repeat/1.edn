@@ -1,3 +1,0 @@
-(Repeat
- (-> (Msg "Hello"))
- :Times 5)

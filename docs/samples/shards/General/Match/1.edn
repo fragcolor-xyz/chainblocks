@@ -1,8 +1,0 @@
-;; single match + nil match at end + no passthrough
-1
-(Match [2 (-> "Matched 2")         ;; case processed, match not found
-        1 (-> "Matched 1")         ;; case processed, match found
-        3 (-> "Matched 3")         ;; case ignored
-        nil (-> "Matched nil")]    ;; case ignored 
-       :Passthrough false)         ;; no passthrough --
-(Assert.Is "Matched 1" true)       ;; -- so matched case's output becomes `Match` shard's output

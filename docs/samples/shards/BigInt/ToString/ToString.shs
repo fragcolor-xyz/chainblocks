@@ -1,0 +1,1 @@
+42 | BigInt | BigInt.Shift(20) | BigInt.ToString | Assert.Is("4200000000000000000000" Break: true)

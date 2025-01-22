@@ -1,0 +1,9 @@
+0 >= n
+Repeat({
+  Msg("Hello")
+} Times: 5)
+
+Repeat({
+  n | Log("Counting")
+  Math.Inc(n)
+} Until: {n | IsMore(9)})

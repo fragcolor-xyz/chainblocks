@@ -1,7 +1,0 @@
-;; Add integers
-(int 5) ;; :Input
-(Log) ;; prints input => 5
-(Math.Add
- 2) ;; :Operand
-(Log) ;; prints input + operand => 7
-(Assert.Is 7 true) ;; expect: (5 + 2) => 7

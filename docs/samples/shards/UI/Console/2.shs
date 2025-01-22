@@ -1,0 +1,36 @@
+; Console with filters
+@wire(capture {
+  CaptureLog(
+    Size: 24
+    MinLevel: "info"
+    Pattern: "%^[%l]%$ [%Y-%m-%d %T.%e] %v"
+    Suspend: true
+  ) | String.Join > logs
+  Math.Inc(generation)
+} Looped: true)
+
+; Setup
+"" | Set(logs Global: true)
+0 | Set(generation Global: true)
+Detach(capture)
+
+GFX.MainWindow(Contents: {
+  ; Setup
+  GFX.DrawQueue = ui-draw-queue
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.BottomPanel(Contents: {
+      Get(generation Global: true) | ToString | UI.Label
+    })
+
+    UI.CentralPanel(Contents: {
+      UI.Button("Say Hello" {Msg("Hello!")})
+      Get(logs Global: true) | UI.Console(ShowFilters: true)
+    })
+  })
+
+  UI.Render(ui-draw-queue)
+  GFX.Render(Steps: render-steps)
+})

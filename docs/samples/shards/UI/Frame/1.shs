@@ -1,0 +1,25 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  GFX.DrawQueue = ui-draw-queue
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Frame(
+        InnerMargin: @f4(10 10 10 10)
+        OuterMargin: @f4(0 0 0 0)
+        Rounding: @f4(5 5 5 5)
+        FillColor: @color(50 50 21)
+        StrokeColor: @color(250 250 32)
+        StrokeWidth: 2.0
+        Contents: {
+          "Frame content" | UI.Label
+        }
+      )
+    })
+  })
+
+  UI.Render(ui-draw-queue)
+  GFX.Render(Steps: render-steps)
+})

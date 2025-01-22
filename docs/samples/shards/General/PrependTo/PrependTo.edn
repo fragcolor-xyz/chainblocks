@@ -1,9 +1,0 @@
-;; prepend element to sequence
-[1 2 3] >= .seq
-0 (PrependTo .seq)   ;; prepends element to sequence
-.seq (Log)           ;; updated sequence => [0, 1, 2, 3]
-
-;; prepend character to string
-"pen" >= .str
-"O" (PrependTo .str) ;; prepends character to string
-.str (Log)           ;; updated string => Open

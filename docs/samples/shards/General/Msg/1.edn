@@ -1,6 +1,0 @@
-(defshards msgshard [a b]
-  (Msg a)  ;; print value of 1st arg passed
-  (Msg b)) ;; print value of 2nd arg passed
-
-(Msg "Hello World") ;; prints string
-(msgshard "Bye" "Universe") ;; prints args passed

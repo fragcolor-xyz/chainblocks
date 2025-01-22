@@ -1,0 +1,5 @@
+; :Break = `false`, assertion false
+; => log assertion error but dont abort program
+8.0 | Maybe({
+  Assert.IsAlmost(7.999 Break: false Threshold: 0.0001)
+})

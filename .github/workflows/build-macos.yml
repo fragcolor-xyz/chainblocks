@@ -11,11 +11,6 @@ on:
         options:
           - Debug
           - Release
-      runtime-tests:
-        description: Run the runtime tests?
-        required: true
-        default: false
-        type: boolean
       run-tests:
         description: Run the tests?
         required: false
@@ -32,10 +27,6 @@ on:
         required: true
         default: Debug
         type: string
-      runtime-tests:
-        required: true
-        default: false
-        type: boolean
       run-tests:
         required: false
         default: false
@@ -61,7 +52,6 @@ jobs:
         shell: bash
         run: |
           echo "build-type=${{ github.event.inputs.build-type || inputs.build-type }}" >> $GITHUB_OUTPUT
-          echo "runtime-tests=${{ github.event.inputs.runtime-tests || inputs.runtime-tests }}" >> $GITHUB_OUTPUT
           echo "run-tests=${{ github.event.inputs.run-tests || inputs.run-tests }}" >> $GITHUB_OUTPUT
           echo "rust-cache=${{ github.event.inputs.rust-cache || inputs.rust-cache }}" >> $GITHUB_OUTPUT
       - name: Checkout shards
@@ -88,19 +78,14 @@ jobs:
           cd build
           cmake -G Ninja -DSPDLOG_ACTIVE_LEVEL="SPDLOG_LEVEL_DEBUG" -DSHARDS_DEFAULT_LOG_LEVEL="SPDLOG_LEVEL_DEBUG" -DSKIP_HEAVY_INLINE=1 -DWITH_SQLITE_VEC=ON -DCMAKE_BUILD_TYPE=${{ steps.setup.outputs.build-type }} -DSHARDS_THREAD_FIBER=ON -DUSE_ASAN=ON -DTRACY_ENABLE=ON -DTRACY_TIMER_FALLBACK=ON ..
           ninja shards
-      - name: Test runtime (Debug)
-        if: ${{ steps.setup.outputs.runtime-tests == 'true' && steps.setup.outputs.build-type == 'Debug' }}
-        env:
-          RUST_BACKTRACE: full
-        run: |
-          cd build
           ninja test-runtime
-          ./test-runtime
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
           name: shards-macos ${{ steps.setup.outputs.build-type }}
-          path: build/shards
+          path: |
+            build/shards
+            build/test-runtime
           if-no-files-found: error
           retention-days: 1
 
@@ -134,6 +119,10 @@ jobs:
         run: |
           cd build
           chmod +x shards
+          chmod +x test-runtime
+          # Run test-runtime
+          ./test-runtime
+          # Run other tests
           ./shards new ../shards/tests/general.shs
           ./shards new ../shards/tests/zip-map.shs
           ./shards new ../shards/tests/strings.shs
@@ -176,8 +165,8 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           cd docs/samples
-          for i in $(find shards -name '*.edn' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
+          for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
           do
             echo "Running sample $i";
-            ../../build/shards run-sample.edn --file "$i";
+            ../../build/shards new run-sample.shs file:"$i" looped:false;
           done

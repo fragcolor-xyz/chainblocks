@@ -20,11 +20,6 @@ on:
         options:
           - Exe
           - Library
-      runtime-tests:
-        description: Run the runtime tests (Debug only)?
-        required: false
-        default: false
-        type: boolean
       run-tests:
         description: Run the tests?
         required: false
@@ -45,10 +40,6 @@ on:
         required: false
         default: Exe
         type: string
-      runtime-tests:
-        required: false
-        default: false
-        type: boolean
       run-tests:
         required: false
         default: false
@@ -84,7 +75,6 @@ jobs:
           fi
           echo "binary-type=${{ github.event.inputs.binary-type || inputs.binary-type }}" >> $GITHUB_OUTPUT
           echo "run-tests=${{ github.event.inputs.run-tests || inputs.run-tests }}" >> $GITHUB_OUTPUT
-          echo "runtime-tests=${{ github.event.inputs.runtime-tests || inputs.runtime-tests }}" >> $GITHUB_OUTPUT
           echo "rust-cache=${{ github.event.inputs.rust-cache || inputs.rust-cache }}" >> $GITHUB_OUTPUT
 
           if [ "${{ github.event.inputs.binary-type || inputs.binary-type }}" == "Exe" ]
@@ -144,14 +134,10 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ steps.setup.outputs.build-type }} ..
           echo "Building shards"
           ninja ${{ steps.setup.outputs.build-target }}
-
-          if [ "${{ steps.setup.outputs.runtime-tests }}" == "true" ]
-          then
-            echo "Building runtime tests"
-            ninja test-runtime
-            echo "Building graphics tests"
-            ninja test-gfx
-          fi
+          echo "Building runtime tests"
+          ninja test-runtime
+          echo "Building graphics tests"
+          ninja test-gfx
       # Minimize disk usage to prevent the next steps getting stuck on glTF models
       - name: Minimize disk usage
         env:
@@ -164,24 +150,26 @@ jobs:
           rm -rf build/deps
           rm -rf build/_deps
           rm -rf build/.cache
-      - name: Test runtime (Debug)
-        if: ${{ steps.setup.outputs.runtime-tests == 'true' && steps.setup.outputs.build-type == 'Debug' }}
+      - name: Test
         env:
           RUST_BACKTRACE: full
         shell: bash
         run: |
           cd build
+          # Run test-runtime
           ./test-runtime
+          # Run other tests
+          ./shards new ../shards/tests/hello.shs
       - name: Checkout glTF-Sample-Assets
         # Match with test step below
-        if: ${{ steps.setup.outputs.runtime-tests == 'true' && steps.setup.outputs.build-type == 'Debug' }}
+        if: ${{ steps.setup.outputs.build-type == 'Debug' }}
         uses: actions/checkout@v3
         with:
           repository: shards-lang/glTF-Sample-Assets
           path: external/glTF-Sample-Assets
           fetch-depth: 1
       - name: Test graphics (Debug)
-        if: ${{ steps.setup.outputs.runtime-tests == 'true' && steps.setup.outputs.build-type == 'Debug' }}
+        if: ${{ steps.setup.outputs.build-type == 'Debug' }}
         env:
           RUST_BACKTRACE: full
         shell: bash
@@ -297,10 +285,10 @@ jobs:
         shell: bash
         run: |
           cd docs/samples
-          for i in $(find shards -name '*.edn' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
+          for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
           do
             echo "Running sample $i";
-            ../../build/shards.exe run-sample.edn --file "$i";
+            ../../build/shards.exe new run-sample.shs file:"$i" looped:false;
           done
       - name: Test doc samples (GFX)
         env:
@@ -309,15 +297,10 @@ jobs:
         shell: bash
         run: |
           cd docs/samples
-          for i in $(find shards -name '*.edn' \( -path '*UI*' -or -path '*GFX*' \));
-          do
-            echo "Running sample $i";
-            ../../build/shards.exe run-sample.edn --looped true --file "$i";
-          done
           for i in $(find shards -name '*.shs' \( -path '*UI*' -or -path '*GFX*' \));
           do
             echo "Running sample $i";
-            ../../build/shards.exe new run-sample.shs file:"$i";
+            ../../build/shards.exe new run-sample.shs file:"$i" looped:true;
           done
       - name: Graphics Test
         env:

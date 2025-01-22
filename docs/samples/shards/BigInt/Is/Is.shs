@@ -1,0 +1,2 @@
+11 | BigInt = expected
+11 | BigInt | BigInt.Is(Operand: expected) | Assert.Is(true Break: true)

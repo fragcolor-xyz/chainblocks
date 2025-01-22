@@ -1,9 +1,0 @@
-;; append element to sequence
-[1 2 3] >= .seq
-4 (AppendTo .seq)    ;; appends element to sequence
-.seq (Log)           ;; updated sequence => [1, 2, 3, 4]
-
-;; append character to string
-"Hell" >= .str
-"o" (AppendTo .str)  ;; appends character to string
-.str (Log)           ;; updated string => Hello

@@ -4,11 +4,9 @@ GFX.MainWindow(
       GFX.DrawQueue >= ui-draw-queue
       GFX.UIPass(ui-draw-queue) >> render-steps
       UI.LayoutClass(
-        MainDirection: LayoutDirection::LeftToRight
-      ) >= left-to-right-layout-class
+      MainDirection: LayoutDirection::LeftToRight) >= left-to-right-layout-class
       UI.LayoutClass(
-        MainDirection: LayoutDirection::TopDown
-      ) >= top-down-layout-class
+      MainDirection: LayoutDirection::TopDown) >= top-down-layout-class
     })
     UI(
       UI.CentralPanel({
@@ -30,7 +28,7 @@ GFX.MainWindow(
           }
         )
       })
-    ) | UI.Render(ui-draw-queue)
+    ) | UI.Render(ui-draw-queue)
     GFX.Render(Steps: render-steps)
   }
 )

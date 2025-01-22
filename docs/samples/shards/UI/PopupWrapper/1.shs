@@ -9,7 +9,7 @@ GFX.MainWindow(
       UI.CentralPanel({
         UI.PopupWrapper(
           Widget: {
-             UI.Button(
+            UI.Button(
               Label: "Send message"
               Action: {
                 "Message sent!" | Log
@@ -27,7 +27,7 @@ GFX.MainWindow(
         )
         UI.PopupWrapper(
           Widget: {
-             UI.Button(
+            UI.Button(
               Label: "Send message"
               Action: {
                 "Message sent!" | Log
@@ -44,8 +44,8 @@ GFX.MainWindow(
           }
         )
       })
-    ) | UI.Render(ui-draw-queue)
-
+    ) | UI.Render(ui-draw-queue)
+    
     GFX.Render(Steps: render-steps)
   }
 )

@@ -1,5 +1,0 @@
-false (Not)
-(Assert.Is true :Break true)
-
-true (Not)
-(Assert.Is false :Break true)

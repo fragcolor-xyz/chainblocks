@@ -1,0 +1,1 @@
+42 | BigInt | BigInt.ToInt | Assert.Is(42 Break: true)

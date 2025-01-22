@@ -1,0 +1,10 @@
+@wire(loop {
+  Math.Add(1) | Log
+  When(
+    {Is(5)}
+    {Stop}
+  )
+  Restart
+} Looped: true)
+
+0 | Do(loop)

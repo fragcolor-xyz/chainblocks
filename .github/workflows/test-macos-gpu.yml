@@ -69,8 +69,6 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           set -e
-          export DISPLAY=:1
-          Xvfb "$DISPLAY" &
 
           export LOG_GFX=debug
 
@@ -134,8 +132,6 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           set -e
-          export DISPLAY=:1
-          Xvfb "$DISPLAY" &
 
           echo "Running physics"
           build/shards new shards/tests/physics.shs
@@ -144,19 +140,17 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           set -e
-          export DISPLAY=:1
-          Xvfb "$DISPLAY" &
 
           cd docs/samples
-          for i in $(find shards -name '*.edn' \( -path '*UI*' -or -path '*GFX*' \));
-          do
-            echo "Running sample $i";
-            ../../build/shards run-sample.edn --looped true --file "$i";
-          done
           for i in $(find shards -name '*.shs' \( -path '*UI*' -or -path '*GFX*' \));
           do
             echo "Running sample $i";
-            ../../build/shards new run-sample.shs file:"$i";
+            ../../build/shards new run-sample.shs looped:true file:"$i";
+          done
+          for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
+          do
+            echo "Running sample $i";
+            ../../build/shards new run-sample.shs file:"$i" looped:false;
           done
       - name: Coverage (Debug)
         if: ${{ steps.setup.outputs.build-type == 'Debug' }}

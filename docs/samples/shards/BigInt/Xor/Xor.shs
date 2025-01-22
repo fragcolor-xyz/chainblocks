@@ -1,0 +1,3 @@
+5 | BigInt = expected
+3 | BigInt = operand
+6 | BigInt | BigInt.Xor(Operand: operand) | BigInt.Is(expected) | Assert.Is(true Break: true)

@@ -1,6 +1,0 @@
-;; Update a sequence (needs to be mutable!)
-[10 20] >= .sequence
-(Log) ;; prints original target sequence => [10 20]
-[0 2 1 3] (Assoc .sequence) ;; input sequence updates target sequence [index-0 ele => 2, index-1 ele => 3]
-.sequence (Log) ;; prints updated target sequence => [2 3] 
-.sequence (Assert.Is [2 3] true)

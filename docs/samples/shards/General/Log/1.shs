@@ -1,0 +1,9 @@
+"I am a var" = var1
+2 | Math.Multiply(4) | Log ; log previous shard output
+var1 | Log ; log a variable value
+3 | Math.Add(9) | Log(Prefix: "String") ; prefix a string to the logged output
+
+"I am a var" = var2
+2 | Math.Multiply(4) | Log(Level: LogLevel::Info) ; log previous shard output
+var2 | Log(Level: LogLevel::Warning) ; log a variable value
+3 | Math.Add(9) | Log(Prefix: "String" Level: LogLevel::Error)

@@ -1,0 +1,3 @@
+@f3(0 3.1415927 6.2831853) | Math.Cos | Log
+Math.Subtract(@f3(1.0 -1.0 1.0)) | Math.Abs
+IsLess(@f3(0.00001 0.00001 0.00001)) | Assert.Is(true Break: true)

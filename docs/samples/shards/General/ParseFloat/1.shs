@@ -1,0 +1,2 @@
+"3.14" | ParseFloat | Log
+Assert.Is(3.14 Break: true)

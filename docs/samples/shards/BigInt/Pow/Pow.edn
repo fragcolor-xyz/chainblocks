@@ -1,7 +1,0 @@
-8 (BigInt) = .expected
-
-2 (BigInt)
-(BigInt.Pow
- ;:Operand
- 3)
-(BigInt.Is .expected) (Assert.Is true true)

@@ -1,0 +1,4 @@
+42 | WhenNot(
+  {IsMore(50)}
+  {Msg("Less than 50")}
+)

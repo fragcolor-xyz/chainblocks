@@ -1,3 +1,0 @@
-42 (BigInt)
-(BigInt.ToInt)
-(Assert.Is (int 42) true)

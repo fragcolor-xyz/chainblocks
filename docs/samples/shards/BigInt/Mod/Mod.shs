@@ -1,0 +1,3 @@
+3 | BigInt = expected
+10 | BigInt = operand
+13 | BigInt | BigInt.Mod(Operand: operand) | BigInt.Is(expected) | Assert.Is(true Break: true)

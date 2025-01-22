@@ -1,0 +1,20 @@
+GFX.MainWindow(Contents: {
+  ; Setup
+  GFX.DrawQueue = ui-draw-queue
+  GFX.UIPass(ui-draw-queue) >> render-steps
+  
+  ; UI
+  UI({
+    UI.TopPanel(Contents: {
+      UI.MenuBar({
+        UI.Menu(Title: "Menu" Contents: {
+          UI.Button("Close") | UI.CloseMenu
+        })
+      })
+    })
+  })
+  
+  UI.Render(ui-draw-queue)
+  
+  GFX.Render(Steps: render-steps)
+})

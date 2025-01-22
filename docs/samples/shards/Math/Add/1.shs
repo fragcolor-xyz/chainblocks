@@ -1,0 +1,27 @@
+; Add integers
+5 | Log ; prints input => 5
+  | Math.Add(2) | Log ; prints input + operand => 7
+  | Assert.Is(7 Break: true) ; expect: (5 + 2) => 7
+
+; Add floats
+5.3 | Log ; prints input => 5.3
+    | Math.Add(2.1) | Log ; prints input + operand => 7.4
+    | Assert.Is(7.4 Break: true) ; expect: (5.3 + 2.1) => 7.4
+
+; Add equal-sized sequences
+[4 5.1 6.4] | Log ; prints input => [4 5.1 6.4]
+            | Math.Add([3 4.0 2.2]) ; input seq elements compute with corresponding operand seq elements
+            | Log ; prints input + operand => [7 9.1 8.6]
+            | Assert.IsAlmost([7 9.1 8.6] Break: true) ; expect: [(4 + 3) (5.1 + 4.0) (6.4 + 2.2)] => [7 9.1 8.6]
+
+; Add unequal-sized sequences (input size < operand size)
+[4.0] | Log ; prints input => [4.0]
+      | Math.Add([3.0 4.0 2.2]) ; input seq elements compute with corresponding operand seq elements
+      | Log ; prints input + operand => [7.0]
+      | Assert.Is([7.0] Break: true) ; expect: [(4.0 + 3.0) ... ... ] => [7.0]
+
+; Add unequal-sized sequences (input size > operand size)
+[4 2 1 5 8] | Log ; prints input => [4 2 1 5 8]
+            | Math.Add([6 4]) ; input seq elements compute with corresponding operand seq elements
+            | Log ; prints input + operand => [10 6 7 9 14]
+            | Assert.Is([10 6 7 9 14] Break: true) ; expect: [(4 + 6) (2 + 4) (1 + 6) (5 + 4) (8 + 6)] => [10 6 7 9 14]

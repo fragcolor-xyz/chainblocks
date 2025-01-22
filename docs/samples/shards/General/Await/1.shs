@@ -1,0 +1,19 @@
+; Asynchronous execution of shards (using keyword `Await`)
+; Printing order of messages not consistent across program runs --
+; -- as asynchronous shards might complete at different times
+@wire(await-wire {
+  Await({
+    {Msg("Message 1")}
+    ; messages might print in any order (1/2/3, 1/3/2, 3/2/1, etc.)
+    {Msg("Message 2")}
+    ; messages might print in any order (1/2/3, 1/3/2, 3/2/1, etc.)
+  })
+})
+
+@wire(my-wire {
+  {Msg("Message 3")}
+  ; messages might print in any order (1/2/3, 1/3/2, 3/2/1, etc.)
+})
+
+Do(await-wire)
+Do(my-wire)

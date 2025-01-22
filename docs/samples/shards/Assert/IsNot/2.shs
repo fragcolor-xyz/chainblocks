@@ -1,0 +1,5 @@
+; :Break = `true`, assertion false
+; => abort the program
+8 | Maybe({
+  Assert.IsNot(8 Break: true)
+})

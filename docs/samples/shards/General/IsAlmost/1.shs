@@ -1,0 +1,8 @@
+; integer comparison
+199 | Math.Add(300) | IsAlmost(500 Threshold: 1) | Assert.Is(true Break: true)
+
+; float comparison
+4.0 | IsAlmost(3.9999 Threshold: 0.001) | Assert.Is(true Break: true)
+
+; sequence comparison
+[1 2 3.14] | IsAlmost([1 2 3.14]) | Assert.Is(true Break: true)

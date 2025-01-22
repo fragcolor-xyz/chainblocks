@@ -1,9 +1,0 @@
-;; :Break = `false`, assertion false
-;; => log assertion error but don't abort program
-7
-(Maybe
- (Assert.Is
-  ;:Value
-  8
-  ;:Break
-  false))

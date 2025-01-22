@@ -1,4 +1,0 @@
-(float 0)
-(Math.Expm1) (Log)
-
-(Assert.Is (float 0) true)

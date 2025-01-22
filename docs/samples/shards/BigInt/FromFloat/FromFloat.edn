@@ -1,4 +1,0 @@
-42 (BigInt) = .expected
-
-42.1 (BigInt.FromFloat)
-(BigInt.Is .expected) (Assert.Is true true)

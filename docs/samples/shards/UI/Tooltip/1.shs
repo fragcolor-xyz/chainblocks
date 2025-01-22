@@ -1,22 +1,22 @@
-GFX.MainWindow(
-  Contents: {
-    Once({
-      GFX.DrawQueue >= ui-draw-queue
-      GFX.UIPass(ui-draw-queue) >> render-steps
-    })
-    UI(
-      UI.CentralPanel(
-        UI.Tooltip(
-          OnHover: {
-            "Tooltip" | UI.Label
-          }
-          Contents: {
-            "Lorem ipsum" | UI.Label
-          }
-        )
-      )
-    ) | UI.Render(ui-draw-queue)
+GFX.MainWindow(Contents: {
+  ; Setup
+  GFX.DrawQueue = ui-draw-queue
+  GFX.UIPass(ui-draw-queue) >> render-steps
 
-    GFX.Render(Steps: render-steps)
-  }
-)
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Tooltip(
+        Contents: {
+          "Lorem ipsum" | UI.Label
+        }
+        OnHover: {
+          "Tooltip" | UI.Label
+        }
+      )
+    })
+  })
+
+  UI.Render(ui-draw-queue)
+  GFX.Render(Steps: render-steps)
+})

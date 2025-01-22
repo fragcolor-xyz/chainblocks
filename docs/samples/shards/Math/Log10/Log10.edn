@@ -1,5 +1,0 @@
-(float3 1.0 0.5 10.0)
-(Math.Log10) (Log)
-
-(Math.Subtract (float3 0.0 -0.30102999 1.0)) (Math.Abs)
-(IsLess (float3 1e-05 1e-05 1e-05)) (Assert.Is true true)

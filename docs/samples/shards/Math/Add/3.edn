@@ -1,8 +1,0 @@
-;; Add equal-sized sequences
-[4 5.1 6.4] ;; :Input
-(Log) ;; prints input => [4 5.1 6.4]
-(Math.Add
- [3 4.0 2.2]) ;; :Operand
-;; input seq elements compute with corresponding operand seq elements
-(Log) ;; prints input + operand => [7 9.1 8.6]
-(Assert.IsAlmost [7 9.1 8.6] true) ;; expect: [(4 + 3) (5.1 + 4.0) (6.4 + 2.2)] => [7 9.1 8.6]

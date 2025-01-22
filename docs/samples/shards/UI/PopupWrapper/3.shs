@@ -56,8 +56,8 @@ GFX.MainWindow(
           }
         )
       })
-    ) | UI.Render(ui-draw-queue)
-
+    ) | UI.Render(ui-draw-queue)
+    
     GFX.Render(Steps: render-steps)
   }
 )

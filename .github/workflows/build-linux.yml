@@ -104,6 +104,10 @@ jobs:
         run: |
           cd build
           chmod +x shards
+          # Run test-runtime
+          ninja test-runtime
+          ./test-runtime
+          # Run other tests
           ./shards new ../shards/tests/hello.shs
           ./shards new ../shards/tests/general.shs
           ./shards new ../shards/tests/zip-map.shs
@@ -159,26 +163,20 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           cd build
-          ./shards ../shards/tests/export-strings.edn
           ./shards new ../shards/tests/audio.shs test-device:true
           ./shards new ../shards/tests/audio2.shs test-device:true
       - name: Test doc samples (non-UI)
         env:
           RUST_BACKTRACE: full
         run: |
-          cd docs/samples
-          for i in $(find shards -name '*.edn' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
+          cd docs
+          ../build/shards new generate.shs
+          cd samples
+          for i in $(find shards -name '*.shs' \( ! -path '*UI*' ! -path '*GFX*' ! -path '*Dialog*' \));
           do
             echo "Running sample $i";
-            ../../build/shards run-sample.edn --file "$i";
+            ../../build/shards new run-sample.shs file:"$i" looped:false;
           done
-      - name: Test runtime
-        env:
-          RUST_BACKTRACE: full
-        run: |
-          cd build
-          ninja test-runtime
-          ./test-runtime
       - name: Test Tools
         env:
           RUST_BACKTRACE: full

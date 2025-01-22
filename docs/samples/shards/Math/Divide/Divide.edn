@@ -1,6 +1,0 @@
-(float 9)
-(Math.Divide
- ;:Operand
- 2.0) (Log)
-
-(Assert.Is 4.5 true)

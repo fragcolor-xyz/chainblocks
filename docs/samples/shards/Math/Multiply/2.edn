@@ -1,7 +1,0 @@
-;; Multiply floats
-(float 5.3) ;; :Input
-(Log) ;; prints input => 5.3
-(Math.Multiply
- 2.1) ;; :Operand
- (Log) ;; prints input * operand => 11.13
-(Assert.Is 11.13 true) ;; expect: (5.3 * 2.1) => 11.13

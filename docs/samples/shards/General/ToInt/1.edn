@@ -1,8 +1,0 @@
-1 (ToInt) (Log)
-(Assert.Is 1 :Break true)
-
-2.2 (ToInt) (Log)
-(Assert.Is 2 :Break true)
-
-"3" (ToInt) (Log)
-(Assert.Is 3 :Break true)

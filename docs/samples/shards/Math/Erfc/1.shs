@@ -1,0 +1,3 @@
+@f3(0.0 1.0 2.0) | Math.Erfc | Log
+Math.Subtract(@f3(1.0 0.15729920 0.004677735)) | Math.Abs
+IsLess(@f3(0.00001 0.00001 0.00001)) | Assert.Is(true Break: true)

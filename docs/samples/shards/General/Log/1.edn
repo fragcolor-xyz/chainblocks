@@ -1,4 +1,0 @@
-"I am a var" = .var
-(* 2 4) (Log) ;; log previous shard output
-.var (Log)  ;; log a variable value
-(+ 3 9) (Log :Prefix "String") ;; prefix a string to the logged output

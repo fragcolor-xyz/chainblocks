@@ -264,7 +264,7 @@ private:
   static inline Type MathVarType = Type::VariableOf(MathTypes);
   static inline Parameters _params = {
       {"Value", SHCCSTR("The value to test against for almost equality."), {MathTypes, {MathVarType}}},
-      {"Abort", SHCCSTR("If we should abort the process on failure."), {CoreInfo::BoolType}},
+      {"Break", SHCCSTR("If we should trigger a debug breakpoint on failure."), {CoreInfo::BoolType}},
       {"Threshold",
        SHCCSTR("The smallest difference to be considered equal. Should be greater than zero."),
        {CoreInfo::FloatType, CoreInfo::IntType}}};

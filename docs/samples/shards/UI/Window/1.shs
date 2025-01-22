@@ -1,19 +1,21 @@
+; This sample test file tests the usage of closable windows
 GFX.MainWindow(
   Contents: {
     Once({
       GFX.DrawQueue >= ui-draw-queue
       GFX.UIPass(ui-draw-queue) >> render-steps
+      true >= window-open
     })
     UI(
-        UI.Window(
-          Title: "Greetings"
-          Flags: WindowFlags::NoCollapse
-          Contents: {
-            "Hello shards!" | UI.Label
-          }
-        )
-    ) | UI.Render(ui-draw-queue)
-
+      UI.Window(
+        Title: "Greetings"
+        Flags: WindowFlags::NoCollapse
+        Contents: {
+          "Hello shards!" | UI.Label
+        }
+      )
+    ) | UI.Render(ui-draw-queue)
+    
     GFX.Render(Steps: render-steps)
   }
 )

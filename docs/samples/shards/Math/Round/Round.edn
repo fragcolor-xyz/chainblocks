@@ -1,4 +1,0 @@
-(float3 -0.95 4.0 7.54)
-(Math.Round) (Log)
-
-(Assert.Is (float3 -1.0 4.0 8.0) true)

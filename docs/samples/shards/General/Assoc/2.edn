@@ -1,6 +1,0 @@
-;; Update a global-var table (Global = true; table available to all the wires in the same mesh)
-{:key1 [10 20] :key2 [30 40]} (Set .tableG :Global true)
-(Log) ;; prints original table => {:key1 [10 20] :key2 [30 40]}
-[0 2 1 3] (Assoc .tableG "key1") ;; input sequence updates value of key "key1" in table
-.tableG (Log) ;; prints updated table => {:key1 [2 3] :key2 [30 40]}
-.tableG (Assert.Is {:key1 [2 3] :key2 [30 40]} true)

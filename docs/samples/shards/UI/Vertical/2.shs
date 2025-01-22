@@ -1,22 +1,20 @@
-GFX.MainWindow(
-  Contents: {
-    Once({
-      GFX.DrawQueue >= ui-draw-queue
-      GFX.UIPass(ui-draw-queue) >> render-steps
-    })
-    UI(
-      UI.CentralPanel(
-        UI.Vertical(
-          Centered: true
-          Contents: {
-            "Hello" | UI.Label
-            UI.Separator
-            "World" | UI.Label
-          }
-        )
-      )
-    ) | UI.Render(ui-draw-queue)
+GFX.MainWindow(Contents: {
+  ; Setup
+  GFX.DrawQueue = ui-draw-queue
+  GFX.UIPass(ui-draw-queue) >> render-steps
+  ui-draw-queue | GFX.ClearQueue
 
-    GFX.Render(Steps: render-steps)
-  }
-)
+  ; UI
+  UI({
+    UI.CentralPanel({
+      UI.Vertical(Centered: true Contents: {
+        "Hello" | UI.Label
+        UI.Separator
+        "World" | UI.Label
+      })
+    })
+  })
+
+  UI.Render(ui-draw-queue)
+  GFX.Render(Steps: render-steps)
+})

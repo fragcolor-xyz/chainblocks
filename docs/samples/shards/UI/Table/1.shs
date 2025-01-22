@@ -8,15 +8,14 @@ GFX.MainWindow(
       UI.CentralPanel(
         Contents: {
           [
-            { Name: "Doe" Surname: "John" }
-            { Name: "Dough" Surname: "Jane" }
-            { Name: "Smith" Surname: "Dick" }
-          ] | UI.Table(
+            {Name: "Doe" Surname: "John"}
+            {Name: "Dough" Surname: "Jane"}
+            {Name: "Smith" Surname: "Dick"}] | UI.Table(
             Resizable: true
             Striped: true
             RowIndex: index
             Columns: [
-              { Initial: 20.0 }
+              {Initial: 20.0}
               {
                 Header: "Surname"
                 Initial: 100.0
@@ -28,18 +27,16 @@ GFX.MainWindow(
                 Initial: 80.0
                 AtLeast: 60.0
                 AtMost: 160.0
-              }
-            ]
+              }]
             Builder: [
-              { index | ToString | UI.Label }
-              { Take("Surname") | UI.Label }
-              { Take("Name") | UI.Label }
-            ]
+              {index | ToString | UI.Label}
+              {Take("Surname") | UI.Label}
+              {Take("Name") | UI.Label}]
           )
         }
       )
-    ) | UI.Render(ui-draw-queue)
-
+    ) | UI.Render(ui-draw-queue)
+    
     GFX.Render(Steps: render-steps)
   }
 )

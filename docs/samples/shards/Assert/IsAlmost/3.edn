@@ -1,8 +1,0 @@
-;; :Break = `false`, assertion true
-;; => log no errors and don't abort program
-8.0
-(Assert.IsAlmost
- ;:Value
- 8.0
- ;:Break
- false)

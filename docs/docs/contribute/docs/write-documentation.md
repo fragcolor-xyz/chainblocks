@@ -97,7 +97,7 @@ To generate the documentation for the Shards API:
 
  3. Input the following command:
 
-        ./build/Debug/shards ./docs/generate.edn
+        ./build/Debug/shards new ./docs/generate.shs
 
 !!! note
     The **Debug** version of Shards should be used for the generating of the Shards API pages.

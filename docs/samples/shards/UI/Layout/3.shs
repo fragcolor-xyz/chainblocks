@@ -5,10 +5,10 @@ GFX.MainWindow(
       GFX.UIPass(ui-draw-queue) >> render-steps
       UI.LayoutClass(
         MainDirection: LayoutDirection::RightToLeft
-        MinSize: @f2(200, 200)
+        MinSize: @f2(200 200)
         ; note that some direction layouts may try to expand to max size and this max size will increase if the contents are too large
         ; also, without max size, the layout will try to expand to max size of the window, so for shrink to fit, may want to set to (0 0)
-        MaxSize: @f2(600, 600)
+        MaxSize: @f2(600 600)
         ; FillHeight: true
         ; FillWidth: true
         Disabled: false
@@ -76,7 +76,7 @@ GFX.MainWindow(
           }
         )
       })
-    ) | UI.Render(ui-draw-queue)
+    ) | UI.Render(ui-draw-queue)
     GFX.Render(Steps: render-steps)
   }
 )

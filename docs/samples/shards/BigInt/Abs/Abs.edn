@@ -1,5 +1,0 @@
-1 (BigInt) = .expected
-
--1 (BigInt)
-(BigInt.Abs)
-(BigInt.Is .expected) (Assert.Is true true)

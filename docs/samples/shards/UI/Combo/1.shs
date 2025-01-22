@@ -1,0 +1,19 @@
+; Simple combo
+GFX.MainWindow(Contents: {
+  ; Setup
+  GFX.DrawQueue = ui-draw-queue
+  GFX.UIPass(ui-draw-queue) >> render-steps
+
+  ; UI
+  UI({
+    UI.CentralPanel({
+      ["α Α" "ω Ω"] | UI.Combo(
+        Label: "Greek letter"
+        Index: index
+      ) | ExpectString >= letter
+    })
+  })
+
+  UI.Render(ui-draw-queue)
+  GFX.Render(Steps: render-steps)
+})

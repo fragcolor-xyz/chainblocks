@@ -1,6 +1,0 @@
-42 (BigInt)
-(BigInt.ToBytes
- ;:Bits
- 16)
-(ToHex)
-(Assert.Is "0x002a" true)
