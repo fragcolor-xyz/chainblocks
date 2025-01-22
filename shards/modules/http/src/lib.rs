@@ -369,8 +369,8 @@ impl RequestBase {
               print_error(&e);
               "Failed to decode the failure response"
             })?;
-            let err_text = if err_text.len() > 128 {
-              format!("{}...", err_text.chars().take(128).collect::<String>())
+            let err_text = if err_text.len() > 1024 {
+              format!("{}...", err_text.chars().take(1024).collect::<String>())
             } else {
               err_text
             };
