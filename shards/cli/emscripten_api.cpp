@@ -16,9 +16,8 @@ struct Instance {
   std::shared_ptr<SHMesh> mesh{};
   std::shared_ptr<SHWire> wire{};
   std::optional<std::string> error;
-  ~Instance() {
-    mesh->terminate();
-  }
+  int guard = 9999;
+  ~Instance() { mesh->terminate(); }
 };
 
 struct Message {
@@ -289,22 +288,17 @@ EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *c
   }
 
   Instance *instance = (*outInstance) = new Instance();
-  SHLEvalEnv *env{};
   std::vector<SHStringWithLen> includeDirs;
-
-  DEFER({
-    if (env)
-      shards_free_env(env);
-  });
 
   try {
     instance->mesh = SHMesh::make();
 
-    SHLEvalEnv *env = shards_create_env("shards"_swl);
-
     auto astRes = shards_read("script"_swl, toSWL(code), toSWL(base_path), includeDirs.data(), includeDirs.size());
+    shards::OwnedVar ast{astRes.ast};
     if (astRes.error) {
       SPDLOG_ERROR("Failed to read code: {}", astRes.error->message);
+      shards_free_error(astRes.error);
+      return;
     }
 
     core->setRootPath(base_path);
@@ -314,7 +308,6 @@ EMSCRIPTEN_KEEPALIVE void shardsLoadScript(Instance **outInstance, const char *c
     if (shlwire.error) {
       SPDLOG_ERROR("Failed to evaluate script at {}:{}: {}", shlwire.error->line, shlwire.error->column, shlwire.error->message);
       instance->error = shlwire.error->message;
-      shards_free_error(shlwire.error);
       return;
     }
 
@@ -333,7 +326,7 @@ EMSCRIPTEN_KEEPALIVE void shardsTick(Instance *instance, uint32_t *resultPtr) {
   uint32_t result = instance->mesh->tick() ? 1 : 0;
   if (instance->mesh->empty()) {
     SPDLOG_DEBUG("Mesh is empty");
-    result = 0;
+    result = 0; 
   }
 
   if (resultPtr) {
@@ -358,7 +351,14 @@ EMSCRIPTEN_KEEPALIVE void shardsSetLoggerLevel(const char *loggerName, int level
   }
 }
 
-EMSCRIPTEN_KEEPALIVE void shardsFreeInstance(Instance *instance) { delete instance; }
+EMSCRIPTEN_KEEPALIVE void shardsFreeInstance(Instance *instance) {
+  if (instance->guard != 9999) {
+    SPDLOG_ERROR("Invalid instance");
+    return;
+  }
+  instance->guard = 0;
+  delete instance;
+}
 
 EMSCRIPTEN_KEEPALIVE void shardsLockLogBuffer() { logBuffer.mutex.lock(); }
 
