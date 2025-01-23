@@ -720,7 +720,7 @@ struct FromJson {
     }
   }
 
-  SHVar activate(SHContext *context, const SHVar &input) {
+  SHVar &activate(SHContext *context, const SHVar &input) {
     _releaseMemory(_output); // release previous
 
     try {

@@ -549,7 +549,7 @@ struct Await : public BaseSubFlow {
 
     // copy around to avoid race conditions
     OwnedVar inputCopy = input;
-    _output = awaitne(
+    auto output = awaitne(
         context,
         [&] {
           // we cannot give the real context to the other thread or we will have race conditions
@@ -565,6 +565,9 @@ struct Await : public BaseSubFlow {
       SHLOG_DEBUG("Await shard stopped by context");
       context->mirror(&*_context);
     }
+
+    // copy after checking if we should continue
+    _output = output;
 
     return _output;
   }
