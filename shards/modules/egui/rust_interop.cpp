@@ -5,6 +5,7 @@
 #include <gfx/renderer.hpp>
 #include <shards/core/foundation.hpp>
 #include <spdlog/spdlog.h>
+#include <shards/modules/gfx/shards_types.hpp>
 
 using namespace shards::input;
 using namespace gfx;
