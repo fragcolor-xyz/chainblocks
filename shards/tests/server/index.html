@@ -161,8 +161,8 @@
       mod._shardsInit();
 
       instance.setLoggerLevel("gfx", SPDLOG_LEVEL_TRACE);
-      // instance.setLoggerLevel("wgpu", SPDLOG_LEVEL_TRACE);
       instance.setLoggerLevel("shards", SPDLOG_LEVEL_TRACE);
+      // instance.setLoggerLevel("wgpu", SPDLOG_LEVEL_TRACE);
       // instance.setLoggerLevel("http", SPDLOG_LEVEL_TRACE);
       // instance.setLoggerLevel("audio", SPDLOG_LEVEL_DEBUG);
 
@@ -227,6 +227,7 @@
     const ffile = mod.cwrap('shardsCWDAndTryLoad', 'void', ['string', 'string'], { async: false });
     // fdir("/tfs/shards/tests", "data");
     // ffile("/tfs", "main.cpp");
+    // ffile("/tfs/shards/tests", "web-inc.shs");
 
     async function runAction(action) {
       if (action.action == "update-preloaded") {
@@ -262,7 +263,8 @@
               if (err) {
                 throw new Error(mod.UTF8ToString(err));
               }
-              await sleep(0);
+              // await sleep(2);
+              await new Promise(resolve => window.requestAnimationFrame(resolve));
             }
           } finally {
             mod._shardsFreeInstance(inst);
