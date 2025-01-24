@@ -1,0 +1,30 @@
+; SPDX-License-Identifier: BSD-3-Clause
+; Copyright © 2021 Fragcolor Pte. Ltd.
+
+@mesh(root)
+
+@template(logic [shards] {
+  Maybe({shards})
+})
+
+@wire(test-wire {
+  Take("input-x") >= x
+  @logic({"x": x "y": 20 "z": 30})
+})
+
+@template(template_ [] {
+  {"input-x": 10} | Do(test-wire)
+})
+
+@wire(test {
+  @template_()
+})
+
+@schedule(root test)
+@run(root 0.1) | Assert.Is(true)
+
+@schedule(root test)
+@run(root 0.1) | Assert.Is(true)
+
+@schedule(root test) 
+@run(root 0.1) | Assert.Is(true)

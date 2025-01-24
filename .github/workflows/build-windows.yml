@@ -257,8 +257,6 @@ jobs:
           ./shards new ../shards/tests/snappy.shs
           echo "Running expect-like"
           ./shards new ../shards/tests/expect.shs
-          # echo "Running ws"
-          # ./shards ../shards/tests/ws.edn
           echo "Running bigint"
           ./shards new ../shards/tests/bigint.shs
           echo "Running wasm"
