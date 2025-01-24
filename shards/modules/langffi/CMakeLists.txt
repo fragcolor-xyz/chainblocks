@@ -14,6 +14,13 @@ if(TRACY_ENABLE)
   # )
 endif()
 
+# Manually add shards lang source files as dependencies
+set(EGUI_PATH ../../lang)
+file(GLOB_RECURSE LANG_DEPS ${EGUI_PATH}/*.rs ${EGUI_PATH}/Cargo.toml)
+file(GLOB_RECURSE LANG_DEPS_REMOVE ${EGUI_PATH}/target/*.rs)
+message(DEBUG ${LANG_DEPS_REMOVE})
+list(REMOVE_ITEM LANG_DEPS ${LANG_DEPS_REMOVE})
+
 add_rust_library(
   NAME shards-langffi
   PROJECT_PATH ${CMAKE_CURRENT_LIST_DIR}

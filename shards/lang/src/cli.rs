@@ -2,11 +2,13 @@ use crate::error::Error;
 use crate::read::{get_dependencies, read_with_env, ReadEnv};
 use crate::{eval, formatter, Program};
 use crate::{eval::eval, eval::new_cancellation_token, read::read};
-use clap::{arg, Parser};
+use clap::{arg, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use shards::core::{sleep, Core};
 use shards::types::Mesh;
 use shards::util::from_raw_parts_allow_null;
-use shards::{fourCharacterCode, shlog, shlog_debug, shlog_error, SHCore, GIT_VERSION, SHARDS_CURRENT_ABI};
+use shards::{
+  fourCharacterCode, shlog, shlog_debug, shlog_error, SHCore, GIT_VERSION, SHARDS_CURRENT_ABI,
+};
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::fs;
@@ -20,6 +22,24 @@ extern "C" {
   fn shardsInterface(version: u32) -> *mut SHCore;
   fn shards_install_signal_handlers();
   fn shards_decompress_strings();
+}
+
+#[derive(Debug, clap::Args)]
+struct RunArgs {
+  /// The script to execute
+  #[arg(value_hint = clap::ValueHint::FilePath)]
+  file: String,
+  /// Decompress help strings before running the script
+  #[arg(long, short = 'd', default_value = "false", action)]
+  decompress_strings: bool,
+  /// Change the current path to the scripts's path
+  #[arg(long, short = 'c', action)]
+  skip_cwd: bool,
+  /// List of include directories
+  #[arg(long, short = 'I')]
+  include: Vec<String>,
+  #[arg(num_args = 0..)]
+  args: Vec<String>,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -40,22 +60,8 @@ enum Commands {
   /// Run formatter tests
   Test {},
   /// Reads and executes a Shards file
-  New {
-    /// The script to execute
-    #[arg(value_hint = clap::ValueHint::FilePath)]
-    file: String,
-    /// Decompress help strings before running the script
-    #[arg(long, short = 'd', default_value = "false", action)]
-    decompress_strings: bool,
-    /// Change the current path to the scripts's path
-    #[arg(long, short = 'c', action)]
-    skip_cwd: bool,
-    /// List of include directories
-    #[arg(long, short = 'I')]
-    include: Vec<String>,
-    #[arg(num_args = 0..)]
-    args: Vec<String>,
-  },
+  New(RunArgs),
+  Run(RunArgs),
   /// Reads and builds a binary AST Shards file
   Build {
     /// The script to evaluate
@@ -96,9 +102,6 @@ enum Commands {
     #[arg(num_args = 0..)]
     args: Vec<String>,
   },
-
-  #[command(external_subcommand)]
-  External(Vec<String>),
 }
 
 #[derive(Debug, clap::Parser)]
@@ -108,6 +111,13 @@ enum Commands {
 struct Cli {
   #[command(subcommand)]
   command: Commands,
+}
+
+#[derive(Debug, clap::Parser)]
+#[command(name = "shards run")]
+struct SimpleCLI {
+  #[command(flatten)]
+  run_args: RunArgs,
 }
 
 pub fn process_args(argc: i32, argv: *const *const c_char, no_cancellation: bool) -> i32 {
@@ -135,59 +145,46 @@ pub fn process_args(argc: i32, argv: *const *const c_char, no_cancellation: bool
       .collect()
   };
 
-  let cli = Cli::parse_from(args);
+  unsafe {
+    shards::core::Core = shardsInterface(SHARDS_CURRENT_ABI as u32);
+    shards_install_signal_handlers();
+    shlog_debug!("Shards git version: {}", GIT_VERSION);
+  }
 
-  // Init Core interface when not running external commands
-  match &cli.command {
-    Commands::External(_) => {}
-    _ => unsafe {
-      shards::core::Core = shardsInterface(SHARDS_CURRENT_ABI as u32);
-      shards_install_signal_handlers();
-      shlog_debug!("Shards git version: {}", GIT_VERSION);
+  let cli = Cli::try_parse_from(args.clone());
+  let res = match cli {
+    Ok(cli) => match &cli.command {
+      Commands::Build {
+        file,
+        output,
+        include,
+        depfile,
+        json,
+      } => build(file, &output, include.to_vec(), depfile.as_deref(), *json),
+      Commands::AST {
+        file,
+        output,
+        include,
+      } => build(file, &output, include.to_vec(), None, true),
+      Commands::Load {
+        file,
+        decompress_strings,
+        args,
+      } => load(file, args, *decompress_strings, cancellation_token),
+      Commands::New(args) => execute(args, cancellation_token),
+      Commands::Run(args) => execute(args, cancellation_token),
+      Commands::Format {
+        file,
+        output,
+        inline,
+      } => format(file, output, *inline),
+      Commands::Test {} => formatter::run_tests(),
     },
-  };
-
-  let res: Result<_, Error> = match &cli.command {
-    Commands::Build {
-      file,
-      output,
-      include,
-      depfile,
-      json,
-    } => build(file, &output, include.to_vec(), depfile.as_deref(), *json),
-    Commands::AST {
-      file,
-      output,
-      include,
-    } => build(file, &output, include.to_vec(), None, true),
-    Commands::Load {
-      file,
-      decompress_strings,
-      args,
-    } => load(file, args, *decompress_strings, cancellation_token),
-    Commands::New {
-      file,
-      decompress_strings,
-      args,
-      skip_cwd,
-      include,
-    } => execute(
-      file,
-      *decompress_strings,
-      include,
-      args,
-      cancellation_token,
-      !*skip_cwd,
-    ),
-    Commands::Format {
-      file,
-      output,
-      inline,
-    } => format(file, output, *inline),
-    Commands::Test {} => formatter::run_tests(),
-    Commands::External(_args) => {
-      return 99;
-    }
+    // Try to support a simple "shards script.shs" command line in case none of the above matched
+    Err(orig_err) => match SimpleCLI::try_parse_from(args) {
+      Ok(cli) => execute(&cli.run_args, cancellation_token),
+      Err(e) => Err(Box::new(orig_err) as Box<dyn std::error::Error>),
+    },
   };
 
   if let Err(e) = res {
@@ -423,15 +420,16 @@ fn build(
   Ok(())
 }
 
-fn execute(
-  file: &str,
-  decompress_strings: bool,
-  include_paths_: &Vec<String>,
-  args: &Vec<String>,
-  cancellation_token: Arc<AtomicBool>,
-  change_current_path: bool,
-) -> Result<(), Error> {
-  if decompress_strings {
+fn execute(eargs: &RunArgs, cancellation_token: Arc<AtomicBool>) -> Result<(), Error> {
+  let RunArgs {
+    file,
+    decompress_strings,
+    skip_cwd,
+    include: in_include_paths,
+    args,
+  } = eargs;
+
+  if *decompress_strings {
     unsafe {
       shards_decompress_strings();
     }
@@ -449,7 +447,7 @@ fn execute(
     let parent_path = file_path.parent().unwrap().to_str().unwrap();
 
     let mut include_paths = Vec::new();
-    for path in include_paths_ {
+    for path in in_include_paths {
       let path = std::path::PathBuf::from(path);
       let path = path
         .canonicalize()
@@ -457,7 +455,7 @@ fn execute(
       include_paths.push(path.to_string_lossy().to_string());
     }
 
-    if change_current_path {
+    if !*skip_cwd {
       // get absolute parent path of the file
       let c_parent_path = std::ffi::CString::new(parent_path).unwrap();
       // set it as root path
