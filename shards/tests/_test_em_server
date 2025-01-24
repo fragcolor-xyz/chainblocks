@@ -13,7 +13,8 @@ set -ex
 (
   sleep 0.5 &&
     control action:preload-files data:"$(cygpath -w $root_dir/assets)" &&
-    control action:preload-files data:"$(cygpath -w $root_dir/shards/tests/data)" &&
+    control action:preload-files data:"$(cygpath -w $root_dir/shards/tests)" &&
+    control action:preload-files data:"$(cygpath -w $root_dir/lib)" &&
     control action:preload-files data:"$(cygpath -w $root_dir/external/glTF-Sample-Assets/Models/Avocado)" &&
     control action:preload-files data:"$(cygpath -w $root_dir/external/glTF-Sample-Assets/Models/DamagedHelmet)"
 ) &

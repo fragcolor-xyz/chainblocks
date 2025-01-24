@@ -11,7 +11,7 @@ ${CARGO_CRATE_DEPS}
 [patch.crates-io]
 chrono = { git = "https://github.com/shards-lang/chrono", rev = "5aaf74235778120b5984b46ced47478c1431d9a0" }
 tar = { git = "https://github.com/shards-lang/tar-rs", rev = "6d26c0d1724326c8c1b06eaafc25a19253afbcdc" }
-libc = { git = "https://github.com/shards-lang/libc.git", version = "=0.2.155", rev = "7df63bd7f61bf3408344673cf0ba08e7ff0df134" }
+libc = { git = "https://github.com/shards-lang/libc.git", version = "=0.2.155", rev = "b8930635007e937ffedc6735d559ed5dfa3425cc" }
 mio = { git = "https://github.com/shards-lang/mio.git", version = "=0.8.11", rev = "65e4240c7c8dc6dde2ccf3617d4830fed9e670b6" }
 getrandom = { git = "https://github.com/shards-lang/getrandom.git", version = "=0.2.15", rev = "5edb0453b3ab46e352c7f3463f192b4959770c2e" }
 socket2 = { git = "https://github.com/shards-lang/socket2.git", version = "=0.5.7", rev = "17a4d72eb2f3b2311bc724cfb4a43a28cc6c70de" }
