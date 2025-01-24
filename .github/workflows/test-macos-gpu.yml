@@ -165,7 +165,7 @@ jobs:
             --ignore-errors inconsistent,gcov,range
           # remove external dependencies
           lcov \
-            --remove coverage/coverage.info "*/c++/*" "*/boost/*" "*/usr/*" "*/deps/*" "*/shards/mal/*" \
+            --remove coverage/coverage.info "*/c++/*" "*/boost/*" "*/usr/*" "*/deps/*" \
             --output-file coverage/coverage-macos-gpu.info \
             --ignore-errors inconsistent,gcov,range
           # convert absolute path to relative path
