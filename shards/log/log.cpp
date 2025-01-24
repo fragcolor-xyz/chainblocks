@@ -12,6 +12,7 @@
 #include <boost/algorithm/string.hpp>
 #include <spdlog/sinks/dist_sink.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include "../core/platform.hpp"
 
@@ -141,7 +142,7 @@ struct Sinks {
 
   std::shared_ptr<spdlog::sinks::dist_sink_mt> distSink;
   std::shared_ptr<spdlog::sinks::stderr_color_sink_mt> stdErrSink;
-  std::shared_ptr<spdlog::sinks::basic_file_sink_mt> logFileSink;
+  std::shared_ptr<spdlog::sinks::sink> logFileSink;
 #if SH_ANDROID
   std::shared_ptr<spdlog::sinks::android_sink_mt> androidSink;
 #elif SH_EMSCRIPTEN
@@ -196,7 +197,16 @@ struct Sinks {
     if (logFileSink)
       distSink->remove_sink(logFileSink);
 
+#if defined(SHARDS_LOG_ROTATING_MAX_FILE_SIZE) && defined(SHARDS_LOG_ROTATING_MAX_FILES)
+    logFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+        logFilePath.c_str(), 
+        SHARDS_LOG_ROTATING_MAX_FILE_SIZE,
+        SHARDS_LOG_ROTATING_MAX_FILES,
+        true);
+#else
     logFileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logFilePath.c_str(), true);
+#endif
+
     if (Config::DefaultFileLogLevel) {
       logFileSink->set_level(Config::DefaultFileLogLevel.value());
     }

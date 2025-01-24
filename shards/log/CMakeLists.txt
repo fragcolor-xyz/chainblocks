@@ -2,10 +2,6 @@ add_library(shards-logging log.cpp)
 target_include_directories(shards-logging PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../..)
 target_link_libraries(shards-logging spdlog magic_enum Boost::filesystem Boost::algorithm)
 
-if(DESKTOP)
-  target_compile_definitions(shards-logging PRIVATE SHARDS_LOG_FILE=1)
-endif()
-
 if(NOT EMSCRIPTEN)
   target_link_libraries(shards-logging SDL3-static)
   target_compile_definitions(shards-logging PRIVATE SHARDS_LOG_SDL=1)
@@ -41,4 +37,13 @@ endif()
 # Default filter for file logger
 if(SHARDS_DEFAULT_FILE_LOG_LEVEL)
   target_compile_definitions(shards-logging PRIVATE SHARDS_DEFAULT_FILE_LOG_LEVEL=${SHARDS_DEFAULT_FILE_LOG_LEVEL})
+endif()
+
+# Add options for rotating log variation instead of basic file sink
+if(SHARDS_LOG_ROTATING_MAX_FILE_SIZE)
+  target_compile_definitions(shards-logging PRIVATE SHARDS_LOG_ROTATING_MAX_FILE_SIZE=${SHARDS_LOG_ROTATING_MAX_FILE_SIZE})
+endif()
+
+if(SHARDS_LOG_ROTATING_MAX_FILES)
+  target_compile_definitions(shards-logging PRIVATE SHARDS_LOG_ROTATING_MAX_FILES=${SHARDS_LOG_ROTATING_MAX_FILES})
 endif()

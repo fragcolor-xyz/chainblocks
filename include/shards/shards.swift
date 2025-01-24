@@ -596,12 +596,12 @@ class OwnedVar {
         v.valueType = VarType.Bool.asSHType()
         v.payload.boolValue = bool
     }
-    
+
     func set(int: Int) {
         v.valueType = VarType.Int.asSHType()
         v.payload.intValue = Int64(int)
     }
-    
+
     func set(int: Int64) {
         v.valueType = VarType.Int.asSHType()
         v.payload.intValue = int
@@ -1529,6 +1529,16 @@ class Shards {
             let length = message.lengthOfBytes(using: .utf8)
             shString.len = UInt64(length)
             G.Core.pointee.log(shString)
+        }
+    }
+
+    static func logLevel(_ level: Int, _ message: String) {
+        message.withCString { cString in
+            var shString = SHStringWithLen()
+            shString.string = cString
+            let length = message.lengthOfBytes(using: .utf8)
+            shString.len = UInt64(length)
+            G.Core.pointee.logLevel(Int32(level), shString)
         }
     }
 
