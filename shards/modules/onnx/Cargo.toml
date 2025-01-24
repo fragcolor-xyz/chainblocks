@@ -10,5 +10,15 @@ edition = "2021"
 lazy_static = "1.5.0"
 shards = { path = "../../rust" }
 compile-time-crc32 = "0.1.2"
-ort = { version = "=2.0.0-rc.9" }
 ndarray = "0.16"
+ort = { version = "=2.0.0-rc.9" }
+
+# CoreML on apple platforms
+[target.'cfg(any(target_os = "macos", target_os = "ios", target_os = "visionos"))'.dependencies.ort]
+version = "=2.0.0-rc.9"
+features = ["coreml"]
+
+# DirectML on windows
+[target.'cfg(windows)'.dependencies.ort]
+version = "=2.0.0-rc.9"
+features = ["directml"]
