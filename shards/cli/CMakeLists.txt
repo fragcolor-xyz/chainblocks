@@ -8,9 +8,9 @@ function(setup_shards_target TARGET)
   endif()
 
   if(APPLE)
-    target_link_libraries(${TARGET} replxx shards-core shards_core_swift)
+    target_link_libraries(${TARGET} shards-core shards_core_swift)
   else()
-    target_link_libraries(${TARGET} replxx shards-core)
+    target_link_libraries(${TARGET} shards-core)
   endif()
 
   set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)

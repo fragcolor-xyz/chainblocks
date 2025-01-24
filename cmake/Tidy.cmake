@@ -72,7 +72,6 @@ set(
   -I${SHARDS_DIR}/include
   -I${SHARDS_DIR}/src/core
   -I${SHARDS_DIR}/src/gfx
-  -I${SHARDS_DIR}/deps/replxx/include
   -I${SHARDS_DIR}/deps/spdlog/include
   -I${SHARDS_DIR}/deps/SPSCQueue/include
   -I${SHARDS_DIR}/deps/stb
