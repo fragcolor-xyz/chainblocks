@@ -1128,7 +1128,7 @@ struct WriteFile {
   static const SHTable *properties() { return &experimental.payload.tableValue; }
 
   static inline Parameters params{
-      {"File", SHCCSTR("The audio file to read from (wav,ogg,mp3,flac)."), {CoreInfo::StringType, CoreInfo::StringVarType}},
+      {"File", SHCCSTR("The audio file to write to (.wav)."), {CoreInfo::StringType, CoreInfo::StringVarType}},
       {"Channels", SHCCSTR("An int representing the number of desired output audio channels."), {CoreInfo::IntType}},
       {"SampleRate", SHCCSTR("An int representing the desired number of samples in the output."), {CoreInfo::IntType}}};
 
