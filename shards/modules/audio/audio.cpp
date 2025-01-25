@@ -1199,6 +1199,11 @@ struct WriteFile {
     if (input.payload.audioValue.channels != _channels) {
       throw ActivationError("Input has an invalid number of audio channels");
     }
+    if (!_initialized) {
+      const auto fname = SHSTRVIEW(_filename.get());
+      initFile(fname);
+      _initialized = true;
+    }
     ma_encoder_write_pcm_frames(&_encoder, input.payload.audioValue.samples, input.payload.audioValue.nsamples, NULL);
     return input;
   }
