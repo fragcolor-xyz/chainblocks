@@ -26,13 +26,10 @@ struct Schedule {
   SHVar activate(SHContext *context, const SHVar &input) {
     auto &sharedMesh = *reinterpret_cast<std::shared_ptr<SHMesh> *>(_mesh->payload.objectValue);
     auto &wire = SHWire::sharedFromRef(_wire->payload.wireValue);
-    sharedMesh->schedule(wire, input);
+    sharedMesh->schedule(wire, SHVar{});
     return input;
   }
 };
-
-using RunClock = std::chrono::high_resolution_clock;
-static std::optional<RunClock::time_point> resumeAt;
 
 struct Run {
   static SHTypesInfo inputTypes() { return shards::CoreInfo::AnyType; }
