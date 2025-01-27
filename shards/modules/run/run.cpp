@@ -41,12 +41,12 @@ struct Run {
   PARAM_PARAMVAR(_mesh, "Mesh", "The mesh to run", {SHMesh::MeshType});
   PARAM_PARAMVAR(_tickTime, "TickTime", "Time per frame",
                  {shards::CoreInfo::NoneType, shards::CoreInfo::FloatType, shards::CoreInfo::FloatVarType});
+  PARAM_PARAMVAR(_iterations, "Iterations", "Number of iterations",
+                 {shards::CoreInfo::NoneType, shards::CoreInfo::IntType, shards::CoreInfo::IntVarType});
   PARAM_PARAMVAR(_fps, "FPS", "Frames per second",
                  {shards::CoreInfo::NoneType, shards::CoreInfo::IntType, shards::CoreInfo::IntVarType,
                   shards::CoreInfo::FloatType, shards::CoreInfo::FloatVarType});
-  PARAM_PARAMVAR(_iterations, "Iterations", "Number of iterations",
-                 {shards::CoreInfo::NoneType, shards::CoreInfo::IntType, shards::CoreInfo::IntVarType});
-  PARAM_IMPL(PARAM_IMPL_FOR(_mesh), PARAM_IMPL_FOR(_tickTime), PARAM_IMPL_FOR(_fps), PARAM_IMPL_FOR(_iterations));
+  PARAM_IMPL(PARAM_IMPL_FOR(_mesh), PARAM_IMPL_FOR(_tickTime), PARAM_IMPL_FOR(_iterations), PARAM_IMPL_FOR(_fps));
 
   PARAM_REQUIRED_VARIABLES()
   SHTypeInfo compose(const SHInstanceData &data) {
