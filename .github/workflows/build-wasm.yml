@@ -20,11 +20,15 @@ jobs:
           repository: emscripten-core/emsdk
           path: emsdk
           fetch-depth: 1
-      - name: Download shards artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: shards-linux Release
-          path: build_host
+      # - name: Download shards artifact
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: shards-linux Release
+      #     path: build_host
+      - name: Download shards
+        run: |
+          mkdir -p build_host
+          wget -O build_host/shards https://develop.fragcolor.com/shards-linux-release
       - name: Make shards executable
         run: |
           # Shards interpreter
@@ -74,7 +78,7 @@ jobs:
           rustup +nightly component add rust-src
       - name: Build
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNODEJS=1 -DSKIP_HEAVY_INLINE=1 -DUSE_LTO=0 -DRUST_USE_LTO=0 -DEMSCRIPTEN_PTHREADS=${{ steps.setup.outputs.threading == 'mt' }} -DEMSCRIPTEN_IDBFS=1 -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN_ROOT/cmake/Modules/Platform/Emscripten.cmake
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSKIP_HEAVY_INLINE=1 -DUSE_LTO=0 -DRUST_USE_LTO=0 -DEMSCRIPTEN_PTHREADS=ON -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN_ROOT/cmake/Modules/Platform/Emscripten.cmake
           cmake --build shards --target shards
 
           echo "SHARDS_BUILD=$(pwd)/build" >> $GITHUB_ENV
@@ -92,7 +96,6 @@ jobs:
 
           # Spawn the test server
           ./run_server
-
 
           source shards/tests/web/shared
 
@@ -123,8 +126,8 @@ jobs:
           # Copy distribution symbols
           pushd $SHARDS_BUILD
           mkdir dist
-          cp shards-mt.wasm shards/
-          cp shards-mt.js shards/
+          cp shards-mt.wasm dist/
+          cp shards-mt.js dist/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
