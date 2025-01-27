@@ -99,7 +99,7 @@ jobs:
 
           ninja shards
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: shards-linux ${{ steps.setup.outputs.build-type }}
           path: build/shards
@@ -223,7 +223,7 @@ jobs:
           sed -i s/${PWD////\\/}/./g coverage/coverage.linux.info
       - name: Upload coverage (Debug)
         if: ${{ steps.setup.outputs.build-type == 'Debug' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: shards-linux-coverage
           path: coverage/coverage.linux.info
