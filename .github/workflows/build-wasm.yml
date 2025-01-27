@@ -90,11 +90,13 @@ jobs:
           cat ./.emscripten
           export EM_CONFIG=$PWD/.emscripten
           echo "EM_CONFIG=$EM_CONFIG" >> $GITHUB_ENV
+          EMSCRIPTEN_ROOT=$PWD/upstream/emscripten
+          echo "EMSCRIPTEN_ROOT=$EMSCRIPTEN_ROOT" >> $GITHUB_ENV
           popd
 
           # Use custom fork for js/scripts (this is picked up by the cmake script)
-          pushd emscripten
-          echo "EMSCRIPTEN_ROOT=$PWD" >> $GITHUB_ENV
+          pushd $EMSCRIPTEN_ROOT
+          ls -la
           # Needed for rust-cc
           echo "AR=$PWD/emar" >> $GITHUB_ENV
           echo "CC=$PWD/emcc" >> $GITHUB_ENV
