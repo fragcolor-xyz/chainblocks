@@ -1,4 +1,8 @@
-SHARDS=build/clang-x86_64-pc-windows-msvc/Debug/shards.exe
+if [ -z "$shards" ]; then
+  echo "Error: shards executable not found"
+  exit 1
+fi
+
 OK_TAG_DIR=shards/tests/tag_ok
 ERR_TAG_DIR=shards/tests/tag_err
 IGNORE_TAG_DIR=shards/tests/tag_ignore
@@ -13,7 +17,7 @@ find shards/tests -maxdepth 1 -name "*.shs" | while read -r test; do
     continue
   fi
   echo "Running $test"
-  "$SHARDS" new "$test" 2> $ERR_TAG
+  "$shards" new "$test" 2> $ERR_TAG
   RESULT=$?
   if [[ $RESULT -eq 0 ]]; then
     rm -f $OK_TAG
