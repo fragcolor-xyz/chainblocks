@@ -594,6 +594,11 @@ struct RendererImpl final : public ContextData {
 #ifdef TRACY_ENABLE
     TracyPlot("Drawables Processed", int64_t(storage.frameStats.numDrawables));
 
+    TracyPlot("BindGroups Created (Total)", int64_t(storage.frameStats.totalBindGroupsCreated()));
+    TracyPlot("BindGroups Created (View)", int64_t(storage.frameStats.viewBindGroupsCreated));
+    TracyPlot("BindGroups Created (Draw)", int64_t(storage.frameStats.drawBindGroupsCreated));
+    TracyPlot("Buffers Created", int64_t(storage.frameStats.numCreatedBuffers));
+
     TracyPlotConfig("GFX WorkerMemory", tracy::PlotFormatType::Memory, true, true, 0);
     TracyPlot("GFX WorkerMemory", int64_t(storage.workerMemory.getMemoryResource().totalRequestedBytes));
     

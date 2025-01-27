@@ -13,8 +13,18 @@ namespace gfx::detail {
 
 struct FrameStats {
   size_t numDrawables{};
+  size_t viewBindGroupsCreated{};
+  size_t drawBindGroupsCreated{};
+  size_t numCreatedBuffers{};
 
-  void reset() { numDrawables = 0; }
+  void reset() {
+    numDrawables = 0;
+    viewBindGroupsCreated = 0;
+    drawBindGroupsCreated = 0;
+    numCreatedBuffers = 0;
+  }
+
+  size_t totalBindGroupsCreated() const { return viewBindGroupsCreated + drawBindGroupsCreated; }
 };
 
 using DebugVisualizer = shards::FunctionBase<512, void(gfx::ShapeRenderer &sr)>;

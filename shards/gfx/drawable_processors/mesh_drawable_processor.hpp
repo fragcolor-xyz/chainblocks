@@ -161,36 +161,41 @@ struct MeshDrawableProcessor final : public IDrawableProcessor {
 
   ContextDataCollector contextDataCollector;
 
+  uint32_t numCreatedBuffers{};
+
   MeshDrawableProcessor(Context &context)
-      : uniformBufferPool(getUniformBufferInitializer(context)), storageBufferPool(getStorageBufferInitializer(context)),
+      : uniformBufferPool(getUniformBufferInitializer(context, &numCreatedBuffers)), storageBufferPool(getStorageBufferInitializer(context, &numCreatedBuffers)),
         samplerCache(context.wgpuDevice) {
     wgpuDeviceGetLimits(context.wgpuDevice, &limits);
   }
 
-  static std::function<WGPUBuffer(size_t)> getStorageBufferInitializer(Context &context) {
-    return [device = context.wgpuDevice](size_t bufferSize) {
+  static std::function<WGPUBuffer(size_t)> getStorageBufferInitializer(Context &context, uint32_t* numCreatedBuffers) {
+    return [device = context.wgpuDevice, numCreatedBuffers](size_t bufferSize) {
       WGPUBufferDescriptor desc{
           .label = "<storage buffer>",
           .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           .size = bufferSize,
       };
+      ++(*numCreatedBuffers);
       return wgpuDeviceCreateBuffer(device, &desc);
     };
   }
 
-  static std::function<WGPUBuffer(size_t)> getUniformBufferInitializer(Context &context) {
-    return [device = context.wgpuDevice](size_t bufferSize) {
+  static std::function<WGPUBuffer(size_t)> getUniformBufferInitializer(Context &context, uint32_t* numCreatedBuffers) {
+    return [device = context.wgpuDevice, numCreatedBuffers](size_t bufferSize) {
       WGPUBufferDescriptor desc{
           .label = "<uniform buffer>",
           .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
           .size = bufferSize,
       };
+      ++(*numCreatedBuffers);
       return wgpuDeviceCreateBuffer(device, &desc);
     };
   }
 
   void reset(size_t frameCounter) override {
     ZoneScoped;
+    this->numCreatedBuffers = 0;
     this->frameCounter = frameCounter;
     uniformBufferPool.reset();
     storageBufferPool.reset();
@@ -635,6 +640,7 @@ struct MeshDrawableProcessor final : public IDrawableProcessor {
       }
 
       prepareData->viewBindGroup.reset(viewBindGroupBuilder.finalize(context.context.wgpuDevice, viewBindGroupLayout));
+      storage.frameStats.viewBindGroupsCreated++;
     }
 
     {
@@ -721,6 +727,7 @@ struct MeshDrawableProcessor final : public IDrawableProcessor {
           groupData.ownedDrawBindGroup.reset(drawBindGroupBuilder.finalize(context.context.wgpuDevice, drawBindGroupLayout));
           groupData.drawBindGroup = groupData.ownedDrawBindGroup;
           cache.emplace(bindGroupHash, groupData.drawBindGroup);
+          storage.frameStats.drawBindGroupsCreated++;
         } else {
           groupData.drawBindGroup = it->second;
         }
@@ -799,6 +806,9 @@ struct MeshDrawableProcessor final : public IDrawableProcessor {
         wgpuRenderPassEncoderDraw(encoder, (uint32_t)meshContextData->numVertices, group.numInstances, 0, 0);
       }
     }
+
+    context.storage.frameStats.numCreatedBuffers += numCreatedBuffers;
+    numCreatedBuffers = 0;
   }
 
   void preprocess(const DrawablePreprocessContext &context) override {
