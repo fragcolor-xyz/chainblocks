@@ -62,6 +62,7 @@ jobs:
           cat ./.emscripten
           export EM_CONFIG=$PWD/.emscripten
           echo "EM_CONFIG=$EM_CONFIG" >> $GITHUB_ENV
+          echo "EMSCRIPTEN_ROOT=$PWD/upstream/emscripten" >> $GITHUB_ENV
           popd
 
           which ninja
