@@ -232,6 +232,10 @@
     async function runAction(action) {
       if (action.action == "update-preloaded") {
         await updatePreloadedFiles();
+      } else if(action.action == "shutdown") {
+        console.log("<puppeteer>shutdown");
+        console.log("Shutting down");
+        window.close();
       } else if (action.action == "run") {
         const mod = instance.module;
         const dstFile = `/tfs/${action.data}`;
@@ -282,6 +286,11 @@
       currentAction.style.display = 'block';
       log(`Processing action: ${JSON.stringify(action)}`);
 
+      // Delete pending action
+      await fetch('/control', {
+        method: 'DELETE'
+      });
+
       // Dummy completion after 3 seconds
       // await new Promise(resolve => setTimeout(resolve, 3000));
       try {
@@ -297,11 +306,6 @@
           body: JSON.stringify({ d: error.toString(), a: action })
         });
       }
-
-      // Delete completed action
-      await fetch('/control', {
-        method: 'DELETE'
-      });
 
       currentAction.style.display = 'none';
       isProcessingAction = false;

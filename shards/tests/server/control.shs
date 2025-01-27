@@ -12,10 +12,14 @@
     {action: @action data: @data}
     ToJson | Http.Put(URL: control-url Headers: hdrs)
   }
+  "shutdown" {
+    {action: @action}
+    ToJson | Http.Put(URL: control-url Headers: hdrs)
+  }
   ; Command to preload a given folder, which is required for it to be available in the file system
   "preload-files" {
-    @data | ExpectString = path
-    {path: path exclude: @exclude}
+    @data ExpectString | String.Split(",") ExpectSeq = paths
+    {paths: paths exclude: @exclude}
     ToJson | Http.Post(URL: ([@host "/preload-files"] | String.Join) Headers: hdrs)
   }
   none {

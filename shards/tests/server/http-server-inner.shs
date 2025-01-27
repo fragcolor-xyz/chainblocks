@@ -57,7 +57,6 @@
 
 @template(send-as-json [] {
   ToJson = json-data
-  @srv-log("Response")
   {"Content-Type": "application/json"} = hdrs
   json-data | Http.Response(Headers: hdrs)
 })
@@ -101,7 +100,7 @@ Cond([
       {Is("POST")} {
         request | Take("body") | FromJson | ExpectTable
         @srv-log("Preload files request")
-        {Take("path") | ExpectString | @fs-abs-from-root() | @srv-log("Preload files root path") = path}
+        {Take("paths") | ExpectSeq | Map({ExpectString | @fs-abs-from-root()}) | @srv-log("Preload files root path") = paths}
         {Take("exclude") | ExpectString
           If(Is("") {[]} {
             String.Split(",") | Map(@fs-abs-from-root())
@@ -109,52 +108,55 @@ Cond([
           @srv-log("Exclude path") = excluded
         }
         
-        path | When(FS.IsFile {
-          @srv-log("IsFile")
-          @fs-make-relative = rel-path
-          @srv-log("relIsVfile")
-          preloaded-files-set | Take(rel-path) | When(Is(none) {
-            rel-path | FS.Parent = dir-path
-            @add-directory(dir-path)
-            
-            {f: rel-path} >> preloaded-files
-            @srv-log("Adding preloaded file")
-            Set(preloaded-files-set rel-path)
-          })
-        })
-        
-        When(FS.IsDirectory {
-          >> queue
-          
-          Repeat({
-            Pop(queue) >= scan-path
-            @srv-log("Scanning directory")
-            {@add-directory(scan-path)}
-            FS.Iterate(Recursive: false)
-            ForEach({
-              = it
-              Log("Iter")
-              @fs-make-relative = rel-path
-              excluded | If(FS.IsAny(rel-path) {
-                  rel-path | @srv-log("Excluded")
-                } {
-                  it | Cond([
-                    FS.IsDirectory {
-                      @srv-log("Queueing child directory")
-                      >> queue
-                    }
-                    FS.IsFile {
-                      preloaded-files-set | Take(rel-path) | When(Is(none) {
-                        {f: rel-path} >> preloaded-files
-                        @srv-log("Adding preloaded file")
-                        Set(preloaded-files-set rel-path)
-                      })
-                    } ;
-                    {true} {["Path does not exist:" it] | String.Format | Log}])
-                }
-              )
+        paths | ForEach({
+          @srv-log("Scanning path")
+          = path
+          When(FS.IsFile {
+            @srv-log("IsFile")
+            @fs-make-relative = rel-path
+            @srv-log("relIsVfile")
+            preloaded-files-set | Take(rel-path) | When(Is(none) {
+              rel-path | FS.Parent = dir-path
+              @add-directory(dir-path)
+              
+              {f: rel-path} >> preloaded-files
+              @srv-log("Adding preloaded file")
+              Set(preloaded-files-set rel-path)
             })
-          } Until: {Count(queue) | Is(0)})
+          })
+          
+          When(FS.IsDirectory {
+            >> queue
+            
+            Repeat({
+              Pop(queue) >= scan-path
+              @srv-log("Scanning directory")
+              {@add-directory(scan-path)}
+              FS.Iterate(Recursive: false)
+              ForEach({
+                = real-path
+                @fs-make-relative = rel-path
+                excluded | If(FS.IsAny(real-path) {
+                    rel-path | @srv-log("Excluded")
+                  } {
+                    real-path | Cond([
+                      FS.IsDirectory {
+                        @srv-log("Queueing child directory")
+                        >> queue
+                      }
+                      FS.IsFile {
+                        preloaded-files-set | Take(rel-path) | When(Is(none) {
+                          {f: rel-path} >> preloaded-files
+                          @srv-log("Adding preloaded file")
+                          Set(preloaded-files-set rel-path)
+                        })
+                      } ;
+                      {true} {["Path does not exist:" real-path] | String.Format | Log}])
+                  }
+                )
+              })
+            } Until: {Count(queue) | Is(0)})
+          })
         })
         
         ; Insert update preloaded into action queue

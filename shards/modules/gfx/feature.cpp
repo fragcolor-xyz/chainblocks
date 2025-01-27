@@ -957,8 +957,5 @@ void registerFeatureShards() {
 
   REGISTER_SHARD("GFX.BuiltinFeature", BuiltinFeatureShard);
   REGISTER_SHARD("GFX.Feature", FeatureShard);
-
-  SPDLOG_INFO("Sharder param types: {}", gfx::detail::ShaderParamTypes);
-  SPDLOG_INFO("Feature Shard Params: {}", FeatureShard::_paramsParameterInfo._types);
 }
 } // namespace gfx

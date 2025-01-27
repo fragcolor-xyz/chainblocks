@@ -1,0 +1,31 @@
+#!/bin/bash
+
+SCRIPT_DIR=$(dirname $0)
+SERVER_DIR=$SCRIPT_DIR/../server
+
+if [ -z "$shards" ]; then
+  echo "Error: \$shards command not set"
+  exit 1
+fi
+
+
+function control() {
+  SHARDS_LOG_FILE=control.log $shards new $SERVER_DIR/control.shs ${@}
+}
+
+function preload_files() {
+  local paths=("$@")
+  # echo "Paths: $paths"
+  if [[ "$OSTYPE" == "msys" ]]; then
+    for i in "${!paths[@]}"; do
+      paths[$i]=$(cygpath -w "${paths[$i]}")
+    done
+  fi
+  local joined_paths=$(IFS=,; echo "${paths[*]}")
+  # echo "Joined paths: $joined_paths"
+  control action:preload-files data:"$joined_paths"
+}
+
+function server() {
+  LOG_FLUSH_ON=debug LOG_http=debug SHARDS_LOG_FILE=server.log $shards new $SERVER_DIR/http-server.shs
+}

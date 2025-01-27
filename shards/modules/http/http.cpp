@@ -1251,6 +1251,13 @@ struct SendFile {
     auto pstr = p.generic_string();
     bool done = false;
     file.open(pstr.c_str(), boost::beast::file_mode::read, ec);
+
+    // Close file when sent (OR WHEN EXCEPTION OCCURS)
+    DEFER({
+      _response.body().close();
+      _response.clear();
+    });
+
     if (unlikely(bool(ec))) {
       _404_response.clear();
       _404_response.result(http::status::not_found);
@@ -1270,10 +1277,6 @@ struct SendFile {
       _response.result(http::status::ok);
       _response.set(http::field::content_type, mime_type(SHSTRVIEW(input)));
       _response.body() = std::move(file);
-      DEFER({
-        _response.body().close();
-        _response.clear();
-      });
 
       // add custom headers
       if (_headers.get().valueType == SHType::Table) {
@@ -1290,7 +1293,6 @@ struct SendFile {
       }
 
       _response.prepare_payload();
-
       http::async_write(*peer->socket, _response, [&, peer](beast::error_code ec, std::size_t nbytes) {
         if (ec) {
           throw PeerError{"SendFile:2", ec, peer};

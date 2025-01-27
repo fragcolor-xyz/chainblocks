@@ -2,55 +2,12 @@ name: Build (Wasm)
 
 on:
   workflow_dispatch:
-    inputs:
-      threading:
-        description: Single or multi-threading?
-        required: true
-        default: st
-        type: choice
-        options:
-          - st
-          - mt
-      run-tests:
-        description: Run the tests?
-        required: false
-        default: false
-        type: boolean
-      rust-cache:
-        description: Use existing rust cache?
-        required: false
-        default: false
-        type: boolean
   workflow_call:
-    inputs:
-      threading:
-        required: true
-        default: st
-        type: string
-      run-tests:
-        required: false
-        default: false
-        type: boolean
-      rust-cache:
-        required: false
-        default: true
-        type: boolean
-
 jobs:
-  #
-  # Build shards for emscripten
-  #
   wasm32-emscripten:
     name: Build (${{ github.event.inputs.threading || inputs.threading }})
     runs-on: ubuntu-latest
     steps:
-      - name: Setup
-        id: setup
-        shell: bash
-        run: |
-          echo "threading=${{ github.event.inputs.threading || inputs.threading }}" >> $GITHUB_OUTPUT
-          echo "run-tests=${{ github.event.inputs.run-tests || inputs.run-tests }}" >> $GITHUB_OUTPUT
-          echo "rust-cache=${{ github.event.inputs.rust-cache || inputs.rust-cache }}" >> $GITHUB_OUTPUT
       - name: Checkout shards
         uses: actions/checkout@v4
         with:
@@ -63,15 +20,24 @@ jobs:
           repository: emscripten-core/emsdk
           path: emsdk
           fetch-depth: 1
-      - name: Checkout emscripten fork
-        uses: actions/checkout@v4
+      - name: Download shards artifact
+        uses: actions/download-artifact@v3
         with:
-          repository: guusw/emscripten
-          path: emscripten
-          fetch-depth: 1
-          # Custom branch with fix based on top of 3.1.67
-          # Can remove when 3.1.68 is released (See https://github.com/emscripten-core/emscripten/pull/22623)
-          ref: guus/transfer-canvas-fix
+          name: shards-linux Release
+          path: build_host
+      - name: Make shards executable
+        run: |
+          # Shards interpreter
+          chmod +x ./build_host/shards
+          echo "shards=$(pwd)/build_host/shards" >> $GITHUB_ENV
+      # If we ever need custom emscripten fork again
+      # - name: Checkout emscripten fork
+      #   uses: actions/checkout@v4
+      #   with:
+      #     repository: guusw/emscripten
+      #     path: emscripten
+      #     fetch-depth: 1
+      #     ref: <branch_name>
       - name: Set up dependencies
         run: |
           sudo apt-get -y update
@@ -84,8 +50,8 @@ jobs:
 
           # Use the prebuilt SDK tools/binaries (MAKE SURE VERSION IS COMPATIBLE)
           pushd emsdk
-          ./emsdk install 3.1.67
-          ./emsdk activate 3.1.67
+          ./emsdk install 4.0.1
+          ./emsdk activate 4.0.1
           source ./emsdk_env.sh
           cat ./.emscripten
           export EM_CONFIG=$PWD/.emscripten
@@ -93,63 +59,77 @@ jobs:
           popd
 
           # Use custom fork for js/scripts (this is picked up by the cmake script)
-          pushd emscripten
-          echo "EMSCRIPTEN_ROOT=$PWD" >> $GITHUB_ENV
+          # If we ever need custom emscripten fork again: UNCOMMENT THIS
+          # pushd emscripten
+          # echo "EMSCRIPTEN_ROOT=$PWD" >> $GITHUB_ENV
+
           # Needed for rust-cc
           echo "AR=$PWD/emar" >> $GITHUB_ENV
           echo "CC=$PWD/emcc" >> $GITHUB_ENV
           ./bootstrap
           popd
-      - name: Set up rust (mt)
-        if: ${{ steps.setup.outputs.run-tests == 'true' && steps.setup.outputs.threading == 'mt' }}
+      - name: Set up rust
         run: |
           rustup +nightly component add rust-src
-      - uses: Swatinem/rust-cache@v2
-        if: ${{ steps.setup.outputs.rust-cache == 'true' }}
-        with:
-          key: ${{ steps.setup.outputs.threading }}
       - name: Build
         run: |
-          mkdir build
-          cd build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DNODEJS=1 -DSKIP_HEAVY_INLINE=1 -DUSE_LTO=0 -DRUST_USE_LTO=0 -DEMSCRIPTEN_PTHREADS=${{ steps.setup.outputs.threading == 'mt' }} -DEMSCRIPTEN_IDBFS=1 -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN_ROOT/cmake/Modules/Platform/Emscripten.cmake ..
-          ninja shards && ninja test-runtime
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNODEJS=1 -DSKIP_HEAVY_INLINE=1 -DUSE_LTO=0 -DRUST_USE_LTO=0 -DEMSCRIPTEN_PTHREADS=${{ steps.setup.outputs.threading == 'mt' }} -DEMSCRIPTEN_IDBFS=1 -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN_ROOT/cmake/Modules/Platform/Emscripten.cmake
+          cmake --build shards --target shards
+
+          echo "SHARDS_BUILD=$(pwd)/build" >> $GITHUB_ENV
       # Node LTS v16.15.0 freezes during exit on the st build, using version 18 works
       - uses: actions/setup-node@v3
         with:
           # Node 18.1.0 has a change in fetch() that causes it to fail loading the wasm module
           node-version: 18.0.0
-      - name: Test (st)
-        if: ${{ steps.setup.outputs.run-tests == 'true' && steps.setup.outputs.threading == 'st' }}
+      - name: Test
         run: |
-          cd build
-          node ../shards/tests/test-shards.js shards-st.js || [[ $? == 143 ]] || exit
-          node ../shards/tests/test-runtime.js || [[ $? == 143 ]] || exit
-          mkdir shards
-          cp shards-st.wasm shards/
-          cp shards-st.js shards/
-      - name: Test (mt)
-        if: ${{ steps.setup.outputs.threading == 'mt' }}
+          pushd shards/tests/web
+
+          npm install
+          npx puppeteer browsers install chrome@latest 
+
+          # Spawn the test server
+          ./run_server
+
+
+          source shards/tests/web/shared
+
+          function queue_test() {
+            control action:run data:shards/tests/$1
+          }
+          queue_test gfx-cube.shs
+          queue_test gfx-texture.shs
+          queue_test gfx-gltf.shs
+          queue_test gfx-gltf-anim.shs
+          queue_test gfx-shader-translator-0.shs
+          queue_test gfx-shader-translator-1.shs
+          queue_test gfx-shader-translator-2.shs
+          queue_test gfx-shader-translator-3.shs
+          queue_test gfx-shader-translator-4.shs
+          queue_test gfx-queue.shs
+          queue_test gfx-read-texture.shs
+          queue_test gfx-pbr.shs
+          queue_test ui-1.shs
+          queue_test general.shs
+          control action:shutdown
+
+          # Run the browser, it will automatically terminate on success
+          node shards/tests/web/run_browser.js
+
+      - name: Package build artifacts
         run: |
-          cd build
-          node --experimental-wasm-threads ../shards/tests/test-shards.js shards-mt.js || [[ $? == 143 ]] || exit
-          node --experimental-wasm-threads ../shards/tests/test-runtime.js || [[ $? == 143 ]] || exit
-          mkdir shards
+          # Copy distribution symbols
+          pushd $SHARDS_BUILD
+          mkdir dist
           cp shards-mt.wasm shards/
           cp shards-mt.js shards/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
           name: shards-wasm ${{ steps.setup.outputs.threading }}
           path: |
-            build/shards/
+            build/dist/
           if-no-files-found: error
           retention-days: 1
-      # - name: Upload shards to IPFS
-      #   uses: shards-lang/ipfs-action@master
-      #   if: ${{ github.event_name == 'push' }}
-      #   with:
-      #     path: build/shards/
-      #     service: infura
-      #     port: 5001
-      #     protocol: https

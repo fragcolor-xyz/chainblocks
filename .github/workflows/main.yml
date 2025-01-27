@@ -24,12 +24,9 @@ jobs:
   # Build shards for emscripten
   #
   wasm32-emscripten-mt:
-    needs: Setup
+    needs: [Setup, Linux-Release]
     uses: ./.github/workflows/build-wasm.yml
     secrets: inherit
-    with:
-      threading: mt
-      run-tests: true
 
   #
   # Build shards for linux

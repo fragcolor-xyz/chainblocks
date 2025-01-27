@@ -1,4 +1,7 @@
 @define(port 3000)
 @define(root-path "../../..")
 @define(web-path "./")
-@define(binaries-path "../../../build/emscripten-mt/release")
+@define(binaries-path #(
+  @env("SHARDS_BUILD")
+  If(Is("") {"../../../build/emscripten-mt/release"} Pass)
+))
