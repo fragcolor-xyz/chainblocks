@@ -17,7 +17,6 @@ target_include_directories(kcp-wrapper INTERFACE kcp)
 
 add_subdirectory(magic_enum)
 add_subdirectory(nameof)
-add_subdirectory(replxx)
 add_subdirectory(spdlog)
 add_subdirectory(sqlite)
 

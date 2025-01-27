@@ -13,9 +13,6 @@
 [submodule "cpp-taskflow"]
 	path = deps/cpp-taskflow
 	url = https://github.com/shards-lang/cpp-taskflow.git
-[submodule "deps/replxx"]
-	path = deps/replxx
-	url = https://github.com/shards-lang/replxx.git
 [submodule "deps/nameof"]
 	path = deps/nameof
 	url = https://github.com/shards-lang/nameof.git

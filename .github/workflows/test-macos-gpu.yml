@@ -88,14 +88,6 @@ jobs:
             build/shards new "$i"
           done
 
-          echo "\n"
-          echo "Running graphics test scripts"
-          for i in $(find shards/tests -maxdepth 1 -name 'gfx*.edn');
-          do
-            echo "Running $i"
-            build/shards "$i"
-          done
-
           echo "Running input test"
           build/shards new shards/tests/input.shs
 
@@ -165,7 +157,7 @@ jobs:
             --ignore-errors inconsistent,gcov,range
           # remove external dependencies
           lcov \
-            --remove coverage/coverage.info "*/c++/*" "*/boost/*" "*/usr/*" "*/deps/*" "*/shards/mal/*" \
+            --remove coverage/coverage.info "*/c++/*" "*/boost/*" "*/usr/*" "*/deps/*" \
             --output-file coverage/coverage-macos-gpu.info \
             --ignore-errors inconsistent,gcov,range
           # convert absolute path to relative path
