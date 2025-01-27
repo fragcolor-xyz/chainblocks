@@ -60,7 +60,7 @@
 		<DisplayString Condition="valueType == SHType::Int3">{payload.int3Value}</DisplayString>
 		<DisplayString Condition="valueType == SHType::Int4">{payload.int4Value}</DisplayString>
 		<DisplayString Condition="valueType == SHType::Int8">{payload.int8Value}</DisplayString>
-		<DisplayString Condition="valueType == SHType::Int16">{(boost::uuids::uuid*)&amp;payload}</DisplayString>
+		<DisplayString Optional="true" Condition="valueType == SHType::Int16">{(boost::uuids::uuid*)&amp;payload}</DisplayString>
 		<DisplayString Condition="valueType == SHType::Float">{payload.floatValue}</DisplayString>
 		<DisplayString Condition="valueType == SHType::Float2">{payload.float2Value}</DisplayString>
 		<DisplayString Condition="valueType == SHType::Float3">{payload.float3Value}</DisplayString>
