@@ -58,16 +58,17 @@ jobs:
           echo "EM_CONFIG=$EM_CONFIG" >> $GITHUB_ENV
           popd
 
-          # Use custom fork for js/scripts (this is picked up by the cmake script)
-          # If we ever need custom emscripten fork again: UNCOMMENT THIS
-          # pushd emscripten
-          # echo "EMSCRIPTEN_ROOT=$PWD" >> $GITHUB_ENV
-
-          # Needed for rust-cc
-          echo "AR=$PWD/emar" >> $GITHUB_ENV
-          echo "CC=$PWD/emcc" >> $GITHUB_ENV
-          ./bootstrap
-          popd
+      # - name: Set up emscripten fork
+      #   run: |
+      #     # Use custom fork for js/scripts (this is picked up by the cmake script)
+      #     # If we ever need custom emscripten fork again: UNCOMMENT THIS
+      #     pushd emscripten
+      #     # Needed for rust-cc
+      #     echo "AR=$PWD/emar" >> $GITHUB_ENV
+      #     echo "CC=$PWD/emcc" >> $GITHUB_ENV
+      #     echo "EMSCRIPTEN_ROOT=$PWD" >> $GITHUB_ENV
+      #     ./bootstrap
+      #     popd
       - name: Set up rust
         run: |
           rustup +nightly component add rust-src
