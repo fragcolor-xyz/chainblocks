@@ -568,6 +568,8 @@ struct GLTFShard {
         _model->root = std::static_pointer_cast<MeshTreeDrawable>(other->clone());
         _model->animations = shOther.animations;
         _model->materials = shOther.materials;
+        _model->boundsMin = shOther.boundsMin;
+        _model->boundsMax = shOther.boundsMax;
         rootNodeWrapped = shOther.rootNodeWrapped;
       } break;
       case LoadMode::LoadFileStatic:
@@ -586,6 +588,8 @@ struct GLTFShard {
       _drawable->drawable = _model->root;
       _drawable->animations = _model->animations;
       _drawable->materials = _model->materials;
+      _drawable->boundsMin = _model->boundsMin;
+      _drawable->boundsMax = _model->boundsMax;
 
       if (hasAnimationController()) {
         shardifyAnimationData();
