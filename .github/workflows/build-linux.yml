@@ -98,6 +98,13 @@ jobs:
           fi
 
           ninja shards
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shards-linux ${{ steps.setup.outputs.build-type }}
+          path: build/shards
+          if-no-files-found: error
+          retention-days: 1
       - name: Test
         env:
           RUST_BACKTRACE: full
@@ -214,16 +221,9 @@ jobs:
             --output-file coverage/coverage.linux.info
           # convert absolute path to relative path
           sed -i s/${PWD////\\/}/./g coverage/coverage.linux.info
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: shards-linux ${{ steps.setup.outputs.build-type }}
-          path: build/shards
-          if-no-files-found: error
-          retention-days: 1
       - name: Upload coverage (Debug)
         if: ${{ steps.setup.outputs.build-type == 'Debug' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: shards-linux-coverage
           path: coverage/coverage.linux.info
