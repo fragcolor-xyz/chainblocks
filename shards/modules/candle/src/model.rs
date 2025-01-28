@@ -204,23 +204,40 @@ impl Shard for ModelShard {
           &Device::Cpu
         };
 
-        // Create a temporary file to store the model data
-        let mut temp_file = tempfile::NamedTempFile::new().map_err(|e| {
+        // Create a temporary file with unique name in the current directory
+        let temp_path = std::path::PathBuf::from(format!("temp_model_{}.gguf", std::process::id()));
+        let mut temp_file = std::fs::File::create(&temp_path).map_err(|e| {
           shlog_error!("Failed to create temporary file: {}", e);
           "Failed to create temporary file"
         })?;
 
         // Write the model data to the temporary file
-        temp_file.write_all(data).map_err(|e| {
+        let write_result = temp_file.write_all(data).map_err(|e| {
+          // Try to clean up the file even if write failed
+          let _ = std::fs::remove_file(&temp_path);
           shlog_error!("Failed to write model data: {}", e);
           "Failed to write model data"
         })?;
 
-        let vb =
-          quantized_var_builder::VarBuilder::from_gguf(temp_file.path(), device).map_err(|e| {
-            shlog_error!("Failed to load model: {}", e);
-            "Failed to load model"
-          })?;
+        // Drop the file handle to ensure it's properly written
+        drop(temp_file);
+
+        // Use the temporary file to load the model
+        let load_result = quantized_var_builder::VarBuilder::from_gguf(&temp_path, device).map_err(|e| {
+          // Clean up the file if loading fails
+          let _ = std::fs::remove_file(&temp_path);
+          shlog_error!("Failed to load model: {}", e);
+          "Failed to load model"
+        });
+
+        // Clean up the temporary file now that we're done with it
+        if let Err(e) = std::fs::remove_file(&temp_path) {
+          shlog_error!("Failed to remove temporary file: {}", e);
+          // Continue anyway since the model is loaded
+        }
+
+        // Now handle the result of loading
+        let vb = load_result?;
         let config: TableVar = self.configuration.get().as_ref().try_into()?;
         let config = WhisperConfig::try_from(&config)?;
         let model = Whisper::quantized_model::Whisper::load(&vb, config.0).map_err(|e| {

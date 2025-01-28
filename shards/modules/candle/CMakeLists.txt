@@ -1,10 +1,10 @@
 # Platform-specific features
-if(APPLE)
-  if(NOT DISABLE_CANDLE_METAL)
-    list(APPEND ML_RUST_FEATURES "metal") # In reality this will only work on macOS unless metal is initialized before (e.g. Formabble app)
-  endif()
-  list(APPEND ML_RUST_FEATURES "accelerate")
-endif()
+# if(APPLE)
+#   if(NOT DISABLE_CANDLE_METAL)
+#     list(APPEND ML_RUST_FEATURES "metal") # In reality this will only work on macOS unless metal is initialized before (e.g. Formabble app)
+#   endif()
+#   list(APPEND ML_RUST_FEATURES "accelerate")
+# endif()
 
 # Add an option to enable or disable CUDA support
 option(ENABLE_CUDA "Enable CUDA support" OFF)
