@@ -116,6 +116,10 @@ if(CARGO_OFFLINE_MODE)
   list(APPEND RUSTC_FLAGS --offline)
 endif()
 
+if(CARGO_VERBOSE)
+  list(APPEND RUSTC_FLAGS -vv)
+endif()
+
 # if(USE_ASAN)
 # list(APPEND RUST_FLAGS -Zsanitizer=address)
 # endif()
