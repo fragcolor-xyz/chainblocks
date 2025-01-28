@@ -82,7 +82,7 @@ jobs:
           git clone https://github.com/BurntSushi/memchr.git
           cd memchr
           git checkout 2.5.0
-          cargo +$RUSTUP_TOOLCHAIN -vvv build || true
+          # cargo +$RUSTUP_TOOLCHAIN -vvv build || true
           cargo +$RUSTUP_TOOLCHAIN -vvv build --target wasm32-unknown-emscripten || true
 
       - name: Set up rust
