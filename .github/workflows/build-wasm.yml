@@ -47,7 +47,7 @@ jobs:
           sudo apt-get -y update
           sudo apt-get -y install build-essential  git cmake wget ninja-build
           ./bootstrap
-          RUSTUP_TOOLCHAIN=`cat rust.version`
+          export RUSTUP_TOOLCHAIN=`cat rust.version`
           echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN" >> $GITHUB_ENV
           rustup toolchain install $RUSTUP_TOOLCHAIN
           rustup +$RUSTUP_TOOLCHAIN target add wasm32-unknown-emscripten
@@ -57,8 +57,6 @@ jobs:
           export HOST_AR=`which ar`
           echo "HOST_CC=$HOST_CC" >> $GITHUB_ENV
           echo "HOST_AR=$HOST_AR" >> $GITHUB_ENV
-          echo "HOST_CC=$HOST_CC"
-          echo "HOST_AR=$HOST_AR"
 
           # Use the prebuilt SDK tools/binaries (MAKE SURE VERSION IS COMPATIBLE)
           pushd emsdk
@@ -68,7 +66,7 @@ jobs:
           cat ./.emscripten
           export EM_CONFIG=$PWD/.emscripten
           echo "EM_CONFIG=$EM_CONFIG" >> $GITHUB_ENV
-          EMSCRIPTEN_ROOT=$PWD/upstream/emscripten
+          export EMSCRIPTEN_ROOT=$PWD/upstream/emscripten
           echo "EMSCRIPTEN_ROOT=$EMSCRIPTEN_ROOT" >> $GITHUB_ENV
           popd
 
@@ -79,6 +77,13 @@ jobs:
           # UNCOMMENT THIS When using custom emscripten fork
           # ./bootstrap
           # popd
+
+           # Test
+          git clone https://github.com/BurntSushi/memchr.git
+          cd memchr
+          git checkout 2.5.0
+          cargo -vvv build +$RUSTUP_TOOLCHAIN || true
+          cargo -vvv build +$RUSTUP_TOOLCHAIN --target wasm32-unknown-emscripten || true
 
       - name: Set up rust
         run: |
