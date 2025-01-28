@@ -1,0 +1,54 @@
+.sh-parameters table {
+    padding: 0.1em !important;
+}
+
+.sh-parameters th {
+    padding: 0.3em 0.4em !important;
+}
+
+.sh-parameters td {
+    padding: 0.1em 0.4em !important;
+}
+
+.sh-parameters code {
+    font-size: 1em !important;
+    background-color: inherit !important;
+}
+
+.md-typeset__table {
+    min-width: 100%;
+ }
+
+ .md-typeset table:not([class]) {
+     display: table;
+ }
+
+#sh-flags-row {
+    min-width: 1rem !important;
+}
+
+body .md-tabs {
+    margin-top: -1.5em !important;
+}
+
+article h1 {
+    margin-bottom: 0.6em !important;
+}
+
+article h2 {
+    margin-top: 0.5em !important;
+}
+
+/* override slate color (dark theme) */
+[data-md-color-scheme="slate"] {
+    --md-primary-fg-color: #8658FD;
+    --md-typeset-a-color: #8658FD;
+    --md-accent-fg-color: #FF78FF;
+}
+
+/* custom light theme */
+[data-md-color-scheme="fragcolor-light"] {
+    --md-primary-fg-color: #5A82E1;
+    --md-typeset-a-color: #5A82E1;
+    --md-accent-fg-color: #5FE5EB;
+}

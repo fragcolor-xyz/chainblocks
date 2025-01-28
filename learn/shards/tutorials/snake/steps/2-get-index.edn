@@ -1,0 +1,38 @@
+(def grid-cols 5)
+(def grid-rows 4)
+(def grid
+  [0 2 0 0 3
+   1 0 7 0 0
+   0 0 0 4 0
+   6 0 5 0 8])
+
+(defn get-index []
+  (-> (| (Take 0) >= .x)
+      (| (Take 1) >= .y)
+      .y (Math.Multiply grid-cols) (Math.Add .x)))
+
+(defloop main-wire
+  (GFX.MainWindow
+   :Title "Snake game" :Width 480 :Height 360
+   :Contents
+   (->
+    (Setup
+     (GFX.DrawQueue) >= .ui-draw-queue
+     (GFX.UIPass .ui-draw-queue) >> .render-steps)
+    .ui-draw-queue (GFX.ClearQueue)
+
+    (UI
+     .ui-draw-queue
+     (UI.CentralPanel
+      (->
+       (int2 0 1) (get-index) >= .a
+       (int2 3 2) (get-index) >= .b
+
+       grid (Take .a) (ToString) (UI.Label)
+       grid (Take .b) (ToString) (UI.Label))))
+
+    (GFX.Render :Steps .render-steps))))
+
+(defmesh root)
+(schedule root main-wire)
+(run root (/ 1.0 60))

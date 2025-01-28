@@ -1,0 +1,162 @@
+(def grid-cols 12)
+(def grid-rows 10)
+(def empty-grid
+  [0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0])
+
+(defshards get-index []
+  (| (Take 0) >= .x)
+  (| (Take 1) >= .y)
+  .y (Math.Multiply grid-cols) (Math.Add .x))
+
+(defshards get-free-locations [fruit snake]
+  [] >= .locations
+  (ForRange
+   :From 0 :To (- grid-cols 1) :Action
+   (-> >= .a
+       (ForRange
+        :From 0 :To (- grid-rows 1) :Action
+        (-> >= .b
+            [.a .b] (ToInt2) >= .location
+            (When (-> snake (IndexOf .location) (Is -1) (And) fruit (IsNot .location))
+                  (-> .location (Push .locations)))))))
+  .locations)
+
+(defshards move-fruit [fruit snake]
+  (get-free-locations fruit snake) >= .free-loc
+  (Count .free-loc) >= .max
+  (RandomInt .max) >= .next-fruit-loc
+  .free-loc (Take .next-fruit-loc) (ToInt2))
+
+(defshards move-snake [snake offset grow]
+  snake (RTake 0) (Math.Add offset) (Push snake)
+  (WhenNot (-> grow) (DropFront snake)))
+
+(defshards populate-grid [fruit snake]
+  >= .tmp-grid
+
+  ; first the snake tail and body
+  snake (Take 0) (get-index) >= .tail-index
+  [.tail-index 4] (Assoc .tmp-grid)
+  snake (Slice 1 -1)
+  (ForEach
+   (-> (get-index) >= .limb-index
+       [.limb-index 3] (Assoc .tmp-grid)))
+
+  ; then the fruit
+  fruit (get-index) >= .fruit-index
+  [.fruit-index 1] (Assoc .tmp-grid)
+
+  ; finally the snake head
+  snake (RTake 0) (get-index) >= .head-index
+  [.head-index 2] (Assoc .tmp-grid)
+
+  ; return the populated grid
+  .tmp-grid)
+
+(def cell-size 18)
+(def x-offset 48)
+(def y-offset 36)
+(defn render-cells [n]
+  (if
+   (= n -1)
+    nil
+    (->
+     (| (int2
+         (% n grid-cols)
+         (/ n grid-cols))
+        (ToFloat2)
+        (Math.Multiply (float2 cell-size))
+        (Math.Add (float2 x-offset y-offset)) > .position)
+     (| (Take n)
+        (UI.Area
+         :Position .position
+         :Contents
+         (-> (Match
+              [0 (-> ".") ; empty
+               1 (-> "F") ; fruit
+               2 (-> "H") ; head
+               3 (-> "B") ; body
+               4 (-> "T") ; tail
+               ]false)
+             (UI.Label))))
+     (render-cells (- n 1)))))
+
+(defshards initialize []
+  [(int2 1 2) (int2 2 2) (int2 3 2) (int2 3 3) (int2 4 3)] >= .snake
+  false >= .grow
+  (move-fruit (int2 0 0) .snake) >= .fruit
+  "right" >= .direction >= .prev-direction
+  (Time.Now) >= .last-tick
+  ; do it once to not wait the next tick
+  empty-grid (populate-grid .fruit .snake) >= .grid)
+
+(defloop main-wire
+  (Once (initialize))
+  ; logic
+  (When (-> (Time.Now) (Math.Subtract .last-tick) (IsMoreEqual 0.33))
+        (-> (Time.Now) > .last-tick
+            ; move the snake
+            .direction (Match ["up" (move-snake .snake (int2 0 -1) .grow)
+                               "right" (move-snake .snake (int2 1 0) .grow)
+                               "down" (move-snake .snake (int2 0 1) .grow)
+                               "left" (move-snake .snake (int2 -1 0) .grow)])
+            .snake (RTake 0) >= .head
+            ; did the snake eat the fruit?
+            (If (-> .head (Is .fruit))
+                (-> true > .grow
+                    (move-fruit .fruit .snake) > .fruit)
+                (-> false > .grow)
+                :Passthrough true)
+            ; update
+            empty-grid (populate-grid .fruit .snake) > .grid
+            .direction > .prev-direction))
+  ; window
+  (GFX.MainWindow
+   :Title "Snake game" :Width 480 :Height 360
+   :Contents
+   (->
+    (Setup
+     (GFX.DrawQueue) >= .ui-draw-queue
+     (GFX.UIPass .ui-draw-queue) >> .render-steps)
+    .ui-draw-queue (GFX.ClearQueue)
+
+    (UI
+     .ui-draw-queue
+     (->
+      .grid
+      (Setup (float2 0) >= .position)
+      (render-cells (- (* grid-cols grid-rows) 1))))
+
+    (GFX.Render :Steps .render-steps)
+
+    (Inputs.KeyDown
+     "up"
+     (When (-> .prev-direction (IsNot "down"))
+           (-> "up" > .direction)))
+    (Inputs.KeyDown
+     "right"
+     (When (-> .prev-direction (IsNot "left"))
+           (-> "right" > .direction)))
+    (Inputs.KeyDown
+     "down"
+     (When (-> .prev-direction (IsNot "up"))
+           (-> "down" > .direction)))
+    (Inputs.KeyDown
+     "left"
+     (When (-> .prev-direction (IsNot "right"))
+           (-> "left" > .direction)))
+    (Inputs.KeyDown
+     "space" (initialize)))))
+
+(defmesh root)
+(schedule root main-wire)
+(run root (/ 1.0 60))

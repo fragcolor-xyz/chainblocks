@@ -1,0 +1,19 @@
+(defloop main-wire
+  (GFX.MainWindow
+   :Title "Snake game" :Width 480 :Height 360
+   :Contents
+   (->
+    (Setup
+     (GFX.DrawQueue) >= .ui-draw-queue
+     (GFX.UIPass .ui-draw-queue) >> .render-steps)
+    .ui-draw-queue (GFX.ClearQueue) ;; (1)
+
+    (UI ;; (2)
+     .ui-draw-queue
+     (UI.CentralPanel)) ;; (3)
+
+    (GFX.Render :Steps .render-steps)))) ;; (4)
+
+(defmesh root)
+(schedule root main-wire)
+(run root (/ 1.0 60))
