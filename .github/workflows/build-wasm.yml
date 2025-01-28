@@ -102,6 +102,14 @@ jobs:
           echo "CC=$PWD/emcc" >> $GITHUB_ENV
           ./bootstrap
           popd
+
+
+          # Test
+          git clone https://github.com/BurntSushi/memchr.git
+          cd memchr
+          git checkout 2.5.0
+          cargo -vvv build +$RUSTUP_TOOLCHAIN || true
+          cargo -vvv build +$RUSTUP_TOOLCHAIN --target wasm32-unknown-emscripten || true
       - name: Set up rust (mt)
         if: ${{ steps.setup.outputs.run-tests == 'true' && steps.setup.outputs.threading == 'mt' }}
         run: |
