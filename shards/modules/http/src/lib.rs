@@ -162,6 +162,13 @@ lazy_static! {
       INT_TYPES_SLICE
     )
       .into(),
+    (
+      cstr!("ConnectionTimeout"),
+      shccstr!("How many seconds to wait for a connection to be established. Defaults to 10 seconds."),
+      INT_TYPES_SLICE
+    )
+      .into(),
+      
   ];
 }
 
@@ -191,6 +198,7 @@ struct RequestBase {
   keep_alive: bool,
   required: ExposedTypes,
   streaming: bool,
+  connection_timeout: u64,
 }
 
 impl Default for RequestBase {
@@ -209,6 +217,7 @@ impl Default for RequestBase {
       keep_alive: false,
       required: Vec::new(),
       streaming: false,
+      connection_timeout: 10,
     }
   }
 }
@@ -242,6 +251,7 @@ impl RequestBase {
       7 => Ok(self.keep_alive = value.try_into().map_err(|_x| "Failed to set keep_alive")?),
       8 => Ok(self.streaming = value.try_into().map_err(|_x| "Failed to set streaming")?),
       9 => Ok(self.backoff = value.try_into().map_err(|_x| "Failed to set backoff")?),
+      10 => Ok(self.connection_timeout = value.try_into().map_err(|_x| "Failed to set connection_timeout")?),
       _ => unreachable!(),
     }
   }
@@ -258,6 +268,7 @@ impl RequestBase {
       7 => self.keep_alive.into(),
       8 => self.streaming.into(),
       9 => self.backoff.try_into().expect("A valid integer in range"),
+      10 => self.connection_timeout.try_into().expect("A valid integer in range"),
       _ => unreachable!(),
     }
   }
@@ -292,7 +303,8 @@ impl RequestBase {
       self.client = Some(
         reqwest::Client::builder()
           .danger_accept_invalid_certs(self.invalid_certs)
-          .timeout(Duration::from_secs(self.timeout))
+          .read_timeout(Duration::from_secs(self.timeout))
+          .connect_timeout(Duration::from_secs(self.connection_timeout))
           .build()
           .map_err(|e| {
             print_error(&e);

@@ -3254,7 +3254,7 @@ SHVar shards_deserialize_var(const SHVar *bytes_buffer_var) {
 }
 
 SHBool shards_cancel_abort(SHContext *context) {
-  if (context->shouldStop()) {
+  if (context->shouldStop() || context->onLastResume) {
     // ok this flow should stop already... so we can just return false
     return false;
   }
