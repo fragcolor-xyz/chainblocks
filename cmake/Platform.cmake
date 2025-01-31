@@ -276,10 +276,15 @@ endif()
 
 option(USE_LLD "Override linker tools to use lld & llvm-ar/ranlib" ${USE_LLD_DEFAULT})
 
-add_compile_options(-fno-exceptions -D_HAS_EXCEPTIONS=0)
+add_compile_options(-fno-exceptions)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  add_compile_options(-D_ALLOW_KEYWORD_MACROS=1 -D_CRT_SECURE_CPP_NOTHROW=noexcept)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:--include=${SHARDS_DIR}/include/shards/noexcept.hpp>)
+endif()
+
 
 if(USE_LLD)
-  add_link_options(-fuse-ld=lld)
+add_link_options(-fuse-ld=lld)
   SET(CMAKE_AR llvm-ar)
   SET(CMAKE_RANLIB llvm-ranlib)
 endif()
