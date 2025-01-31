@@ -5,6 +5,7 @@
 #define SH_SHARDS_HPP
 
 #include "shards.h"
+#include <shards/exceptions.hpp>
 #include <cstring> // memcpy
 #include <functional>
 #include <memory>
@@ -632,42 +633,42 @@ struct Var : public SHVar {
 
   explicit operator bool() const {
     if (valueType != SHType::Bool) {
-      throw InvalidVarTypeError("Invalid variable casting! expected Bool");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Bool"));
     }
     return payload.boolValue;
   }
 
   explicit operator int() const {
     if (valueType != SHType::Int) {
-      throw InvalidVarTypeError("Invalid variable casting! expected Int");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Int"));
     }
     return static_cast<int>(payload.intValue);
   }
 
   explicit operator uintptr_t() const {
     if (valueType != SHType::Int) {
-      throw InvalidVarTypeError("Invalid variable casting! expected Int");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Int"));
     }
     return static_cast<uintptr_t>(payload.intValue);
   }
 
   explicit operator int16_t() const {
     if (valueType != SHType::Int) {
-      throw InvalidVarTypeError("Invalid variable casting! expected Int");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Int"));
     }
     return static_cast<int16_t>(payload.intValue);
   }
 
   explicit operator uint8_t() const {
     if (valueType != SHType::Int) {
-      throw InvalidVarTypeError("Invalid variable casting! expected Int");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Int"));
     }
     return static_cast<uint8_t>(payload.intValue);
   }
 
   explicit operator int64_t() const {
     if (valueType != SHType::Int) {
-      throw InvalidVarTypeError("Invalid variable casting! expected Int");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Int"));
     }
     return payload.intValue;
   }
@@ -678,7 +679,7 @@ struct Var : public SHVar {
     } else if (valueType == SHType::Int) {
       return static_cast<float>(payload.intValue);
     } else {
-      throw InvalidVarTypeError("Invalid variable casting! expected Float");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Float"));
     }
   }
 
@@ -688,20 +689,20 @@ struct Var : public SHVar {
     } else if (valueType == SHType::Int) {
       return static_cast<double>(payload.intValue);
     } else {
-      throw InvalidVarTypeError("Invalid variable casting! expected Float");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Float"));
     }
   }
 
   explicit operator SHStringWithLen() const {
     if (valueType != SHType::String) {
-      throw InvalidVarTypeError("Invalid variable casting! expected String");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected String"));
     }
     return SHStringWithLen{payload.stringValue, payload.stringLen};
   }
 
   explicit operator std::string_view() const {
     if (valueType != SHType::String) {
-      throw InvalidVarTypeError("Invalid variable casting! expected String");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected String"));
     }
     return std::string_view((const char *)payload.stringValue, payload.stringLen);
   }
@@ -710,14 +711,14 @@ struct Var : public SHVar {
 
   explicit operator SHStringWithLen() {
     if (valueType != SHType::String) {
-      throw InvalidVarTypeError("Invalid variable casting! expected String");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected String"));
     }
     return SHStringWithLen{payload.stringValue, payload.stringLen};
   }
 
   template <typename T> void intoVector(std::vector<T> &outVec) const {
     if (valueType != SHType::Seq) {
-      throw InvalidVarTypeError("Invalid variable casting! expected Seq");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Seq"));
     }
     outVec.resize(payload.seqValue.len);
     for (uint32_t i = 0; i < payload.seqValue.len; i++) {
@@ -779,7 +780,7 @@ struct Var : public SHVar {
     valueType = SHType::Bytes;
     const auto size = bytes.size();
     if (size > UINT32_MAX)
-      throw SHException("std::vector<uint8_t> to Var size exceeded uint32 maximum");
+      SHARDS_THROW(SHException("std::vector<uint8_t> to Var size exceeded uint32 maximum"));
     payload.bytesSize = uint32_t(size);
     payload.bytesValue = const_cast<uint8_t *>(bytes.data());
   }
@@ -995,7 +996,7 @@ struct Var : public SHVar {
 
   uint32_t colorToInt() {
     if (valueType != SHType::Color) {
-      throw InvalidVarTypeError("Invalid variable casting! expected Color");
+      SHARDS_THROW(InvalidVarTypeError("Invalid variable casting! expected Color"));
     }
     uint32_t res = 0;
     res |= (uint32_t(payload.colorValue.r) << 24);
@@ -1138,28 +1139,28 @@ struct OnTrackedVarSet {
 
 inline SHVar *begin(SHVar &a) {
   if (a.valueType != SHType::Seq) {
-    throw shards::SHException("begin expected a Seq");
+    SHARDS_THROW(shards::SHException("begin expected a Seq"));
   }
   return &a.payload.seqValue.elements[0];
 }
 
 inline const SHVar *begin(const SHVar &a) {
   if (a.valueType != SHType::Seq) {
-    throw shards::SHException("begin expected a Seq");
+    SHARDS_THROW(shards::SHException("begin expected a Seq"));
   }
   return &a.payload.seqValue.elements[0];
 }
 
 inline SHVar *end(SHVar &a) {
   if (a.valueType != SHType::Seq) {
-    throw shards::SHException("begin expected a Seq");
+    SHARDS_THROW(shards::SHException("begin expected a Seq"));
   }
   return begin(a) + a.payload.seqValue.len;
 }
 
 inline const SHVar *end(const SHVar &a) {
   if (a.valueType != SHType::Seq) {
-    throw shards::SHException("begin expected a Seq");
+    SHARDS_THROW(shards::SHException("begin expected a Seq"));
   }
   return begin(a) + a.payload.seqValue.len;
 }

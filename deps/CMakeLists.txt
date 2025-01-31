@@ -17,6 +17,8 @@ target_include_directories(kcp-wrapper INTERFACE kcp)
 
 add_subdirectory(magic_enum)
 add_subdirectory(nameof)
+set(SPDLOG_NO_EXCEPTIONS ON CACHE BOOL "" FORCE)
+add_compile_definitions(FMT_EXCEPTIONS=0)
 add_subdirectory(spdlog)
 add_subdirectory(sqlite)
 
@@ -29,9 +31,8 @@ option(USE_AVX512 "Enable AVX512" OFF)
 # Required by Jolt as we enable RTTI
 set(CPP_RTTI_ENABLED ON CACHE BOOL "Enable C++ RTTI" FORCE)
 
-if(EMSCRIPTEN)
-  set(CPP_EXCEPTIONS_ENABLED ON CACHE BOOL "Enable C++ exceptions" FORCE) # wasm requires exceptions to be enabled cos we use exceptions
-endif()
+set(CPP_EXCEPTIONS_ENABLED OFF CACHE BOOL "Enable C++ exceptions" FORCE)
+set(FLOATING_POINT_EXCEPTIONS_ENABLED OFF CACHE BOOL "Enable C++ exceptions" FORCE)
 
 # This triggers warnings+errors on valgrind build
 option(ENABLE_ALL_WARNINGS "Enable all warnings" OFF)
@@ -105,6 +106,7 @@ endif()
 
 set(BOOST_DIR "" CACHE FILEPATH "Use boost from this path, not setting this will download the sources automatically")
 
+add_compile_definitions(BOOST_NO_EXCEPTIONS=1)
 if(BOOST_DIR)
   message(STATUS "Using boost from BOOST_DIR=${BOOST_DIR}")
   add_subdirectory(${BOOST_DIR} ${CMAKE_CURRENT_BINARY_DIR}/boost)
@@ -241,7 +243,7 @@ if(NOT EMSCRIPTEN)
     set(MATH_LIBRARY "" CACHE FILEPATH "" FORCE)
   endif()
 
-  add_subdirectory(llama.cpp)
+  # add_subdirectory(llama.cpp)
 endif()
 
 if(WIN32)

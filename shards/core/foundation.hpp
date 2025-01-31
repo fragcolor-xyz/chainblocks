@@ -152,7 +152,7 @@ template <std::size_t Size = 512> struct bumping_memory_resource {
   void *allocate(std::size_t size) {
     _used += size;
     if (_used > Size)
-      throw shards::SHException("Stack allocator memory exhausted");
+      SHARDS_THROW(shards::SHException("Stack allocator memory exhausted"));
 
     auto ret = _ptr;
     _ptr += size;
@@ -374,7 +374,7 @@ struct SHWire : public std::enable_shared_from_this<SHWire> {
       blk->owned = false;
       shards::decRef(blk);
     } else {
-      throw shards::SHException("removeShard: shard not found!");
+      SHARDS_THROW(shards::SHException("removeShard: shard not found!"));
     }
   }
 
@@ -635,7 +635,7 @@ public:
         blocker_tags.back() = false;
       }
     } else {
-      throw std::runtime_error("No layers to pop!");
+      SHARDS_THROW(std::runtime_error("No layers to pop!"));
     }
   }
 
@@ -646,7 +646,7 @@ public:
       if (!layers.empty()) {
         layers.back()[key] = value;
       } else {
-        throw std::runtime_error("No layers to insert into!");
+        SHARDS_THROW(std::runtime_error("No layers to insert into!"));
       }
     } else {
       // update existing value
@@ -1606,7 +1606,7 @@ inline bool isObjectType(const SHVar &var, const SHTypeInfo &type) {
 template <typename T> T &varAsObjectChecked(const SHVar &var, const shards::Type &type) {
   SHTypeInfo typeInfo(type);
   if (var.valueType != SHType::Object) {
-    throw std::runtime_error(fmt::format("Invalid type, expected: {} got: {}", type, magic_enum::enum_name(var.valueType)));
+    SHARDS_THROW(std::runtime_error(fmt::format("Invalid type, expected: {} got: {}", type, magic_enum::enum_name(var.valueType))));
   }
   if (var.payload.objectVendorId != typeInfo.object.vendorId) {
     throw std::runtime_error(fmt::format("Invalid object vendor id, expected: {} got: {}", type,
@@ -1679,7 +1679,7 @@ inline bool collectRequiredVariables(const SHInstanceData &data, ExposedInfo &ou
   auto msg = fmt::format("No matching variable found for parameter {}, was: {}, expected any of {}", debugTag, (SHTypeInfo &)ti,
                          validTypes);
   SHLOG_ERROR("{}", msg);
-  throw ComposeError(msg);
+  SHARDS_THROW(ComposeError(msg));
 }
 
 template <typename... TArgs>

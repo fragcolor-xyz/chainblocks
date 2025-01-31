@@ -511,22 +511,23 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
   void prettyCompose(const std::shared_ptr<SHWire> &wire, SHInstanceData &data) {
     shards::CompositionContext privateContext;
     data.privateContext = &privateContext;
-    try {
+    // TODO: Exceptions
+    // try {
       auto validation = shards::composeWire(wire.get(), data);
       shards::arrayFree(validation.exposedInfo);
       shards::arrayFree(validation.requiredInfo);
-    } catch (const std::exception &e) {
-      // build a reverse stack error log from privateContext.errorStack
-      std::string errors;
-      for (auto it = privateContext.errorStack.rbegin(); it != privateContext.errorStack.rend(); ++it) {
-        errors += *it;
-        if (++it == privateContext.errorStack.rend())
-          break;
-        errors += "\n";
-      }
-      SHLOG_ERROR("Wire {} failed to compose:\n{}", wire->name, errors);
-      throw;
-    }
+    // } catch (const std::exception &e) {
+    //   // build a reverse stack error log from privateContext.errorStack
+    //   std::string errors;
+    //   for (auto it = privateContext.errorStack.rbegin(); it != privateContext.errorStack.rend(); ++it) {
+    //     errors += *it;
+    //     if (++it == privateContext.errorStack.rend())
+    //       break;
+    //     errors += "\n";
+    //   }
+    //   SHLOG_ERROR("Wire {} failed to compose:\n{}", wire->name, errors);
+    //   throw;
+    // }
   }
 
   void compose(const std::shared_ptr<SHWire> &wire, SHVar input = shards::Var::Empty) {
@@ -536,7 +537,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     if (wire->warmedUp) {
       SHLOG_ERROR("Attempted to Pre-composing a wire multiple times, wire: {}", wire->name);
-      throw shards::SHException("Multiple wire Pre-composing");
+      SHARDS_THROW(shards::SHException("Multiple wire Pre-composing"));
     }
 
     wire->mesh = shared_from_this();
@@ -571,7 +572,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     if (wire->warmedUp || _scheduledSet.count(wire.get())) {
       SHLOG_ERROR("Attempted to schedule a wire multiple times, wire: {}", wire->name);
-      throw shards::SHException("Multiple wire schedule");
+      SHARDS_THROW(shards::SHException("Multiple wire schedule"));
     }
 
     wire->mesh = shared_from_this();
@@ -599,7 +600,7 @@ struct SHMesh : public std::enable_shared_from_this<SHMesh> {
 
     // wire might fail on warmup during prepare
     if (wire->state == SHWire::State::Failed) {
-      throw shards::SHException(fmt::format("Wire {} failed during prepare", wire->name));
+      SHARDS_THROW(shards::SHException(fmt::format("Wire {} failed during prepare", wire->name)));
     }
 
     observer.before_start(wire.get());
@@ -899,7 +900,7 @@ inline bool stop(SHWire *wire, SHVar *result, SHContext *currentContext) {
 
       // Another issue, if we resume from current context to current context we dead lock here!!
       if (currentContext && currentContext == wire->context) {
-        throw ActivationError(fmt::format("Trying to stop wire {} from the same context it's running in!", wire->name));
+        SHARDS_THROW(ActivationError(fmt::format("Trying to stop wire {} from the same context it's running in!", wire->name)));
       } else {
         shards::tick<true>(wire->tickingWire(), SHDuration{});
       }
@@ -946,7 +947,7 @@ template <typename DELEGATE> auto callOnMeshThread(SHContext *context, DELEGATE 
 #else
   if (context) {
     if (unlikely(context->onWorkerThread)) {
-      throw ActivationError("Trying to callOnMeshThread from a worker thread!");
+      SHARDS_THROW(ActivationError("Trying to callOnMeshThread from a worker thread!"));
     }
 
     // shassert(!context->onLastResume && "Trying to callOnMeshThread from a wire that is about to stop!");
@@ -980,11 +981,12 @@ template <typename L, typename V = std::enable_if_t<std::is_invocable_v<L>>> voi
     L &lambda;
     std::exception_ptr exp;
     void action() {
-      try {
+      // try {
         lambda();
-      } catch (...) {
-        exp = std::current_exception();
-      }
+        // TODO: Exceptions
+      // } catch (...) {
+      //   exp = std::current_exception();
+      // }
     }
   } l{func};
   callOnMeshThread(context, l);
@@ -1004,8 +1006,7 @@ template <typename T> inline T emscripten_wait(SHContext *context, emscripten::v
   }
 
   if (fut["hadErrors"].as<bool>()) {
-    throw ActivationError("A javascript async task has failed, check the "
-                          "console for more informations.");
+    SHARDS_THROW(ActivationError("A javascript async task has failed, check the ""console for more informations."));
   }
 
   return fut["result"].as<T>();
