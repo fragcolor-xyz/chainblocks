@@ -1,0 +1,210 @@
+@include("http-server-shared.shs")
+@include("config.shs")
+
+@define(headers {
+  "Cross-Origin-Opener-Policy": "same-origin"
+  "Cross-Origin-Embedder-Policy": "require-corp"
+  "Cache-Control": "public, max-age=30"
+  "Expires": "30"
+})
+
+@template(srv-log [msg] {
+  Log(msg Name: "http" Level: LogLevel::Debug)
+})
+
+@define(fs-abs {
+  FS.Absolute
+  If(String.Starts("\\\\?\\") {
+      Slice(4)
+    } {
+      Pass
+    }
+  )
+})
+
+@template(fs-abs-from-root [] {
+  If(FS.IsAbsolute Pass {
+    = in
+    [@root-path in] | FS.Join
+  }) | FS.Normalize
+})
+
+@define(root-abs #(@root-path | @fs-abs))
+
+@define(fs-make-relative {
+  If(FS.IsAbsolute FS.RelativeTo(@root-abs) Pass) | FS.Normalize
+})
+
+@template(add-directory [dir] {
+  dir | @fs-make-relative >= p0
+  Sequence(queue Type: @type([Type::String]))
+  Repeat({
+    p0 | When(IsNot(".") {
+      >> queue
+    })
+    FS.Parent > p0
+  } Until: {p0 | Is("")})
+  
+  Repeat({
+    Pop(queue) >= p0
+    handler/preloaded-files-set | Take(p0) | When(Is(none) {
+      {d: p0} >> handler/preloaded-files
+      @srv-log("Adding preloaded directory")
+      Set(handler/preloaded-files-set p0)
+    })
+  } Until: {Count(queue) | Is(0)})
+})
+
+@template(send-as-json [] {
+  ToJson = json-data
+  {"Content-Type": "application/json"} = hdrs
+  json-data | Http.Response(Headers: hdrs)
+})
+
+Http.Read = request
+{Take("target") >= target-raw}
+{Take("method") >= method}
+
+target-raw | String.Split("?") | Take(0) = target
+target | @srv-log("request")
+Cond([
+  {Is("/control")} {
+    method | Cond([
+      {Is("GET")} {
+        Count(action-queue) | If(Is(0) {
+            [] | @send-as-json()
+          } {
+            action-queue | Take(0) >> tmp-seq
+            tmp-seq | @send-as-json()
+          }
+        )
+      }
+      {Is("PUT")} {
+        request | Take("body") | FromJson = json-data
+        Expect(@action-type) >> action-queue
+        "" | Http.Response(Status: 200)
+      }
+      {Is("DELETE")} {
+        Count(action-queue) | When(IsMore(0) {
+          @srv-log("Erasing action")
+          Erase(0 action-queue)
+          "" | Http.Response(Status: 200)
+        })
+      }
+      {true} {
+        "Method not allowed" | Http.Response(Status: 405 ContentType: "text/plain")
+      }])
+  }
+  {Is("/preload-files")} {
+    method | Cond([
+      {Is("POST")} {
+        request | Take("body") | FromJson | ExpectTable
+        @srv-log("Preload files request")
+        {Take("paths") | ExpectSeq | Map({ExpectString | @fs-abs-from-root()}) | @srv-log("Preload files root path") = paths}
+        {Take("exclude") | ExpectString
+          If(Is("") {[]} {
+            String.Split(",") | Map(@fs-abs-from-root())
+          }) | Expect(@type([Type::String]))
+          @srv-log("Exclude path") = excluded
+        }
+        
+        paths | ForEach({
+          @srv-log("Scanning path")
+          = path
+          When(FS.IsFile {
+            @srv-log("IsFile")
+            @fs-make-relative = rel-path
+            @srv-log("relIsVfile")
+            preloaded-files-set | Take(rel-path) | When(Is(none) {
+              rel-path | FS.Parent = dir-path
+              @add-directory(dir-path)
+              
+              {f: rel-path} >> preloaded-files
+              @srv-log("Adding preloaded file")
+              Set(preloaded-files-set rel-path)
+            })
+          })
+          
+          When(FS.IsDirectory {
+            >> queue
+            
+            Repeat({
+              Pop(queue) >= scan-path
+              @srv-log("Scanning directory")
+              {@add-directory(scan-path)}
+              FS.Iterate(Recursive: false)
+              ForEach({
+                = real-path
+                @fs-make-relative = rel-path
+                excluded | If(FS.IsAny(real-path) {
+                    rel-path | @srv-log("Excluded")
+                  } {
+                    real-path | Cond([
+                      FS.IsDirectory {
+                        @srv-log("Queueing child directory")
+                        >> queue
+                      }
+                      FS.IsFile {
+                        preloaded-files-set | Take(rel-path) | When(Is(none) {
+                          {f: rel-path} >> preloaded-files
+                          @srv-log("Adding preloaded file")
+                          Set(preloaded-files-set rel-path)
+                        })
+                      } ;
+                      {true} {["Path does not exist:" real-path] | String.Format | Log}])
+                  }
+                )
+              })
+            } Until: {Count(queue) | Is(0)})
+          })
+        })
+        
+        ; Insert update preloaded into action queue
+        {action: "update-preloaded" data: none} >> action-queue
+        "" | Http.Response(Status: 200)
+      }
+      {Is("GET")} {
+        preloaded-files | @send-as-json()
+      }])
+  }
+  {Is("/error")} {
+    method | Cond([
+      {Is("PUT")} {
+        request | Take("body") | FromJson
+        Log("Test error reported")
+        ExpectTable
+        {Take("d") | ExpectString = data}
+        Msg(data Level: LogLevel::Error Name: "REMOTE")
+        "" | Http.Response(Status: 200)
+      }])
+  }
+  {Is("/log")} {
+    method | Cond([
+      {Is("PUT")} {
+        request | Take("body") | FromJson
+        ExpectSeq
+        ForEach({
+          ExpectTable
+          {Take("d") | ExpectString = data}
+          Msg(data Level: LogLevel::Info Name: "REMOTE")
+        })
+      }])
+    "" | Http.Response(Status: 200)
+  }
+  {String.Starts("/tfs/")} {; Index test filesystem
+    target | Slice(4) = rel-path
+    [@root-path rel-path] | FS.Join | @srv-log("Serving test file") | Http.SendFile(@headers)
+  }
+  {Is("/")} {
+    "/index.html" | Http.SendFile(@headers)
+  }
+  {String.Starts("/bin/")} {
+    target | Slice(4) = rel-path
+    [@binaries-path rel-path] | FS.Join | @srv-log("Serving binary") | Http.SendFile(@headers)
+  }
+  {true} {
+    [@root-path target] | FS.Join | @srv-log("Serving")
+    Http.SendFile(@headers)
+  }] Passthrough: true)
+@srv-log("Done")
+

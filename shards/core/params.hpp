@@ -32,7 +32,7 @@
 
 namespace shards {
 #define PARAM_EXT(_type, _name, _paramInfo)                              \
-  static inline shards::ParameterInfo _name##ParameterInfo = _paramInfo; \
+  static inline shards::ParameterInfo& _name##ParameterInfo = _paramInfo; \
   _type _name{};
 
 #define PARAM(_type, _name, _displayName, _help, ...)                                                     \
@@ -144,6 +144,32 @@ struct IterableParam {
         result[i] = baseParams[i];                                              \
       for (size_t i = 0; i < numAddParams; ++i)                                 \
         result[numBaseParams + i] = addParams[i];                               \
+      return result;                                                            \
+    }();                                                                        \
+    outNumParams = combined.size();                                             \
+    return combined.data();                                                     \
+  }                                                                             \
+  PARAM_PARAMS()                                                                \
+  PARAM_GET_SET()
+
+// Add new macro for prepending parameters
+#define PARAM_IMPL_DERIVED_PREPEND(BaseClass, ...)                              \
+  SELF_MACRO_DEFINE_SELF(Self, public)                                          \
+  static const shards::IterableParam *getIterableParams(size_t &outNumParams) { \
+    static std::vector<shards::IterableParam> combined = []() {                 \
+      static shards::IterableParam prependParams[] = {__VA_ARGS__};            \
+      size_t numPrependParams = std::extent<decltype(prependParams)>::value;    \
+                                                                                \
+      size_t numBaseParams{};                                                   \
+      auto *baseParams = BaseClass::getIterableParams(numBaseParams);           \
+      std::vector<shards::IterableParam> result;                                \
+      result.resize(numBaseParams + numPrependParams);                          \
+      /* Add prepend params first */                                            \
+      for (size_t i = 0; i < numPrependParams; ++i)                             \
+        result[i] = prependParams[i];                                           \
+      /* Then add base params */                                                \
+      for (size_t i = 0; i < numBaseParams; ++i)                                \
+        result[numPrependParams + i] = baseParams[i];                           \
       return result;                                                            \
     }();                                                                        \
     outNumParams = combined.size();                                             \

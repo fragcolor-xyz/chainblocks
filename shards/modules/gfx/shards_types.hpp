@@ -1,85 +1,20 @@
 #ifndef E452293C_6700_4675_8B6E_5293674E0A33
 #define E452293C_6700_4675_8B6E_5293674E0A33
 
+#include "gfx.hpp"
 #include <shards/common_types.hpp>
 #include <shards/core/foundation.hpp>
 #include <shards/core/object_type.hpp>
 #include <shards/shards.hpp>
-#include <gfx/enums.hpp>
-#include <gfx/fwd.hpp>
-#include <gfx/pipeline_step.hpp>
-#include <gfx/shader/entry_point.hpp>
-#include <gfx/shader/types.hpp>
-#include <gfx/shader/struct_layout.hpp>
-#include <gfx/drawables/mesh_drawable.hpp>
-#include <gfx/drawables/mesh_tree_drawable.hpp>
-#include <gfx/gltf/animation.hpp>
-#include <gfx/texture.hpp>
-#include <gfx/feature.hpp>
-#include <gfx/view.hpp>
 #include <memory>
 #include <variant>
 #include <vector>
 
 namespace gfx {
-
-struct SHDrawable {
-  using Variant = std::variant<MeshDrawable::Ptr, MeshTreeDrawable::Ptr>;
-  Variant drawable;
-  std::unordered_map<std::string, Animation> animations;
-  std::unordered_map<std::string, MaterialPtr> materials;
-  bool rootNodeWrapped{};
-
-  void assign(const std::shared_ptr<IDrawable> &generic) {
-    if (auto mesh = std::dynamic_pointer_cast<MeshDrawable>(generic)) {
-      this->drawable = mesh;
-    } else if (auto meshTree = std::dynamic_pointer_cast<MeshTreeDrawable>(generic)) {
-      this->drawable = meshTree;
-    } else {
-      throw std::logic_error("unsupported");
-    }
-  }
-};
-
-struct SHBuffer {
-  shader::AddressSpace designatedAddressSpace;
-  shader::StructType type;
-  size_t runtimeSize{};
-  ImmutableSharedBuffer data;
-  BufferPtr buffer;
-
-  uint8_t *getDataMut() { return const_cast<uint8_t *>(data.getData()); }
-};
-
-struct SHView {
-  ViewPtr view;
-
-  static std::vector<uint8_t> serialize(const SHView &);
-  static SHView deserialize(const std::string_view &);
-};
-
-struct SHMaterial {
-  MaterialPtr material;
-};
-
-struct SHRenderTarget {
-  RenderTargetPtr renderTarget;
-};
-
-struct SHDrawQueue {
-  DrawQueuePtr queue;
-};
-
-struct SHSampler {
-  // Unused for now
-};
-
-constexpr uint32_t VendorId = shards::CoreCC;
-
 namespace detail {
 using namespace shards;
+struct ShardsTypes {
 // NOTE: This needs to be a struct ensure correct initialization order under clang
-struct Container {
 #define OBJECT(_id, _displayName, _definedAs, ...)                                                                              \
   static constexpr uint32_t SH_CONCAT(_definedAs, TypeId) = uint32_t(_id);                                                      \
   static inline Type _definedAs{{SHType::Object, {.object = {.vendorId = VendorId, .typeId = SH_CONCAT(_definedAs, TypeId)}}}}; \
@@ -94,10 +29,22 @@ struct Container {
   OBJECT('gbuf', "GFX.Buffer", Buffer, SHBuffer, nullptr, nullptr, nullptr, /*ThreadSafe*/ true)
   OBJECT('__RT', "GFX.RenderTarget", RenderTarget, SHRenderTarget)
 
-  DECL_ENUM_INFO(gfx::WindingOrder, WindingOrder, "Specifies the order in which vertices are defined to determine the front face of a polygon. Affects how faces are culled in rendering.", '_e0');
-  DECL_ENUM_INFO(gfx::ShaderFieldBaseType, ShaderFieldBaseType, "Defines the fundamental data types used in shader fields. Determines how shader variables are interpreted and stored.", '_e1');
-  DECL_ENUM_INFO(gfx::ProgrammableGraphicsStage, ProgrammableGraphicsStage, "Identifies the programmable stages in the graphics pipeline. Used to specify which part of the rendering process a shader program targets.", '_e2');
-  DECL_ENUM_INFO(shader::DependencyType, DependencyType, "Specifies the type of dependency in shader compilation. Determines how different shader components relate to and depend on each other.", '_e3');
+  DECL_ENUM_INFO(gfx::WindingOrder, WindingOrder,
+                 "Specifies the order in which vertices are defined to determine the front face of a polygon. Affects how faces "
+                 "are culled in rendering.",
+                 '_e0');
+  DECL_ENUM_INFO(
+      gfx::ShaderFieldBaseType, ShaderFieldBaseType,
+      "Defines the fundamental data types used in shader fields. Determines how shader variables are interpreted and stored.",
+      '_e1');
+  DECL_ENUM_INFO(gfx::ProgrammableGraphicsStage, ProgrammableGraphicsStage,
+                 "Identifies the programmable stages in the graphics pipeline. Used to specify which part of the rendering "
+                 "process a shader program targets.",
+                 '_e2');
+  DECL_ENUM_INFO(shader::DependencyType, DependencyType,
+                 "Specifies the type of dependency in shader compilation. Determines how different shader components relate to "
+                 "and depend on each other.",
+                 '_e3');
 
   enum class BlendFactor_ {
     Zero = WGPUBlendFactor_Zero,
@@ -114,7 +61,10 @@ struct Container {
     Constant = WGPUBlendFactor_Constant,
     OneMinusConstant = WGPUBlendFactor_OneMinusConstant,
   };
-  DECL_ENUM_INFO(BlendFactor_, BlendFactor, "Defines how color components are combined during blending operations. Used to control transparency and color mixing in rendering.", '_e4');
+  DECL_ENUM_INFO(BlendFactor_, BlendFactor,
+                 "Defines how color components are combined during blending operations. Used to control transparency and color "
+                 "mixing in rendering.",
+                 '_e4');
 
   enum class BlendOperation_ {
     Add = WGPUBlendOperation_Add,
@@ -123,13 +73,19 @@ struct Container {
     Min = WGPUBlendOperation_Min,
     Max = WGPUBlendOperation_Max,
   };
-  DECL_ENUM_INFO(BlendOperation_, BlendOperation, "Specifies the mathematical operation used to combine source and destination colors during blending. Affects how overlapping objects are rendered.", '_e5');
+  DECL_ENUM_INFO(BlendOperation_, BlendOperation,
+                 "Specifies the mathematical operation used to combine source and destination colors during blending. Affects "
+                 "how overlapping objects are rendered.",
+                 '_e5');
 
   enum class FilterMode_ {
     Nearest = WGPUFilterMode_Nearest,
     Linear = WGPUFilterMode_Linear,
   };
-  DECL_ENUM_INFO(FilterMode_, FilterMode, "Determines the method used for sampling textures. Affects the appearance of textures when scaled or viewed at different distances.", '_e6');
+  DECL_ENUM_INFO(FilterMode_, FilterMode,
+                 "Determines the method used for sampling textures. Affects the appearance of textures when scaled or viewed at "
+                 "different distances.",
+                 '_e6');
 
   enum class CompareFunction_ {
     Undefined = WGPUCompareFunction_Undefined,
@@ -142,7 +98,10 @@ struct Container {
     NotEqual = WGPUCompareFunction_NotEqual,
     Always = WGPUCompareFunction_Always,
   };
-  DECL_ENUM_INFO(CompareFunction_, CompareFunction, "Defines the comparison operation used in depth and stencil tests. Controls how fragments are accepted or rejected during rendering.", '_e7');
+  DECL_ENUM_INFO(CompareFunction_, CompareFunction,
+                 "Defines the comparison operation used in depth and stencil tests. Controls how fragments are accepted or "
+                 "rejected during rendering.",
+                 '_e7');
 
   enum class ColorMask_ {
     None = WGPUColorWriteMask_None,
@@ -152,7 +111,10 @@ struct Container {
     Alpha = WGPUColorWriteMask_Alpha,
     All = WGPUColorWriteMask_All,
   };
-  DECL_ENUM_INFO(ColorMask_, ColorMask, "Specifies which color channels are affected by rendering operations. Used to control which components of a color buffer can be modified.", '_e8');
+  DECL_ENUM_INFO(ColorMask_, ColorMask,
+                 "Specifies which color channels are affected by rendering operations. Used to control which components of a "
+                 "color buffer can be modified.",
+                 '_e8');
 
   enum class TextureType_ {
     Default = 0,
@@ -163,14 +125,20 @@ struct Container {
     SNorm,
     Float,
   };
-  DECL_ENUM_INFO(TextureType_, TextureType, "Defines the data format and interpretation of texture data. Affects how texture values are stored and processed in shaders.", '_e9');
+  DECL_ENUM_INFO(TextureType_, TextureType,
+                 "Defines the data format and interpretation of texture data. Affects how texture values are stored and "
+                 "processed in shaders.",
+                 '_e9');
 
   enum class SortMode_ : uint8_t {
     Batch = uint8_t(SortMode::Batch),
     Queue = uint8_t(SortMode::Queue),
     BackToFront = uint8_t(SortMode::BackToFront),
   };
-  DECL_ENUM_INFO(SortMode_, SortMode, "Determines how rendering commands are sorted before execution. Affects the order in which objects are drawn, impacting performance and visual output.", '_e10');
+  DECL_ENUM_INFO(SortMode_, SortMode,
+                 "Determines how rendering commands are sorted before execution. Affects the order in which objects are drawn, "
+                 "impacting performance and visual output.",
+                 '_e10');
 
   enum class TextureFormat_ : uint32_t {
     // Undefined = WGPUTextureFormat_Undefined,
@@ -272,35 +240,55 @@ struct Container {
     // ASTC12x12UnormSrgb = WGPUTextureFormat_ASTC12x12UnormSrgb,
     // Force32 = WGPUTextureFormat_Force32,
   };
-  DECL_ENUM_INFO(TextureFormat_, TextureFormat, "Specifies the format of texture data, including color depth and component layout. Determines how texture data is stored and interpreted by the GPU.", '_e11');
+  DECL_ENUM_INFO(TextureFormat_, TextureFormat,
+                 "Specifies the format of texture data, including color depth and component layout. Determines how texture data "
+                 "is stored and interpreted by the GPU.",
+                 '_e11');
 
   enum class TextureDimension_ {
     D1,
     D2,
     Cube,
   };
-  DECL_ENUM_INFO(TextureDimension_, TextureDimension, "Defines the dimensionality of a texture. Affects how textures are sampled and used in shaders.", '_e12');
+  DECL_ENUM_INFO(TextureDimension_, TextureDimension,
+                 "Defines the dimensionality of a texture. Affects how textures are sampled and used in shaders.", '_e12');
 
   enum class TextureAddressing_ {
     Repeat = WGPUAddressMode_Repeat,
     MirrorRepeat = WGPUAddressMode_MirrorRepeat,
     ClampToEdge = WGPUAddressMode_ClampToEdge,
   };
-  DECL_ENUM_INFO(TextureAddressing_, TextureAddressing, "Specifies how texture coordinates outside the [0, 1] range are handled. Affects texture wrapping and tiling behavior.", '_e13');
+  DECL_ENUM_INFO(
+      TextureAddressing_, TextureAddressing,
+      "Specifies how texture coordinates outside the [0, 1] range are handled. Affects texture wrapping and tiling behavior.",
+      '_e13');
 
   enum class TextureFiltering_ {
     Nearest = WGPUFilterMode_Nearest,
     Linear = WGPUFilterMode_Linear,
   };
-  DECL_ENUM_INFO(TextureFiltering_, TextureFiltering, "Determines how textures are sampled when scaled. Affects the visual quality and performance of texture rendering.", '_e14');
+  DECL_ENUM_INFO(
+      TextureFiltering_, TextureFiltering,
+      "Determines how textures are sampled when scaled. Affects the visual quality and performance of texture rendering.",
+      '_e14');
 
-  DECL_ENUM_INFO(::gfx::OrthographicSizeType, OrthographicSizeType, "Specifies how the size of an orthographic projection is defined. Affects how 2D scenes are rendered and scaled.", '_e15');
+  DECL_ENUM_INFO(
+      ::gfx::OrthographicSizeType, OrthographicSizeType,
+      "Specifies how the size of an orthographic projection is defined. Affects how 2D scenes are rendered and scaled.", '_e15');
 
-  DECL_ENUM_INFO(::gfx::BindGroupId, BindGroupId, "Identifies different bind groups in a shader. Used to organize and access shader resources efficiently.", '_e16');
+  DECL_ENUM_INFO(::gfx::BindGroupId, BindGroupId,
+                 "Identifies different bind groups in a shader. Used to organize and access shader resources efficiently.",
+                 '_e16');
 
-  DECL_ENUM_INFO(::gfx::TextureSampleType, TextureSampleType, "Defines how a texture is sampled in a shader. Affects how texture data is read and interpreted in shader programs.", '_e17');
+  DECL_ENUM_INFO(
+      ::gfx::TextureSampleType, TextureSampleType,
+      "Defines how a texture is sampled in a shader. Affects how texture data is read and interpreted in shader programs.",
+      '_e17');
 
-  DECL_ENUM_INFO(::gfx::shader::AddressSpace, BufferAddressSpace, "Specifies the memory space for buffer resources in shaders. Determines how buffer data is accessed and optimized by the GPU.", '_e18');
+  DECL_ENUM_INFO(::gfx::shader::AddressSpace, BufferAddressSpace,
+                 "Specifies the memory space for buffer resources in shaders. Determines how buffer data is accessed and "
+                 "optimized by the GPU.",
+                 '_e18');
 
   OBJECT('feat', "GFX.Feature", Feature, FeaturePtr)
   static inline Type FeatureSeq = Type::SeqOf(Feature);
@@ -322,37 +310,14 @@ struct Container {
 
   static inline Type TextureVarType = Type::VariableOf(TextureTypes);
 
-  static inline Types ShaderParamTypes{TextureTypes,
-                                       {
-                                           Type::VariableOf(Buffer),
-                                           CoreInfo::Float4x4Type,
-                                           CoreInfo::Float4Type,
-                                           CoreInfo::Float3Type,
-                                           CoreInfo::Float2Type,
-                                           CoreInfo::FloatType,
-                                           CoreInfo::IntType,
-                                           CoreInfo::Int2Type,
-                                           CoreInfo::Int3Type,
-                                           CoreInfo::Int4Type,
-                                       }};
-
-  static inline Types ShaderParamOrVarTypes{ShaderParamTypes, {Type::VariableOf(ShaderParamTypes)}};
-
   // Shared drawable parameters
   static inline Type TransformVarType = Type::VariableOf(CoreInfo::Float4x4Type);
-
-  // Valid types for shader :Params
-  static inline Type ShaderParamTable = Type::TableOf(ShaderParamOrVarTypes);
 
   static inline ParameterInfo TransformParameterInfo{
       "Transform", SHCCSTR("The transform to use"), {CoreInfo::NoneType, TransformVarType}};
 
   static inline ParameterInfo MaterialParameterInfo{
       "Material", SHCCSTR("The material"), {CoreInfo::NoneType, Type::VariableOf(Material)}};
-
-  static inline ParameterInfo ParamsParameterInfo{"Params",
-                                                  SHCCSTR("Shader parameters for this drawable"),
-                                                  {CoreInfo::NoneType, ShaderParamTable, Type::VariableOf(ShaderParamTable)}};
 
   static inline ParameterInfo FeaturesParameterInfo{
       "Features", SHCCSTR("Features to attach to this drawable"), {CoreInfo::NoneType, FeatureSeq, Type::VariableOf(FeatureSeq)}};
@@ -372,7 +337,7 @@ struct Container {
 #undef OBJECT
 };
 } // namespace detail
-using ShardsTypes = detail::Container;
+using detail::ShardsTypes;
 
 } // namespace gfx
 

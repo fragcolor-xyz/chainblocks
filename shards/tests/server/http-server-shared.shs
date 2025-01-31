@@ -1,0 +1,4 @@
+@define(action-type @type({
+  action: Type::String
+  data: Type::String
+}))

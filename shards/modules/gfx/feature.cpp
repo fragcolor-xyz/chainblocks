@@ -1,8 +1,6 @@
 #include "gfx.hpp"
 #include "drawable_utils.hpp"
-#include "gfx.hpp"
-#include "drawable_utils.hpp"
-#include "shards_types.hpp"
+#include "param_types.hpp"
 #include <shards/common_types.hpp>
 #include <shards/core/capturing_brancher.hpp>
 #include <shards/core/foundation.hpp>
@@ -41,7 +39,7 @@ using namespace shards;
 
 namespace gfx {
 enum class BuiltinFeatureId { Transform, BaseColor, VertexColorFromNormal, Wireframe, Velocity, AlphaBlend };
-enum class RequiredAttributes_ { Tangent };
+enum class RequiredAttributes_ { Tangent };  
 } // namespace gfx
 
 ENUM_HELP(gfx::RequiredAttributes_, gfx::RequiredAttributes_::Tangent, SHCCSTR("Require mesh tangents to be available"));
@@ -136,7 +134,7 @@ struct BuiltinFeatureShard {
   SHVar activate(SHContext *context, const SHVar &input) { return ShardsTypes::FeatureObjectVar.Get(_feature); }
 };
 
-struct FeatureShard {
+struct FeatureTypes {
   static inline shards::Types GeneratedViewInputTableTypes{{ShardsTypes::DrawQueue, ShardsTypes::View, ShardsTypes::FeatureSeq}};
   static inline std::array<SHVar, 3> GeneratedViewInputTableKeys{Var("Queue"), Var("View"), Var("Features")};
   static inline Type GeneratedViewInputTableType = Type::TableOf(GeneratedViewInputTableTypes, GeneratedViewInputTableKeys);
@@ -149,12 +147,12 @@ struct FeatureShard {
 
   static inline Type ShaderEntryPointType = Type::SeqOf(CoreInfo::AnyTableType);
 
-  static inline shards::Types ParamSpecEntryTypes{ShardsTypes::ShaderParamOrVarTypes, {CoreInfo::AnyTableType}};
-  static inline Type ParameterSpecType = Type::TableOf(ParamSpecEntryTypes);
-
   static inline Type BlockSpecType = CoreInfo::AnyTableType;
 
   static inline Type RequiredAttributesSeqType = Type::SeqOf(RequiredAttributesEnumInfo::Type);
+};
+
+struct FeatureShard {
 
   static SHTypesInfo inputTypes() { return CoreInfo::NoneType; }
   static SHTypesInfo outputTypes() { return ShardsTypes::Feature; }
@@ -171,7 +169,7 @@ struct FeatureShard {
   // The Before/After parameters are optional and can be used to specify dependencies
   // Each dependency will make sure that entry point is evaluated before or after the named dependency
   // You can give each entry point a name for this purpose using the Name parameter
-  PARAM_PARAMVAR(_shaders, "Shaders", "A list of shader entry points", {CoreInfo::NoneType, ShaderEntryPointType});
+  PARAM_PARAMVAR(_shaders, "Shaders", "A list of shader entry points", {CoreInfo::NoneType, FeatureTypes::ShaderEntryPointType});
   // Any constant undefined variables used in the shader can be injected using this parameter
   PARAM_PARAMVAR(_composeWith, "ComposeWith", "Any table of values that need to be injected into this feature's shaders",
                  {CoreInfo::NoneType, CoreInfo::AnyTableType, CoreInfo::AnyVarTableType});
@@ -197,16 +195,14 @@ struct FeatureShard {
   //   :<name> {:Type <ShaderFieldBaseType> :Dimension <number>}
   //   :<name> {:Default <default>}   (type will be derived from value)
   //   :<name> <default-value>        (type will be derived from value)
-  PARAM_PARAMVAR(_params, "Params",
-                 "The parameters to add to the object buffer and expose to shaders, these default values can later be modified "
-                 "by the Params parameter in GFX.Material or GFX.Drawable.",
-                 {CoreInfo::NoneType, ParameterSpecType, Type::VariableOf(ParameterSpecType)});
+  PARAM_EXT(ParamVar, _params, gfx::detail::FeatureParamsParameterInfo);
 
   // Table of block shader parameters, can be defined using any of the formats below:
   //   :<name> {:Type <ShaderFieldBaseType> :Dimension <number>}
   //   :<name> {:Default <default>}   (type will be derived from value)
   //   :<name> <default-value>        (type will be derived from value)
-  PARAM_VAR(_blockParams, "BlockParams", "Custom bindings to expose to shaders", {CoreInfo::NoneType, BlockSpecType});
+  PARAM_VAR(_blockParams, "BlockParams", "Custom bindings to expose to shaders",
+            {CoreInfo::NoneType, FeatureTypes::BlockSpecType});
 
   PARAM_VAR(_uniqueVariables, "UniqueVariables", "List of variables that should be made unique",
             {CoreInfo::NoneType, CoreInfo::StringSeqType});
@@ -214,7 +210,7 @@ struct FeatureShard {
   PARAM_PARAMVAR(
       _requiredAttributes, "RequiredAttributes",
       "The parameters to expose to shaders, these default values can later be overriden by materials or drawable Params",
-      {CoreInfo::NoneType, RequiredAttributesSeqType});
+      {CoreInfo::NoneType, FeatureTypes::RequiredAttributesSeqType});
 
   PARAM_IMPL(PARAM_IMPL_FOR(_shaders), PARAM_IMPL_FOR(_composeWith), PARAM_IMPL_FOR(_state), PARAM_IMPL_FOR(_viewGenerators),
              PARAM_IMPL_FOR(_drawableGenerators), PARAM_IMPL_FOR(_params), PARAM_IMPL_FOR(_blockParams),
@@ -398,12 +394,12 @@ public:
       // Expose custom render context
       innerExposed.push_back(RequiredGraphicsRendererContext::getExposedTypeInfo());
 
-      generatorInstanceData.inputType = GeneratedDrawInputTableType;
+      generatorInstanceData.inputType = FeatureTypes::GeneratedDrawInputTableType;
       _sharedData->drawableGeneratorBranch.brancher.setRunnables(deepClone(_drawableGenerators));
       if (!_sharedData->drawableGeneratorBranch.wires().empty())
         _sharedData->drawableGeneratorBranch.compose(generatorInstanceData, innerExposed, IgnoredVariables);
 
-      generatorInstanceData.inputType = GeneratedViewInputTableType;
+      generatorInstanceData.inputType = FeatureTypes::GeneratedViewInputTableType;
       _sharedData->viewGeneratorBranch.brancher.setRunnables(deepClone(_viewGenerators));
       if (!_sharedData->viewGeneratorBranch.wires().empty())
         _sharedData->viewGeneratorBranch.compose(generatorInstanceData, innerExposed, IgnoredVariables);

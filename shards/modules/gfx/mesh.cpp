@@ -3,6 +3,7 @@
 #include <gfx/geom.hpp>
 #include <gfx/mesh.hpp>
 #include <shards/core/params.hpp>
+#include "shards_types.hpp"
 
 using namespace shards;
 namespace gfx {

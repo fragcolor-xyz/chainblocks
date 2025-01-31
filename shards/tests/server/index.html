@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      height: 100vh;
+    }
+
+    #canvas-container {
+      width: 60%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+    }
+
+    #current-action {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+    }
+
+    #log-container {
+      width: 40%;
+      /* height: 100%; */
+      overflow-y: auto;
+      background: #f0f0f0;
+      padding: 10px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="canvas-container">
+    <canvas id="canvas"></canvas>
+    <div id="current-action"></div>
+  </div>
+  <div id="log-container"></div>
+
+  <script type="module">
+    const logContainer = document.getElementById('log-container');
+    const canvasContainer = document.getElementById("canvas-container");
+    const canvas = document.getElementById('canvas');
+    const currentAction = document.getElementById('current-action');
+    let isProcessingAction = false;
+
+    function parseWindowSearchOpts(query_) {
+      var opts = {};
+      var query = query_ || window.location.search.substring(1);
+      var vars = query.split('&');
+      for (var i = 0; i < vars.length; i++) {
+        var pair = vars[i].split('=');
+        opts[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
+      }
+      return opts;
+    }
+    const urlQuery = parseWindowSearchOpts();
+
+    const SPDLOG_LEVEL_TRACE = 0;
+    const SPDLOG_LEVEL_DEBUG = 1;
+    const SPDLOG_LEVEL_INFO = 2;
+    const SPDLOG_LEVEL_WARN = 3;
+    const SPDLOG_LEVEL_ERROR = 4;
+    const SPDLOG_LEVEL_CRITICAL = 5;
+    const SPDLOG_LEVEL_OFF = 6;
+
+    const logQueue = [];
+    function logRemote(message, level, name, file, col, line) {
+      logQueue.push({ d: message, l: level, n: name, f: file, c: col, l: line });
+    }
+
+    function logLocal(message) {
+      const div = document.createElement('div');
+      div.textContent = message;
+      logContainer.appendChild(div);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function log(message) {
+      logLocal(message);
+      logRemote(message, SPDLOG_LEVEL_INFO, "web-automation", "index.html", 0, 0);
+    }
+
+    async function sleep(ms) {
+      await new Promise(done => setTimeout(done, ms));
+    }
+
+    async function processLogQueue() {
+      if (logQueue.length > 0) {
+        const queueSize = logQueue.length;
+        const resp = await fetch('/log', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(logQueue)
+        });
+        if (resp.ok) {
+          logQueue.splice(0, queueSize);
+        } else {
+          log(`Failed to log messages: ${resp.statusText}`);
+        }
+      }
+      setTimeout(processLogQueue, 100);
+    }
+    processLogQueue();
+
+    let instance = {};
+    // import ShardsModule from "./bin/shards-mt1.js";
+    // const bpath = "./bin/shards-mt1.wasm";
+
+    import ShardsModule from "./bin/shards-mt.js";
+    const bpath = "./bin/shards-mt.wasm";
+
+    async function updatePreloadedFiles() {
+      const response = await fetch('/preload-files');
+      const payload = await response.text();
+      const payloadPtr = mod.stringToNewUTF8(payload);
+      mod._shardsPreloadFiles(payloadPtr, payload.length);
+      mod._free(payloadPtr);
+    }
+
+    async function loadShards() {
+      const response = await fetch(bpath);
+      if (!response.ok) {
+        log(`Failed to fetch wasm: ${response.statusText}`);
+      }
+
+      const wasmBytes = await response.arrayBuffer();
+      const mod = instance.module = await ShardsModule({
+        wasmBinary: new Uint8Array(wasmBytes),
+        // INITIAL_MEMORY: 134217728,
+      });
+      log("Module loaded");
+
+      instance.setLoggerLevel = (loggerName, level) => {
+        const tmpStr = mod.stringToNewUTF8(loggerName);
+        mod._shardsSetLoggerLevel(tmpStr, level);
+        mod._free(tmpStr);
+      };
+      // if (urlQuery["trace"] !== "1") {
+
+      // Set the canvas to use for input and graphics
+      mod["canvas"] = canvas;
+      mod.gfxSetup(canvasContainer, canvas);
+
+      mod._shardsInit();
+
+      instance.setLoggerLevel("gfx", SPDLOG_LEVEL_TRACE);
+      instance.setLoggerLevel("shards", SPDLOG_LEVEL_TRACE);
+      // instance.setLoggerLevel("wgpu", SPDLOG_LEVEL_TRACE);
+      // instance.setLoggerLevel("http", SPDLOG_LEVEL_TRACE);
+      // instance.setLoggerLevel("audio", SPDLOG_LEVEL_DEBUG);
+
+      // Mount the test file system
+      const shardsFSMountHTTP = await mod.cwrap('shardsFSMountHTTP', 'void', ['string', 'string']);
+      shardsFSMountHTTP("/tfs", `${window.location.origin}/tfs/`);
+      while (!mod._shardsFetchBackendReady()) {
+        await sleep(100);
+      }
+    }
+
+    log("Loading shards...");
+    await loadShards();
+    const mod = instance.module;
+
+    // Load initial list of preloaded files
+    await updatePreloadedFiles();
+
+    // Add log polling function
+    const countPtr = mod._malloc(4);
+    const returnValuePtr = mod._malloc(4); // Allocate memory for return value
+    function pollLogs() {
+      const mod = instance.module;
+      mod._shardsLockLogBuffer();
+      try {
+        const messagesPtr = mod._shardsGetLogMessages(countPtr);
+        const count = mod.HEAP32[countPtr >> 2];
+
+        if (count > 0 && messagesPtr !== 0) {
+          const messageSize = 16; // size of MessageRep struct (ptr + ptr + int + int)
+          for (let i = 0; i < count; i++) {
+            const offset = messagesPtr + (i * messageSize);
+            const msgPtr = mod.HEAP32[offset >> 2];
+            const filePtr = mod.HEAP32[(offset + 4) >> 2];
+            const level = mod.HEAP32[(offset + 12) >> 2];
+
+            const msg = mod.UTF8ToString(msgPtr);
+            const file = mod.UTF8ToString(filePtr);
+
+            let prefix = '';
+            switch (level) {
+              case 0: prefix = '[trace] '; break;
+              case 1: prefix = '[debug] '; break;
+              case 2: prefix = '[info] '; break;
+              case 3: prefix = '[warn] '; break;
+              case 4: prefix = '[error] '; break;
+              case 5: prefix = '[critical] '; break;
+            }
+
+            logLocal(`${prefix}${file ? `[${file}] ` : ''}${msg}`);
+            logRemote(msg, level, file, 0, 0);
+          }
+        }
+      } finally {
+        mod._shardsUnlockLogBuffer();
+      }
+      setTimeout(pollLogs, 5000);
+    }
+    pollLogs();
+
+    const fdir = mod.cwrap('shardsCWDAndList', 'void', ['string', 'string'], { async: false });
+    const ffile = mod.cwrap('shardsCWDAndTryLoad', 'void', ['string', 'string'], { async: false });
+    // fdir("/tfs/shards/tests", "data");
+    // ffile("/tfs", "main.cpp");
+    // ffile("/tfs/shards/tests", "web-inc.shs");
+
+    async function runAction(action) {
+      if (action.action == "update-preloaded") {
+        await updatePreloadedFiles();
+      } else if(action.action == "shutdown") {
+        console.log("<puppeteer>shutdown");
+        console.log("Shutting down");
+        window.close();
+      } else if (action.action == "run") {
+        const mod = instance.module;
+        const dstFile = `/tfs/${action.data}`;
+
+        const code = await fetch(dstFile).then(r => r.text());
+        const codePtr = mod.stringToNewUTF8(code);
+
+        const lastSlash = action.data.lastIndexOf('/');
+        const basePath = lastSlash >= 0 ? `/tfs/${action.data.substring(0, lastSlash+1)}` : '/tfs/';
+        console.log("basePath", basePath);
+        const basePathPtr = mod.stringToNewUTF8(basePath);
+        try {
+          mod._shardsLoadScript(returnValuePtr, codePtr, basePathPtr);
+          const inst = mod.HEAP32[returnValuePtr >> 2];
+
+          if (!inst) {
+            throw new Error("Failed to load script");
+          }
+          const err = mod._shardsGetError(inst);
+          if (err) {
+            throw new Error(mod.UTF8ToString(err));
+          }
+          try {
+            var result = 1;
+            while (result > 0) {
+              mod._shardsTick(inst, returnValuePtr);
+              result = mod.HEAP32[returnValuePtr >> 2];
+              const err = mod._shardsGetError(inst);
+              if (err) {
+                throw new Error(mod.UTF8ToString(err));
+              }
+              // await sleep(2);
+              await new Promise(resolve => window.requestAnimationFrame(resolve));
+            }
+          } finally {
+            mod._shardsFreeInstance(inst);
+          }
+        } finally {
+          mod._free(codePtr);
+          mod._free(basePathPtr);
+        }
+      }
+    }
+
+    async function processAction(action) {
+      isProcessingAction = true;
+      currentAction.textContent = JSON.stringify(action);
+      currentAction.style.display = 'block';
+      log(`Processing action: ${JSON.stringify(action)}`);
+
+      // Delete pending action
+      await fetch('/control', {
+        method: 'DELETE'
+      });
+
+      // Dummy completion after 3 seconds
+      // await new Promise(resolve => setTimeout(resolve, 3000));
+      try {
+        await runAction(action);
+        log('Action completed successfully');
+      } catch (error) {
+        log(`Error running action: ${error}`);
+        await fetch('/error', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ d: error.toString(), a: action })
+        });
+      }
+
+      currentAction.style.display = 'none';
+      isProcessingAction = false;
+    }
+
+    async function pollControl() {
+      if (!isProcessingAction) {
+        try {
+          const response = await fetch('/control');
+          const actions = await response.json();
+
+          if (actions && actions.length > 0) {
+            await processAction(actions[0]);
+          }
+        } catch (error) {
+          log(`Error polling control: ${error}`);
+        }
+      }
+
+      setTimeout(pollControl, 1000);
+    }
+    pollControl();
+  </script>
+</body>
+
+</html>

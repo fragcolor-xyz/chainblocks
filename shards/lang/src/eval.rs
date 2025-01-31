@@ -7,6 +7,7 @@ use crate::RcStrWrapper;
 use crate::ShardsExtension;
 
 use core::convert::TryInto;
+use std::rc::Rc;
 
 use nanoid::nanoid;
 use shards::cstr;
@@ -3366,65 +3367,9 @@ fn eval_pipeline(
           }
           ("schedule", true) => {
             if let Some(ref params) = func.params {
-              let param_helper = ParamHelper::new(params);
-
-              let mesh_id = param_helper.get_param_by_name_or_index("Mesh", 0).ok_or(
-                (
-                  "schedule built-in function requires a mesh parameter",
-                  block.line_info.unwrap_or_default(),
-                )
-                  .into(),
-              )?;
-              let wire_id = param_helper.get_param_by_name_or_index("Wire", 1).ok_or(
-                (
-                  "schedule built-in function requires a wire parameter",
-                  block.line_info.unwrap_or_default(),
-                )
-                  .into(),
-              )?;
-
-              // make sure the env is fully resolved before schedule cos that will calls compose and what not!
-              finalize_env(e)?;
-
-              // wire is likely lazy so we need to evaluate it
-              let wire = match &wire_id.value {
-                // can be only identifier or string
-                Value::Identifier(name) => {
-                  if let Some(wire) = e.finalized_wires.get(name) {
-                    Ok(wire.0)
-                  } else {
-                    Err(
-                      (
-                        "schedule built-in function requires a valid wire parameter",
-                        block.line_info.unwrap_or_default(),
-                      )
-                        .into(),
-                    )
-                  }
-                }
-                _ => Err(
-                  (
-                    "schedule built-in function requires a wire parameter",
-                    block.line_info.unwrap_or_default(),
-                  )
-                    .into(),
-                ),
-              }?;
-
-              let mesh = get_mesh(&mesh_id, find_mesh, e, block)?;
-              let wire = wire.as_ref().try_into().unwrap(); // qed, we know it's a wire
-
-              if !mesh.compose(wire) {
-                return Err(
-                  (
-                    "failed to compose wire into mesh",
-                    block.line_info.unwrap_or_default(),
-                  )
-                    .into(),
-                );
-              }
-              mesh.schedule(wire, false);
-
+              let mut otherFn = func.clone();
+              otherFn.name.name = RcStrWrapper::new("Schedule");
+              add_shard(&otherFn, block.line_info.unwrap_or_default(), e)?;
               Ok(())
             } else {
               Err(
@@ -3438,163 +3383,9 @@ fn eval_pipeline(
           }
           ("run", true) => {
             if let Some(ref params) = func.params {
-              let param_helper = ParamHelper::new(params);
-
-              let mesh_id = param_helper.get_param_by_name_or_index("Mesh", 0).ok_or(
-                (
-                  "run built-in function requires a mesh parameter",
-                  block.line_info.unwrap_or_default(),
-                )
-                  .into(),
-              )?;
-              let tick_param = param_helper.get_param_by_name_or_index("TickTime", 1);
-              let iterations_param = param_helper.get_param_by_name_or_index("Iterations", 2);
-              let fps_param = param_helper.get_param_by_name_or_index("FPS", 3);
-
-              let tick = match (tick_param, fps_param) {
-                (Some(rate), None) => {
-                  let v = as_var(&rate.value, block.line_info.unwrap_or_default(), None, e)?;
-                  let v = match v {
-                    SVar::NotCloned(v) => f64::try_from(&v),
-                    SVar::Cloned(v) => f64::try_from(&v.0),
-                  }
-                  .map_err(|_| {
-                    (
-                      "run built-in function requires a float number (or something that evaluates into a float) rate parameter",
-                      block.line_info.unwrap_or_default(),
-                    )
-                      .into()
-                  })?;
-                  Ok(Some(v))
-                }
-                (None, Some(fps)) => {
-                  let v = as_var(&fps.value, block.line_info.unwrap_or_default(), None, e)?;
-                  let fv = match &v {
-                    SVar::NotCloned(v) => f64::try_from(v),
-                    SVar::Cloned(v) => f64::try_from(&v.0),
-                  };
-                  if let Ok(fv) = fv {
-                    Ok(Some(1.0 / fv))
-                  } else {
-                    let iv = match &v {
-                      SVar::NotCloned(v) => i64::try_from(v),
-                      SVar::Cloned(v) => i64::try_from(&v.0),
-                    };
-                    if let Ok(iv) = iv {
-                      Ok(Some(1.0 / iv as f64))
-                    } else {
-                      Err(
-                        (
-                          "run built-in function requires a float or int number (or something that evaluates into it) fps parameter",
-                          block.line_info.unwrap_or_default(),
-                        )
-                          .into(),
-                      )
-                    }
-                  }
-                }
-                (Some(_), Some(_)) => Err(
-                  (
-                    "run built-in function requires either a rate or fps parameter",
-                    block.line_info.unwrap_or_default(),
-                  )
-                    .into(),
-                ),
-                _ => Ok(None),
-              }?;
-
-              let iterations = if let Some(iterations) = iterations_param {
-                let v = as_var(
-                  &iterations.value,
-                  block.line_info.unwrap_or_default(),
-                  None,
-                  e,
-                )?;
-                let fv = match &v {
-                  SVar::NotCloned(v) => i64::try_from(v),
-                  SVar::Cloned(v) => i64::try_from(&v.0),
-                };
-
-                if let Ok(fv) = fv {
-                  Ok(Some(fv as u64))
-                } else {
-                  Err(
-                      (
-                        "run built-in function requires an int number (or something that evaluates into it) iterations parameter",
-                        block.line_info.unwrap_or_default(),
-                      )
-                        .into(),
-                    )
-                }
-              } else {
-                Ok(None)
-              }?;
-
-              fn sleep_and_update(next: &mut Instant, now: Instant, tick: f64) {
-                let real_sleep_time = *next - now;
-
-                if real_sleep_time <= Duration::from_secs_f64(0.0) {
-                  *next = now + Duration::from_secs_f64(tick);
-                } else {
-                  sleep(real_sleep_time.as_secs_f64());
-                  *next += Duration::from_secs_f64(tick);
-                }
-              }
-
-              let mesh = get_mesh(&mesh_id, find_mesh, e, block)?;
-
-              use std::time::{Duration, Instant};
-
-              let mut now = Instant::now();
-              let mut next = now + Duration::from_secs_f64(tick.unwrap_or(0.0));
-              let mut iteration = 0u64;
-              let mut no_errors = true;
-
-              loop {
-                if let Some(tick) = tick {
-                  if !mesh.tick() {
-                    no_errors = false;
-                  }
-                  now = Instant::now();
-                  sleep_and_update(&mut next, now, tick);
-                } else {
-                  if !mesh.tick() {
-                    no_errors = false;
-                  }
-                  // still yield to other threads
-                  sleep(0.0);
-                }
-
-                iteration += 1;
-
-                if cancellation_token.load(atomic::Ordering::Relaxed) {
-                  mesh.terminate();
-                  return Err(ShardsError {
-                    message: String::from("Operation cancelled"),
-                    loc: Default::default(),
-                  });
-                }
-
-                if let Some(max_iterations) = iterations {
-                  if iteration >= max_iterations {
-                    break;
-                  }
-                }
-
-                if mesh.is_empty() {
-                  shlog_trace!("Mesh is empty, exiting");
-                  break;
-                }
-              }
-
-              shlog_trace!("Mesh is done, terminating, without errors: {}", no_errors);
-              mesh.terminate();
-
-              // a @run(...) should transform into a boolean const shard so to be used for error handling
-              let no_errors = no_errors.into();
-              // we cannot use variation 2 here cos we don't have a func we can use, those blocks will be transformed into a constant
-              add_const_shard3(no_errors, block.line_info.unwrap_or_default(), e)?;
-
+              let mut otherFn = func.clone(); 
+              otherFn.name.name = RcStrWrapper::new("Run");
+              add_shard(&otherFn, block.line_info.unwrap_or_default(), e)?;
               Ok(())
             } else {
               Err(

@@ -1,6 +1,7 @@
 #include "gfx.hpp"
 #include "shards_types.hpp"
 #include "shards_utils.hpp"
+#include "param_types.hpp"
 #include <shards/linalg_shim.hpp>
 #include "drawable_utils.hpp"
 #include <gfx/material.hpp>
@@ -17,7 +18,7 @@ struct MaterialShard {
   static SHOptionalString inputHelp() { return DefaultHelpText::InputHelpIgnored; }
   static SHOptionalString outputHelp() { return SHCCSTR("Outputs the material created as a material object."); }
 
-  PARAM_EXT(ParamVar, _params, ShardsTypes::ParamsParameterInfo);
+  PARAM_EXT(ParamVar, _params, gfx::detail::ParamsParameterInfo);
   PARAM_EXT(ParamVar, _features, ShardsTypes::FeaturesParameterInfo);
 
   PARAM_IMPL(PARAM_IMPL_FOR(_params), PARAM_IMPL_FOR(_features));

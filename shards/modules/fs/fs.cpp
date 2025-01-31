@@ -338,9 +338,7 @@ struct Read {
 
   SHTypeInfo compose(const SHInstanceData &data) { return _binary ? CoreInfo::BytesType : CoreInfo::StringType; }
 
-  void cleanup(SHContext *context) {
-    _buffer = {};
-  }
+  void cleanup(SHContext *context) { _buffer = {}; }
 
   SHVar activate(SHContext *context, const SHVar &input) {
     _buffer.clear();
@@ -646,9 +644,37 @@ struct Absolute {
   SHVar activate(SHContext *context, const SHVar &input) {
     _output.clear();
     fs::path p(SHSTRING_PREFER_SHSTRVIEW(input));
-    p = fs::absolute(p);
-    p = _canonical.get().payload.boolValue ? fs::canonical(p) : p;
+    p = _canonical.get().payload.boolValue ? fs::canonical(p) : fs::absolute(p);
     _output.assign(p.string());
+
+    return Var(_output);
+  }
+};
+
+struct IsAbsolute {
+  static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::BoolType; }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    fs::path p(SHSTRING_PREFER_SHSTRVIEW(input));
+    return Var(p.is_absolute());
+  }
+};
+
+struct Normalize {
+  static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::StringType; }
+
+  static SHOptionalString help() {
+    return SHCCSTR("Returns a normalized path by removing redundant separators and up-level references");
+  }
+
+  std::string _output;
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    _output.clear();
+    fs::path p(SHSTRING_PREFER_SHSTRVIEW(input));
+    _output = p.normalize().string();
     return Var(_output);
   }
 };
@@ -683,6 +709,92 @@ struct Rename {
     return input;
   }
 };
+
+struct Is {
+  static SHTypesInfo inputTypes() { return CoreInfo::StringType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::BoolType; }
+
+  static SHOptionalString help() { return SHCCSTR("Returns true if two paths refer to the same file system object"); }
+
+  PARAM_PARAMVAR(_other, "Other", "Path to compare with", {CoreInfo::StringOrStringVar});
+  PARAM_IMPL(PARAM_IMPL_FOR(_other));
+
+  PARAM_REQUIRED_VARIABLES()
+  SHTypeInfo compose(const SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return data.inputType;
+  }
+  void warmup(SHContext *context) { PARAM_WARMUP(context); }
+  void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    fs::path p1(SHSTRING_PREFER_SHSTRVIEW(input));
+    fs::path p2(SHSTRING_PREFER_SHSTRVIEW(_other.get()));
+    return Var(fs::equivalent(p1, p2));
+  }
+};
+
+struct IsAny {
+  static SHTypesInfo inputTypes() { return CoreInfo::StringSeqType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::BoolType; }
+
+  static SHOptionalString help() {
+    return SHCCSTR("Returns true if the input sequence of paths contains a path equivalent to the given path");
+  }
+
+  PARAM_PARAMVAR(_other, "Other", "Path to compare with", {CoreInfo::StringOrStringVar});
+  PARAM_IMPL(PARAM_IMPL_FOR(_other));
+
+  PARAM_REQUIRED_VARIABLES()
+  SHTypeInfo compose(const SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return CoreInfo::BoolType;
+  }
+  void warmup(SHContext *context) { PARAM_WARMUP(context); }
+  void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
+
+  SHVar activate(SHContext *context, const SHVar &input) {
+    auto p2 = fs::path(SHSTRING_PREFER_SHSTRVIEW(_other.get()));
+    for (size_t i = 0; i < input.payload.seqValue.len; i++) {
+      auto p1 = fs::path(SHSTRING_PREFER_SHSTRVIEW(input.payload.seqValue.elements[i]));
+      if (fs::equivalent(p1, p2)) {
+        return Var(true);
+      }
+    }
+    return Var(false);
+  }
+};
+
+struct IsNotAny {
+  static SHTypesInfo inputTypes() { return CoreInfo::StringSeqType; }
+  static SHTypesInfo outputTypes() { return CoreInfo::BoolType; }
+
+  static SHOptionalString help() {
+    return SHCCSTR("Returns true if the input sequence of paths does not contain a path equivalent to the given path");
+  }
+
+  PARAM_PARAMVAR(_other, "Other", "Path to compare with", {CoreInfo::StringOrStringVar});
+  PARAM_IMPL(PARAM_IMPL_FOR(_other));
+
+  PARAM_REQUIRED_VARIABLES()
+  SHTypeInfo compose(const SHInstanceData &data) {
+    PARAM_COMPOSE_REQUIRED_VARIABLES(data);
+    return CoreInfo::BoolType;
+  }
+  void warmup(SHContext *context) { PARAM_WARMUP(context); }
+  void cleanup(SHContext *context) { PARAM_CLEANUP(context); }
+  SHVar activate(SHContext *context, const SHVar &input) {
+    auto p2 = fs::path(SHSTRING_PREFER_SHSTRVIEW(_other.get()));
+    for (size_t i = 0; i < input.payload.seqValue.len; i++) {
+      auto p1 = fs::path(SHSTRING_PREFER_SHSTRVIEW(input.payload.seqValue.elements[i]));
+      if (fs::equivalent(p1, p2)) {
+        return Var(false);
+      }
+    }
+    return Var(true);
+  }
+};
+
 }; // namespace FS
 
 SHARDS_REGISTER_FN(fs) {
@@ -705,6 +817,11 @@ SHARDS_REGISTER_FN(fs) {
   REGISTER_SHARD("FS.SetWriteTime", FS::SetWriteTime);
   REGISTER_SHARD("FS.CreateDirectories", FS::CreateDirectories);
   REGISTER_SHARD("FS.Absolute", FS::Absolute);
+  REGISTER_SHARD("FS.IsAbsolute", FS::IsAbsolute);
+  REGISTER_SHARD("FS.Normalize", FS::Normalize);
   REGISTER_SHARD("FS.Rename", FS::Rename);
+  REGISTER_SHARD("FS.Is", FS::Is);
+  REGISTER_SHARD("FS.IsAny", FS::IsAny);
+  REGISTER_SHARD("FS.IsNotAny", FS::IsNotAny);
 }
 }; // namespace shards

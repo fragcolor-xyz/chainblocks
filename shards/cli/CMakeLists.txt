@@ -26,71 +26,73 @@ function(setup_shards_library_target TARGET)
   setup_shards_target(${TARGET})
 endfunction()
 
-# Executable
-add_executable(shards ${cli_SOURCES})
-setup_shards_target(shards)
-target_link_libraries(shards shards-cpp-union)
+if(NOT EMSCRIPTEN)
+  # Executable
+  add_executable(shards ${cli_SOURCES})
+  setup_shards_target(shards)
+  target_link_libraries(shards shards-cpp-union)
 
-# library
-add_library(shards-lib)
-setup_shards_library_target(shards-lib)
-set_target_properties(shards-lib PROPERTIES OUTPUT_NAME "${LIB_PREFIX}shards-static")
-target_compile_definitions(shards-lib PRIVATE "shards_EXPORTS=1")
+  # library
+  add_library(shards-lib)
+  setup_shards_library_target(shards-lib)
+  set_target_properties(shards-lib PROPERTIES OUTPUT_NAME "${LIB_PREFIX}shards-static")
+  target_compile_definitions(shards-lib PRIVATE "shards_EXPORTS=1")
 
-# Apple Framework target
-if(APPLE)
-  add_library(shards-framework SHARED ${cli_SOURCES})
-  setup_shards_target(shards-framework)
+  # Apple Framework target
+  if(APPLE)
+    add_library(shards-framework SHARED ${cli_SOURCES})
+    setup_shards_target(shards-framework)
 
-  # Framework specific settings
-  set_target_properties(shards-framework PROPERTIES
-    FRAMEWORK TRUE
-    FRAMEWORK_VERSION A
-    MACOSX_FRAMEWORK_IDENTIFIER com.fragcolor.shards
-    MACOSX_FRAMEWORK_BUNDLE_VERSION "1.0"
-    MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
-    XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
-    XCODE_ATTRIBUTE_ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES "YES"
-    XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
-    XCODE_ATTRIBUTE_SWIFT_INSTALL_OBJC_HEADER "NO"
-    OUTPUT_NAME "Shards"
-
-    # Debug symbols generation
-    XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
-    XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS "YES"
-    XCODE_ATTRIBUTE_DEPLOYMENT_POSTPROCESSING "YES"
-    XCODE_ATTRIBUTE_SEPARATE_STRIP "YES"
-    XCODE_ATTRIBUTE_STRIP_INSTALLED_PRODUCT "YES"
-    XCODE_ATTRIBUTE_STRIP_STYLE "debugging"
-  )
-
-  # MacOS specific settings
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    # Framework specific settings
     set_target_properties(shards-framework PROPERTIES
-      XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/../Frameworks @loader_path/Frameworks"
-      INSTALL_RPATH "@executable_path/../Frameworks"
-      BUILD_WITH_INSTALL_RPATH TRUE
+      FRAMEWORK TRUE
+      FRAMEWORK_VERSION A
+      MACOSX_FRAMEWORK_IDENTIFIER com.fragcolor.shards
+      MACOSX_FRAMEWORK_BUNDLE_VERSION "1.0"
+      MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
+      XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
+      XCODE_ATTRIBUTE_ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES "YES"
+      XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
+      XCODE_ATTRIBUTE_SWIFT_INSTALL_OBJC_HEADER "NO"
+      OUTPUT_NAME "Shards"
+
+      # Debug symbols generation
+      XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
+      XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS "YES"
+      XCODE_ATTRIBUTE_DEPLOYMENT_POSTPROCESSING "YES"
+      XCODE_ATTRIBUTE_SEPARATE_STRIP "YES"
+      XCODE_ATTRIBUTE_STRIP_INSTALLED_PRODUCT "YES"
+      XCODE_ATTRIBUTE_STRIP_STYLE "debugging"
     )
 
-    # Link Swift runtime for MacOS
-    target_link_libraries(shards-framework
-      "-framework Foundation"
-      "-framework CoreFoundation"
-      "-lswiftCore"
-      "-lswiftFoundation"
+    # MacOS specific settings
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+      set_target_properties(shards-framework PROPERTIES
+        XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/../Frameworks @loader_path/Frameworks"
+        INSTALL_RPATH "@executable_path/../Frameworks"
+        BUILD_WITH_INSTALL_RPATH TRUE
+      )
+
+      # Link Swift runtime for MacOS
+      target_link_libraries(shards-framework
+        "-framework Foundation"
+        "-framework CoreFoundation"
+        "-lswiftCore"
+        "-lswiftFoundation"
+      )
+    endif()
+
+    # Make headers public for framework
+    file(GLOB PUBLIC_HEADERS "*.hpp")
+    set_target_properties(shards-framework PROPERTIES
+      PUBLIC_HEADER "${PUBLIC_HEADERS}"
     )
+
+    target_link_libraries(shards-framework shards-cpp-union)
   endif()
+else()
+  add_executable(shards emscripten_api.cpp)
 
-  # Make headers public for framework
-  file(GLOB PUBLIC_HEADERS "*.hpp")
-  set_target_properties(shards-framework PROPERTIES
-    PUBLIC_HEADER "${PUBLIC_HEADERS}"
-  )
-
-  target_link_libraries(shards-framework shards-cpp-union)
-endif()
-
-if(EMSCRIPTEN)
   if(EMSCRIPTEN_PTHREADS)
     set_target_properties(shards PROPERTIES SUFFIX "-mt.js")
   else()
@@ -98,8 +100,34 @@ if(EMSCRIPTEN)
   endif()
 
   target_link_options(shards PUBLIC
-    "SHELL:-s MODULARIZE=1"
-    "SHELL:-s EXPORT_NAME=shards"
-    "SHELL:-s NO_EXIT_RUNTIME=1"
+    "-sMODULARIZE=1"
+    "-sEXPORT_NAME=shards"
+    "-sENVIRONMENT=web,worker"
+    "-sEXPORT_ES6=1" # Don't need compatibility with older browsers, wgpu is a limiting factor
+    "-sMIN_FIREFOX_VERSION=125"
+    "-sMIN_CHROME_VERSION=113"
+    "-sMIN_SAFARI_VERSION=-1"
+    "-sPTHREAD_POOL_SIZE=12"
+    "-sEXPORTED_RUNTIME_METHODS=['FS', 'FETCHFS', 'stringToNewUTF8', 'UTF8ToString', 'ccall', 'cwrap', 'gfxSetup']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free']"
+    "-sOFFSCREENCANVAS_SUPPORT=1"
+    "-sSTACK_SIZE=2097152"
+    "-sINITIAL_MEMORY=2147483648"
+    "-sWASMFS"
+    "-lfetchfs.js"
+    "-sFORCE_FILESYSTEM"
   )
+
+  target_link_libraries(shards shards-core shards-cpp-union)
+
+  # Need the lang-ffi bindings
+  add_dependencies(shards cargo-shards-langffi-rust)
+
+  if(SHARDS_DEBUG_SYMBOL_URL)
+    # Set cache to something like:
+    # SHARDS_DEBUG_SYMBOL_URL:STRING=http://localhost/fbl.debug.wasm
+    string(REGEX MATCH "([^/]+)$" DEBUG_SYMBOL_FILENAME ${SHARDS_DEBUG_SYMBOL_URL})
+    target_link_options(shards PRIVATE "-gseparate-dwarf=${DEBUG_SYMBOL_FILENAME}")
+    target_link_options(shards PRIVATE "-sSEPARATE_DWARF_URL=${SHARDS_DEBUG_SYMBOL_URL}")
+  endif()
 endif()

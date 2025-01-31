@@ -1,0 +1,29 @@
+@include("config.shs")
+@define(host #(["http://localhost:" @port] | String.Format) IgnoreRedefined: true)
+@define(action none IgnoreRedefined: true)
+@define(data none IgnoreRedefined: true)
+@define(exclude "" IgnoreRedefined: true)
+
+[@host "/control"] | String.Join = control-url
+{"Content-Type": "application/json"} = hdrs
+@action | Match([
+  ; Command to run a given shards script
+  "run" {
+    {action: @action data: @data}
+    ToJson | Http.Put(URL: control-url Headers: hdrs)
+  }
+  "shutdown" {
+    {action: @action}
+    ToJson | Http.Put(URL: control-url Headers: hdrs)
+  }
+  ; Command to preload a given folder, which is required for it to be available in the file system
+  "preload-files" {
+    @data ExpectString | String.Split(",") ExpectSeq = paths
+    {paths: paths exclude: @exclude}
+    ToJson | Http.Post(URL: ([@host "/preload-files"] | String.Join) Headers: hdrs)
+  }
+  none {
+    Log("Unrecognized action")
+    Fail
+  }
+])

@@ -1,0 +1,39 @@
+@include("http-server-shared.shs")
+@include("config.shs")
+
+@mesh(root)
+
+@define(runtime-wire-path "http-server-inner.shs")
+@define(get-runtime-wire {
+  @runtime-wire-path | FS.LastWriteTime
+  Memoize({
+    ; Log("Loading runtime wire")
+    Await({
+      @runtime-wire-path | FS.Read | Shards.Read(BasePath: ".")
+      Shards.Distill("handler" {} "handler")
+    })
+  })
+})
+
+@wire(web-handler-proxy {
+  @get-runtime-wire = wire
+  Maybe({
+      WireRunner(wire RunWireMode::Inline)
+    } {
+      Log("Web handler failed")
+      "Script error" | Http.Response(Status: 500 ContentType: "text/plain")
+    }
+  )
+} Looped: true)
+
+@wire(web-server {
+  Once({
+    Sequence(handler/action-queue Global: true Type: @type([@action-type]))
+    Sequence(handler/preloaded-files Global: true Type: @type([{none: Type::String}]))
+    Table(handler/preloaded-files-set Global: true Type: @type({none: Type::String}))
+  })
+  Http.Server(web-handler-proxy Port: @port)
+} Looped: true)
+
+@schedule(root web-server)
+@run(root 0.01)

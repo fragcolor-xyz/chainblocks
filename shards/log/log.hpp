@@ -3,6 +3,7 @@
 
 #include <string>
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/dist_sink.h>
 #include <shared_mutex>
 #include <vector>
 
@@ -26,6 +27,8 @@ void setSinkLevel(spdlog::level::level_enum level);
 void setupDefaultLoggerConditional(std::string fileName);
 
 void flush();
+
+std::shared_ptr<spdlog::sinks::dist_sink_mt> getDistSink();
 
 // Set default log level and redirect to main logger
 // !! Do not call directly since this registers the logger

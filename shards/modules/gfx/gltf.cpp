@@ -1,4 +1,5 @@
 #include "boost/filesystem/path.hpp"
+#include "param_types.hpp"
 #include <shards/common_types.hpp>
 #include "gfx/gltf/animation.hpp"
 #include <shards/core/params.hpp>
@@ -124,7 +125,7 @@ struct GLTFShard {
                  {CoreInfo::NoneType, Type::VariableOf(ShardsTypes::Drawable)});
   PARAM_VAR(_wrapRootNode, "WrapRootNode", "Wrap the root node so animations applied to it still work",
             {CoreInfo::NoneType, CoreInfo::BoolType});
-  PARAM_EXT(ParamVar, _params, ShardsTypes::ParamsParameterInfo);
+  PARAM_EXT(ParamVar, _params, gfx::detail::ParamsParameterInfo);
   PARAM_EXT(ParamVar, _features, ShardsTypes::FeaturesParameterInfo);
   PARAM(ShardsVar, _animController, "AnimationController", "The animation controller", {CoreInfo::ShardsOrNone});
   PARAM_IMPL(PARAM_IMPL_FOR(_path), PARAM_IMPL_FOR(_bytes), PARAM_IMPL_FOR(_copy), PARAM_IMPL_FOR(_params),
