@@ -1,0 +1,1 @@
+@define(web-platform #(@platform | Is("emscripten")))

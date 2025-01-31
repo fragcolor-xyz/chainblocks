@@ -155,14 +155,15 @@ template <class T> struct ShardWrapper {
     // setParam
     if constexpr (has_setParam<T>::value) {
       result->setParam = static_cast<SHSetParamProc>([](Shard *b, int i, const SHVar *v) {
-        try {
+        // TODO: Exceptions
+        // try {
           reinterpret_cast<ShardWrapper<T> *>(b)->shard.setParam(i, *v);
           return SHError::Success;
-        } catch (const std::exception &e) {
-          reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
-          return SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
-                                            reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}};
-        }
+        // } catch (const std::exception &e) {
+          // reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
+          // return SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
+          //                                   reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}};
+        // }
       });
     } else {
       result->setParam = static_cast<SHSetParamProc>([](Shard *b, int i, const SHVar *v) { return SHError::Success; });
@@ -179,14 +180,15 @@ template <class T> struct ShardWrapper {
     // compose
     if constexpr (has_compose<T>::value) {
       result->compose = static_cast<SHComposeProc>([](Shard *b, SHInstanceData *data) {
-        try {
+        // try {
           return SHShardComposeResult{SHError::Success, reinterpret_cast<ShardWrapper<T> *>(b)->shard.compose(*data)};
-        } catch (std::exception &e) {
-          reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
-          return SHShardComposeResult{SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
-                                                                 reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}},
-                                      SHTypeInfo{}};
-        }
+          // TODO: Exceptions
+        // } catch (std::exception &e) {
+          // reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
+          // return SHShardComposeResult{SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
+          //                                                        reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}},
+          //                             SHTypeInfo{}};
+        // }
       });
     } else {
       // compose is optional!
@@ -196,14 +198,16 @@ template <class T> struct ShardWrapper {
     // composeV2
     if constexpr (has_composeV2<T>::value) {
       result->composeV2 = static_cast<SHComposeV2Proc>([](Shard *b, SHInstanceData *data) {
-        try {
+        // try {
           return SHShardComposeResult{SHError::Success, reinterpret_cast<ShardWrapper<T> *>(b)->shard.composeV2(*data)};
-        } catch (std::exception &e) {
-          reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
-          return SHShardComposeResult{SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
-                                                                 reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}},
-                                      SHTypeInfo{}};
-        }
+          // TODO: Exceptions
+        // } catch (std::exception &e) {
+          // reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
+
+        //   return SHShardComposeResult{SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
+        //                                                          reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}},
+        //                               SHTypeInfo{}};
+        // }
       });
     } else {
       // composeV2 is optional!
@@ -213,14 +217,15 @@ template <class T> struct ShardWrapper {
     // warmup
     if constexpr (has_warmup<T>::value) {
       result->warmup = static_cast<SHWarmupProc>([](Shard *b, SHContext *ctx) {
-        try {
+        // try {
           reinterpret_cast<ShardWrapper<T> *>(b)->shard.warmup(ctx);
           return SHError::Success;
-        } catch (const std::exception &e) {
-          reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
-          return SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
-                                            reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}};
-        }
+          // TODO: Exceptions
+        // } catch (const std::exception &e) {
+        //   reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
+        //   return SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
+        //                                     reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}};
+        // }
       });
     } else {
       // warmup is optional!
@@ -232,7 +237,7 @@ template <class T> struct ShardWrapper {
     if constexpr (has_activate<T>::value) {
       result->activate = static_cast<SHActivateProc>([](Shard *b, SHContext *ctx, const SHVar *v) -> const SHVar * {
         auto self = reinterpret_cast<ShardWrapper<T> *>(b);
-        try {
+        // try {
           using ReturnType = decltype(self->shard.activate(ctx, *v));
           if constexpr (std::is_same_v<ReturnType, void>) {
             self->shard.activate(ctx, *v);
@@ -244,28 +249,30 @@ template <class T> struct ShardWrapper {
             self->outputStorage = self->shard.activate(ctx, *v);
             return &self->outputStorage;
           }
-        } catch (const std::exception &e) {
-          shards::abortWire(ctx, e.what());
-          return &self->outputStorage;
-        }
+          // TODO: Exceptions
+        // } catch (const std::exception &e) {
+        //   shards::abortWire(ctx, e.what());
+        //   return &self->outputStorage;
+        // }
       });
     }
 
     // cleanup
     if constexpr (has_cleanup<T>::value) {
       result->cleanup = static_cast<SHCleanupProc>([](Shard *b, SHContext *context) {
-        try {
+        // try {
           if constexpr (std::is_invocable_v<decltype(&T::cleanup), T &, SHContext *>) {
             reinterpret_cast<ShardWrapper<T> *>(b)->shard.cleanup(context);
           } else {
             reinterpret_cast<ShardWrapper<T> *>(b)->shard.cleanup();
           }
           return SHError::Success;
-        } catch (const std::exception &e) {
-          reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
-          return SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
-                                            reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}};
-        }
+          // TODO: Exceptions
+        // } catch (const std::exception &e) {
+        //   reinterpret_cast<ShardWrapper<T> *>(b)->lastError.assign(e.what());
+        //   return SHError{1, SHStringWithLen{reinterpret_cast<ShardWrapper<T> *>(b)->lastError.data(),
+        //                                     reinterpret_cast<ShardWrapper<T> *>(b)->lastError.size()}};
+        // }
       });
     } else {
       result->cleanup = static_cast<SHCleanupProc>([](Shard *b, SHContext *) { return SHError::Success; });
@@ -333,26 +340,29 @@ template <class T> struct ShardWrapper {
 #define OVERRIDE_ACTIVATE(__data__, __func__)                                                                            \
   __data__.shard->activate = static_cast<SHActivateProc>([](Shard *b, SHContext *ctx, const SHVar *v) -> const SHVar * { \
     auto self = reinterpret_cast<shards::ShardWrapper<typename std::remove_pointer<decltype(this)>::type> *>(b);         \
-    try {                                                                                                                \
+  })
+  
+    // try {                                                                                                                \
       self->outputStorage = self->shard.__func__(ctx, *v);                                                               \
       return &self->outputStorage;                                                                                       \
-    } catch (std::exception & e) {                                                                                       \
-      shards::abortWire(ctx, e.what());                                                                                  \
-      return &self->outputStorage;                                                                                       \
-    }                                                                                                                    \
-  })
+      // TODO: Exceptions
+    // } catch (std::exception & e) {                                                                                       \
+    //   shards::abortWire(ctx, e.what());                                                                                  \
+    //   return &self->outputStorage;                                                                                       \
 
 #define OVERRIDE_ACTIVATE1(__data__, __func__)                                                                           \
   __data__.shard->activate = static_cast<SHActivateProc>([](Shard *b, SHContext *ctx, const SHVar *v) -> const SHVar * { \
     auto self = reinterpret_cast<shards::ShardWrapper<typename std::remove_pointer<decltype(this)>::type> *>(b);         \
-    try {                                                                                                                \
       self->shard.__func__(ctx, *v);                                                                                     \
-      return v;                                                                                                          \
-    } catch (std::exception & e) {                                                                                       \
-      shards::abortWire(ctx, e.what());                                                                                  \
-      return &self->outputStorage;                                                                                       \
-    }                                                                                                                    \
+      return v;                                                                                                          
   })
+
+    // try {                                                                                                                
+      // TODO: Exceptions
+    // } catch (std::exception & e) {                                                                                       
+    //   shards::abortWire(ctx, e.what());                                                                                  
+    //   return &self->outputStorage;                                                                                       
+    // }                                                                                                                    
 
 template <typename SHCORE, Parameters &Params, size_t NPARAMS, Type &InputType, Type &OutputType> struct TSimpleShard {
   static SHTypesInfo inputTypes() { return InputType; }

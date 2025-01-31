@@ -95,7 +95,7 @@ struct Storage {
   std::string_view load(uint64_t id) {
     return read([&](auto &readLock) {
       if (id >= pool.reverse.size()) {
-        throw std::logic_error("Invalid fast string");
+        SHARDS_THROW(std::logic_error("Invalid fast string"));
       }
       return pool.reverse[id];
     });

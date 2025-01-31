@@ -5,6 +5,7 @@
 #define SH_CORE_OPS_INTERNAL
 
 #include "magic_enum.hpp"
+#include <shards/exceptions.hpp>
 #include <shards/shards.hpp>
 #include "spdlog/fmt/bundled/core.h"
 #include <shards/ops.hpp>
@@ -44,25 +45,25 @@ inline SHVar getDefaultValue(const SHTypeInfo &type) {
   case SHType::Path:
     return shards::Var("");
   case SHType::Enum:
-    throw std::runtime_error("Cannot generate default value for Enum type");
+    SHARDS_THROW(std::runtime_error("Cannot generate default value for Enum type"));
   case SHType::ContextVar:
-    throw std::runtime_error("Cannot generate default value for ContextVar type");
+    SHARDS_THROW(std::runtime_error("Cannot generate default value for ContextVar type"));
   case SHType::Image:
-    throw std::runtime_error("Cannot generate default value for Image type");
+    SHARDS_THROW(std::runtime_error("Cannot generate default value for Image type"));
   case SHType::Wire:
-    throw std::runtime_error("Cannot generate default value for Wire type");
+    SHARDS_THROW(std::runtime_error("Cannot generate default value for Wire type"));
   case SHType::ShardRef:
-    throw std::runtime_error("Cannot generate default value for ShardRef type");
+    SHARDS_THROW(std::runtime_error("Cannot generate default value for ShardRef type"));
   case SHType::Object:
-    throw std::runtime_error("Cannot generate default value for Object type");
+    SHARDS_THROW(std::runtime_error("Cannot generate default value for Object type"));
   case SHType::Audio:
-    throw std::runtime_error("Cannot generate default value for Audio type");
+    SHARDS_THROW(std::runtime_error("Cannot generate default value for Audio type"));
   case SHType::Type:
-    throw std::runtime_error("Cannot generate default value for Type type");
+    SHARDS_THROW(std::runtime_error("Cannot generate default value for Type type"));
   case SHType::Trait:
-    throw std::runtime_error("Cannot generate default value for Trait type");
+    SHARDS_THROW(std::runtime_error("Cannot generate default value for Trait type"));
   default:
-    throw std::runtime_error("Unknown SHType");
+    SHARDS_THROW(std::runtime_error("Unknown SHType"));
   }
 }
 
@@ -89,7 +90,7 @@ template <typename T> struct StringStreamFormatter {
   constexpr auto parse(fmt::format_parse_context &ctx) -> decltype(ctx.begin()) {
     auto it = ctx.begin(), end = ctx.end();
     if (it != end)
-      throw fmt::format_error("invalid format");
+      SHARDS_THROW(fmt::format_error("invalid format"));
     return it;
   }
 
@@ -144,7 +145,7 @@ template <> struct fmt::formatter<SHType> {
   constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) {
     auto it = ctx.begin(), end = ctx.end();
     if (it != end)
-      throw format_error("invalid format");
+      SHARDS_THROW(format_error("invalid format"));
     return it;
   }
   template <typename FormatContext> auto format(const SHType &v, FormatContext &ctx) -> decltype(ctx.out()) {
