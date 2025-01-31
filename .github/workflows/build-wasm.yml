@@ -58,6 +58,10 @@ jobs:
           echo "HOST_CC=$HOST_CC" >> $GITHUB_ENV
           echo "HOST_AR=$HOST_AR" >> $GITHUB_ENV
 
+          # Workaround for linker not being found
+          export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=`which cc`
+          echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=$CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER" >> $GITHUB_ENV
+
           # Use the prebuilt SDK tools/binaries (MAKE SURE VERSION IS COMPATIBLE)
           pushd emsdk
           ./emsdk install 4.0.1
@@ -78,34 +82,28 @@ jobs:
           # ./bootstrap
           # popd
 
-           # Test
-          git clone https://github.com/BurntSushi/memchr.git
-          cd memchr
-          git checkout 2.5.0
+          # Test
+          # git clone https://github.com/BurntSushi/memchr.git
+          # cd memchr
+          # git checkout 2.5.0
           # cargo +$RUSTUP_TOOLCHAIN -vvv build || true
-          cargo +$RUSTUP_TOOLCHAIN -vvv build --target wasm32-unknown-emscripten
+          # cargo +$RUSTUP_TOOLCHAIN -vvv build --target wasm32-unknown-emscripten
 
       - name: Set up rust
         run: |
           rustup +nightly component add rust-src
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
       - name: Build
         run: |
-          pushd memchr
-          rm -rf ./target
-          cargo +$RUSTUP_TOOLCHAIN -vvv build --target wasm32-unknown-emscripten
-          popd
-
           cmake -Bbuild -GNinja -DCARGO_VERBOSE=1 -DCMAKE_BUILD_TYPE=Release -DSKIP_HEAVY_INLINE=1 -DUSE_LTO=0 -DRUST_USE_LTO=0 -DEMSCRIPTEN_PTHREADS=ON -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN_ROOT/cmake/Modules/Platform/Emscripten.cmake
           cmake --build build --target cargo-shards-rust-union-rust
-          # cmake --build build --target shards
+          cmake --build build --target shards
 
           echo "SHARDS_BUILD=$(pwd)/build" >> $GITHUB_ENV
-      # Node LTS v16.15.0 freezes during exit on the st build, using version 18 works
+      - name: Setup tmate session
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
       - uses: actions/setup-node@v3
         with:
-          # Node 18.1.0 has a change in fetch() that causes it to fail loading the wasm module
           node-version: 18.0.0
       - name: Test
         run: |
