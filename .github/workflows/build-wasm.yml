@@ -88,6 +88,8 @@ jobs:
       - name: Set up rust
         run: |
           rustup +nightly component add rust-src
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Build
         run: |
           pushd memchr
