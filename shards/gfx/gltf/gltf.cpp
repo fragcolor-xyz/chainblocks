@@ -610,7 +610,7 @@ struct Loader {
 
       for (auto &gltfChannel : gltfAnimation.channels) {
         auto track = loadAnimationTrack(gltfAnimation, gltfChannel);
-        if(track.target != animation::BuiltinTarget::None)
+        if (track.target != animation::BuiltinTarget::None)
           animation.tracks.emplace_back(std::move(track));
       }
     }
@@ -895,7 +895,12 @@ std::vector<uint8_t> convertToGlb(const std::string &inputPath) {
 
   // Write to a temporary GLB file
   // std::filesystem::path tempOutputPath = std::filesystem::temp_directory_path() / "temp_output.glb";
-  auto tempOutputPath = boost::filesystem::unique_path("temp_output_%%%%-%%%%-%%%%-%%%%.glb");
+  auto tempOutputPath =
+#if SH_EMSCRIPTEN
+      boost::filesystem::unique_path("/tmp/temp_output_%%%%-%%%%-%%%%-%%%%.glb");
+#else
+      boost::filesystem::unique_path("temp_output_%%%%-%%%%-%%%%-%%%%.glb");
+#endif
   tinygltf::TinyGLTF writer;
   if (!writer.WriteGltfSceneToFile(&model, tempOutputPath.string(), true, true, false, true)) {
     throw std::runtime_error("Failed to write glTF to .glb");
