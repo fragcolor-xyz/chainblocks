@@ -80,7 +80,7 @@ jobs:
           ninja shards
           ninja test-runtime
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: shards-macos ${{ steps.setup.outputs.build-type }}
           path: |

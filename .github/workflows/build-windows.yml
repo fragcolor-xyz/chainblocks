@@ -177,13 +177,13 @@ jobs:
           cd build
           SHARDS_GFX_BACKEND=D3D12 ./test-gfx
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.setup.outputs.artifact }} ${{ steps.setup.outputs.build-type }}
           path: ${{ steps.setup.outputs.artifact-path }}
           if-no-files-found: error
           retention-days: 1
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: ${{ steps.setup.outputs.artifact }} rejected test data

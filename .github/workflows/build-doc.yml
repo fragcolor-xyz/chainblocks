@@ -44,7 +44,7 @@ jobs:
             LOG_shards_FORMAT="[%l] %v" ./shards.exe new run-sample.shs looped:true file:"$i" 2>"$i.log";
           done
       - name: Upload samples logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: samples-logs
           path: docs/samples/**/*.log
@@ -74,7 +74,7 @@ jobs:
         run: |
           ./shards.exe new docs/generate.shs
       - name: Upload markdown
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: docs-markdown
           path: |
@@ -165,7 +165,7 @@ jobs:
 
           Using MkDocs {version}."
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: docs-website
           path: shards/docs/site/

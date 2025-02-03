@@ -58,7 +58,7 @@ jobs:
             --output-directory coverage/output
       - name: Upload report
         if: ${{ steps.setup.outputs.html-report == 'true' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: shards-linux-coverage-report
           path: |
