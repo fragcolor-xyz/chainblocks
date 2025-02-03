@@ -37,7 +37,10 @@ struct ModelData {
 };
 
 struct Model {
-  Model() { _useMmap = Var(true); }
+  Model() { 
+    _useMmap = Var(true);
+    _cpuOnly = Var(false);
+  }
 
   static inline int32_t ObjectId = 'llam';
   static inline const char VariableName[] = "LLM.Model";
@@ -52,7 +55,8 @@ struct Model {
   static SHTypesInfo outputTypes() { return Type; }
 
   PARAM_PARAMVAR(_useMmap, "UseMmap", "Use mmap to load the model", {shards::CoreInfo::BoolType, shards::CoreInfo::BoolVarType});
-  PARAM_IMPL(PARAM_IMPL_FOR(_useMmap));
+  PARAM_PARAMVAR(_cpuOnly, "CpuOnly", "Force CPU-only execution", {shards::CoreInfo::BoolType, shards::CoreInfo::BoolVarType});
+  PARAM_IMPL(PARAM_IMPL_FOR(_useMmap), PARAM_IMPL_FOR(_cpuOnly));
 
   void cleanup(SHContext *context) {
     PARAM_CLEANUP(context);
@@ -78,6 +82,7 @@ struct Model {
 
     auto params = llama_model_default_params();
     params.use_mmap = _useMmap.get().payload.boolValue;
+    params.n_gpu_layers = _cpuOnly.get().payload.boolValue ? 0 : -1;  // 0 for CPU-only, -1 for auto
 
     _data->model = std::shared_ptr<llama_model>(llama_load_model_from_file(path.c_str(), params), llama_free_model);
 

@@ -18,7 +18,7 @@
 @wire(ml/embeddings/load {
   Do(ml/embeddings/download-deps)
   Await({
-    LLM.Model(UseMmap: false) = model ; small model, keep in RAM
+    LLM.Model(UseMmap: false CpuOnly: true) = model ; small model, keep in RAM
     LLM.Context(Embeddings: true) = context
   })
   {
