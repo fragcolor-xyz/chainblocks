@@ -421,34 +421,30 @@ impl RequestBase {
             }
           }
 
-          if as_bytes {
+          let content: ClonedVar = if as_bytes {
             let bytes = response.bytes().await.map_err(|e| {
               print_error(&e);
               "Failed to decode the response"
             })?;
 
-            output_table
-              .0
-              .insert_fast_static("body", &bytes.as_ref().into());
+            bytes.as_ref().into()
           } else {
             let str = response.text().await.map_err(|e| {
               print_error(&e);
               "Failed to decode the response"
             })?;
 
-            output_table
-              .0
-              .insert_fast_static("body", &Var::ephemeral_string(str.as_str()));
-          }
+            let shards_str = Var::ephemeral_string(str.as_str());
+            shards_str.into()
+          };
 
           let result: ClonedVar = if full_response {
+            output_table
+              .0
+              .insert_fast_static("body", &content.0);
             output_table.to_cloned()
           } else {
-            // ok here we do something a bit unsafe, but should be fine cos we know how shards manages memory
-            let body = output_table.0.get_mut_fast_static("body");
-            let mut tmp = Var::default();
-            std::mem::swap(&mut tmp, body);
-            ClonedVar(tmp)
+            content
           };
 
           Ok(result)
