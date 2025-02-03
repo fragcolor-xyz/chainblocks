@@ -31,12 +31,12 @@ jobs:
           sudo apt-get -y update
           sudo apt-get -y install lcov
       - name: Download Linux coverage
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: shards-linux-coverage
           path: coverage
       - name: Download Linux GPU coverage
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: shards-macos-gpu-coverage
           path: coverage

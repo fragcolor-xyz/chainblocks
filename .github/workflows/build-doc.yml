@@ -23,7 +23,7 @@ jobs:
           repository: fragcolor-xyz/shards
           fetch-depth: 1
       - name: Download shards
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: shards-win64 Release
           path: docs/samples
@@ -65,7 +65,7 @@ jobs:
           repository: fragcolor-xyz/shards
           fetch-depth: 1
       - name: Download shards
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: shards-win64 Debug
           path: ./
@@ -114,12 +114,12 @@ jobs:
           pip install mkdocs-awesome-pages-plugin
           pip install mkdocs-macros-plugin
       - name: Download markdown
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: docs-markdown
           path: shards/docs/docs/reference/shards
       - name: Download samples logs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: samples-logs
           path: shards/docs/samples

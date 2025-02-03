@@ -109,7 +109,7 @@ jobs:
           fetch-depth: 1
           submodules: true
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ needs.macOS.outputs.artifact-name }}
           path: build
