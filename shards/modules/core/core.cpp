@@ -437,7 +437,8 @@ struct Profile {
 
   static SHOptionalString help() {
     return SHCCSTR(
-        "This shard outputs the amount of time(nanoseconds) it took to execute the shards provided in the Action parameter.");
+        "This shard outputs the amount of time it took to execute the shards provided in the Action parameter, "
+        "automatically choosing the most appropriate time unit (ns, μs, ms, s).");
   }
 
   static SHOptionalString inputHelp() {
@@ -489,13 +490,25 @@ struct Profile {
     throw SHException("Parameter out of range.");
   }
 
+  std::string formatDuration(int64_t nanoseconds) {
+    if (nanoseconds < 1000) {
+      return fmt::format("{} ns", nanoseconds);
+    } else if (nanoseconds < 1000000) {
+      return fmt::format("{:.2f} μs", nanoseconds / 1000.0);
+    } else if (nanoseconds < 1000000000) {
+      return fmt::format("{:.2f} ms", nanoseconds / 1000000.0);
+    } else {
+      return fmt::format("{:.2f} s", nanoseconds / 1000000000.0);
+    }
+  }
+
   SHVar activate(SHContext *context, const SHVar &input) {
     SHVar output{};
     const auto start = std::chrono::high_resolution_clock::now();
     activateShards(SHVar(_shards).payload.seqValue, context, input, output);
     const auto stop = std::chrono::high_resolution_clock::now();
     const auto dur = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
-    SHLOG_INFO("{} took {} nanoseconds.", _label, dur);
+    SHLOG_INFO("{} took {}", _label, formatDuration(dur));
     return output;
   }
 };
