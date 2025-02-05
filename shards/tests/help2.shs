@@ -1,6 +1,7 @@
 Sequence(shard-docs)
 
-Shards.Enumerate | ForEach({
+Shards.Enumerate = shards
+ForEach({
   Set(shard-doc "name")
   Shards.Help
   {Take("help") | Set(shard-doc "help")}
@@ -36,6 +37,8 @@ Shards.Enumerate | ForEach({
 
   shard-doc >> shard-docs
 })
+
+Count(shards) | Log("NShards")
 
 shard-docs | ToJson = shard-docs-json
 "share-docs.json" | FS.Write(shard-docs-json)
