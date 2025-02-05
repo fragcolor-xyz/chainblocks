@@ -37,19 +37,19 @@
     @db-file-2 | FS.Remove
     @db-file-3 | FS.Remove
   })
-
+  
   "CREATE TABLE IF NOT EXISTS integers (x INTEGER, y INTEGER)" | DB.RawQuery(@db-file)
   [88 99 100 101 102] | DB.Query("INSERT INTO integers VALUES (?, ?), (?, ?), (?, NULL)" @db-file)
   [] | DB.Query("SELECT * FROM integers" @db-file) | Log
   Assert.Is({x: [88 100 102] y: [99 101 none]})
   Msg("Test 1 passed")
-
+  
   [] | DB.Query("CREATE TABLE IF NOT EXISTS integers (x INTEGER, y INTEGER)" @db-file-2)
   [88 99 100 101 102] | DB.Query("INSERT INTO integers VALUES (?, ?), (?, ?), (?, NULL)" @db-file-2)
   [] | DB.Query("SELECT * FROM integers" @db-file-2) | Log
   Assert.Is({x: [88 100 102] y: [99 101 none]})
   Msg("Test 2 passed")
-
+  
   11 >= x
   22 >= y
   DB.Transaction({
@@ -62,37 +62,37 @@
   [] | DB.Query("SELECT * FROM integers" @db-file) | Log
   Assert.Is({x: [88 100 102 12 13 14 15 16 17 18 19 20 21] y: [99 101 none 23 24 25 26 27 28 29 30 31 32]})
   Msg("Test 3 passed")
-
+  
   Do(failing-transaction)
-
+  
   Repeat({
     [] | DB.Query("SELECT * FROM integers" @db-file) | Log("Queried after detach")
     Assert.Is({x: [88 100 102 12 13 14 15 16 17 18 19 20 21] y: [99 101 none 23 24 25 26 27 28 29 30 31 32]})
   } Times: 10)
   Msg("Test 4 passed")
-
+  
   DB.Backup(@db-file-3 @db-file)
-
+  
   ; test CRDT capabilities
   DB.LoadExtension("crsqlite" @db-file)
-  [] | DB.Query("create table foo (a primary key not null, b)" @db-file)
-  [] | DB.Query("create table bar (a primary key not null, b, c, d)" @db-file)
-  [] | DB.Query("create table baz (a primary key not null, b, c, d)" @db-file)
-  [] | DB.Query("select crsql_as_crr('foo')" @db-file)
-  [] | DB.Query("select crsql_as_crr('baz')" @db-file)
-  [] | DB.Query("insert into foo (a,b) values (1,2)" @db-file)
-  [] | DB.Query("insert into baz (a,b,c,d) values ('a', 'woo', 'doo', 'daa')" @db-file)
-  [] | DB.Query("select * from foo" @db-file) | Log
-  [] | DB.Query("select * from baz" @db-file) | Log
-  [] | DB.Query("select * from crsql_changes" @db-file) | Log
-
+  [] | Profile(DB.Query("create table foo (a primary key not null, b)" @db-file) "Create foo")
+  [] | Profile(DB.Query("create table bar (a primary key not null, b, c, d)" @db-file) "Create bar")
+  [] | Profile(DB.Query("create table baz (a primary key not null, b, c, d)" @db-file) "Create baz")
+  [] | Profile(DB.Query("select crsql_as_crr('foo')" @db-file) "Select crsql_as_crr('foo')")
+  [] | Profile(DB.Query("select crsql_as_crr('baz')" @db-file) "Select crsql_as_crr('baz')")
+  [] | Profile(DB.Query("insert into foo (a,b) values (1,2)" @db-file) "Insert into foo")
+  [] | Profile(DB.Query("insert into baz (a,b,c,d) values ('a', 'woo', 'doo', 'daa')" @db-file) "Insert into baz")
+  [] | Profile(DB.Query("select * from foo" @db-file) "Select foo") | Log
+  [] | Profile(DB.Query("select * from baz" @db-file) "Select baz") | Log
+  [] | Profile(DB.Query("select * from crsql_changes" @db-file) "Select crsql_changes") | Log
+  
   ; Test AsRows
   Repeat({
     [] | DB.Query("SELECT * FROM integers" @db-file AsRows: true) | Log
     Assert.Is([{x: 88 y: 99} {x: 100 y: 101} {x: 102 y: none} {x: 12 y: 23} {x: 13 y: 24} {x: 14 y: 25} {x: 15 y: 26} {x: 16 y: 27} {x: 17 y: 28} {x: 18 y: 29} {x: 19 y: 30} {x: 20 y: 31} {x: 21 y: 32}])
   } Times: 10)
   Msg("Test 5 passed")
-
+  
   ; Test sqlite-vec - BEHIND cmake flag WITH_SQLITE_VEC
   @if(@with-sqlite-vec {
     DB.LoadExtension("sqlite-vec" @db-file)
@@ -109,7 +109,7 @@
       (3, '[0.716, -0.927, 0.134, 0.052, -0.669, 0.793, -0.634, -0.162]'),
       (4, '[-0.710, 0.330, 0.656, 0.041, -0.990, 0.726, 0.385, -0.958]');
     """ | DB.RawQuery(@db-file)
-
+    
     [] | DB.Query("""-- KNN style query
   select
     rowid,

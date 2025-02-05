@@ -430,15 +430,15 @@ struct Remove : public ActionJointOp {
 struct Profile {
   ShardsVar _shards{};
   SHExposedTypesInfo _exposed{};
+  SHExposedTypesInfo _required{};
   std::string _label{"<no label>"};
 
   static inline Parameters _params{{"Action", SHCCSTR("The action shards to profile."), {CoreInfo::Shards}},
                                    {"Label", SHCCSTR("The label to print when outputting time data."), {CoreInfo::StringType}}};
 
   static SHOptionalString help() {
-    return SHCCSTR(
-        "This shard outputs the amount of time it took to execute the shards provided in the Action parameter, "
-        "automatically choosing the most appropriate time unit (ns, μs, ms, s).");
+    return SHCCSTR("This shard outputs the amount of time it took to execute the shards provided in the Action parameter, "
+                   "automatically choosing the most appropriate time unit (ns, μs, ms, s).");
   }
 
   static SHOptionalString inputHelp() {
@@ -460,10 +460,13 @@ struct Profile {
   SHTypeInfo compose(const SHInstanceData &data) {
     auto res = _shards.compose(data);
     _exposed = res.exposedInfo;
+    _required = res.requiredInfo;
     return res.outputType;
   }
 
   SHExposedTypesInfo exposedVariables() { return _exposed; }
+
+  SHExposedTypesInfo requiredVariables() { return _required; }
 
   void setParam(int index, const SHVar &value) {
     switch (index) {
@@ -505,7 +508,7 @@ struct Profile {
   SHVar activate(SHContext *context, const SHVar &input) {
     SHVar output{};
     const auto start = std::chrono::high_resolution_clock::now();
-    activateShards(SHVar(_shards).payload.seqValue, context, input, output);
+    _shards.activate(context, input, output);
     const auto stop = std::chrono::high_resolution_clock::now();
     const auto dur = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
     SHLOG_INFO("{} took {}", _label, formatDuration(dur));
