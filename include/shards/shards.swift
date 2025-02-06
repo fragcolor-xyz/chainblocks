@@ -439,17 +439,7 @@ extension SHVar: CustomStringConvertible {
         if type != .String {
             return nil
         }
-
-        guard let stringPtr = payload.stringValue else {
-            return ""
-        }
-        let length = Int(payload.stringLen)
-        guard length > 0 else {
-            return ""
-        }
-        // Cast `CChar` (Int8) to `UInt8` for decoding
-        let buffer = UnsafeBufferPointer(start: stringPtr, count: length).map { UInt8(bitPattern: $0) }
-        return String(decoding: buffer, as: UTF8.self)
+        return string
     }
 
     public var bytes: ContiguousArray<UInt8> {
@@ -463,6 +453,13 @@ extension SHVar: CustomStringConvertible {
         }
         let buffer = UnsafeBufferPointer(start: bytesPtr, count: length)
         return ContiguousArray(buffer)
+    }
+
+    public var maybeBytes: ContiguousArray<UInt8>? {
+        if type != .Bytes {
+            return nil
+        }
+        return bytes
     }
 
     init(value: ShardPtr) {
@@ -532,6 +529,7 @@ extension SHVar: CustomStringConvertible {
 
 class OwnedVar {
     var v: SHVar
+    internal var borrowed = false
 
     init() {
         v = SHVar()
@@ -545,8 +543,9 @@ class OwnedVar {
         }
     }
 
-    init(owning: SHVar) {
-        v = owning
+    init(borrowing: SHVar) {
+        v = borrowing
+        borrowed = true
     }
 
     init(string: String) {
@@ -570,6 +569,8 @@ class OwnedVar {
     }
 
     deinit {
+        if borrowed { return }
+
         withUnsafeMutablePointer(to: &v) { ptr in
             G.Core.pointee.destroyVar(ptr)
         }
@@ -629,6 +630,11 @@ class TableVar: OwnedVar, Sequence {
     override init(cloning: SHVar) {
         super.init(cloning: cloning)
         assert(cloning.valueType == VarType.Table.asSHType())
+    }
+
+    override init(borrowing: SHVar) {
+        super.init(borrowing: borrowing)
+        borrowed = true
     }
 
     func insertOrUpdate(key: SHVar, cloning: SHVar) {
@@ -714,6 +720,11 @@ class SeqVar: OwnedVar {
     override init(cloning: SHVar) {
         super.init(cloning: cloning)
         assert(cloning.valueType == VarType.Seq.asSHType())
+    }
+
+    override init(borrowing: SHVar) {
+        super.init(borrowing: borrowing)
+        borrowed = true
     }
 
     func resize(size: Int) {
@@ -1624,6 +1635,111 @@ class Shards {
         G.Core.pointee.suspend(context.context, duration)
     }
 }
+
+#if canImport(SwiftUI)
+    import SwiftUI
+
+    class ObservableSeqVar: ObservableObject, RandomAccessCollection {
+        // Collection protocol requirements
+        typealias Index = Int
+        typealias Element = SHVar
+
+        var startIndex: Int { 0 }
+        var endIndex: Int { size() }
+
+        // Required subscript for RandomAccessCollection
+        subscript(position: Int) -> SHVar {
+            at(position)
+        }
+
+        // Required for RandomAccessCollection
+        func index(after i: Int) -> Int {
+            i + 1
+        }
+
+        // For better performance with ForEach
+        func distance(from start: Int, to end: Int) -> Int {
+            end - start
+        }
+
+        func index(_ i: Int, offsetBy distance: Int) -> Int {
+            i + distance
+        }
+
+        @Published private(set) var count: Int = 0 // This helps SwiftUI track changes
+        public var seq: SeqVar
+
+        init() {
+            seq = SeqVar()
+        }
+
+        // Wrap the original methods but with notification
+        func push(string: String) {
+            seq.push(string: string)
+            objectWillChange.send() // Notify SwiftUI
+            count = seq.size()
+        }
+
+        func pushRaw(value: SHVar) {
+            seq.pushRaw(value: value)
+            objectWillChange.send()
+            count = seq.size()
+        }
+
+        func pushCloning(value: SHVar) {
+            seq.pushCloning(value: value)
+            objectWillChange.send()
+            count = seq.size()
+        }
+
+        func pop() -> SHVar {
+            objectWillChange.send()
+            let result = seq.popRaw()
+            count = seq.size()
+            return result
+        }
+
+        func remove(at index: Int) {
+            seq.remove(index: index)
+            objectWillChange.send()
+            count = seq.size()
+        }
+
+        func removeFast(at index: Int) {
+            seq.removeFast(index: index)
+            objectWillChange.send()
+            count = seq.size()
+        }
+
+        func clear() {
+            seq.clear()
+            objectWillChange.send()
+            count = 0
+        }
+
+        // Read-only operations don't need notifications
+        func at(_ index: Int) -> SHVar {
+            return seq.at(index: index)
+        }
+
+        func size() -> Int {
+            return seq.size()
+        }
+
+        // Allow setting with notification
+        func set(_ index: Int, value: SHVar) {
+            seq.set(index: index, value: value)
+            objectWillChange.send()
+        }
+
+        func triggerChange() {
+            // Ensure UI updates happen on main thread
+            DispatchQueue.main.async {
+                self.objectWillChange.send()
+            }
+        }
+    }
+#endif
 
 #if canImport(UIKit)
     import UIKit
