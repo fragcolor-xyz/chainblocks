@@ -1,0 +1,11 @@
+@mesh(main)
+
+@wire(onnx-test {
+  ; should be normalized using mean = [0.485, 0.456, 0.406] and std = [0.229, 0.224, 0.225]
+  LoadImage("../../assets/simple1.PNG") | StripAlpha | ResizeImage(224 224) | ImageToFloats = image
+  ONNX.Load("data/mobilenet_v2_Opset18.onnx" [1 3 224 224]) = model | Log
+  Await (image | ONNX.Activate(Model: model) | Log)
+})
+
+@schedule(main onnx-test)
+@run(main) | Assert.Is(true)

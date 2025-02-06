@@ -94,6 +94,10 @@ if(RUST_USE_LTO)
   list(APPEND RUST_FLAGS -Clinker-plugin-lto -Clinker=clang -Clink-arg=-fuse-ld=lld)
 endif()
 
+if(APPLE)
+  list(APPEND RUST_FLAGS -Clink-arg=-fapple-link-rtlib)
+endif()
+
 if(EMSCRIPTEN_PTHREADS)
   list(APPEND RUST_FLAGS -Ctarget-feature=+atomics,+bulk-memory)
   list(APPEND RUST_CARGO_UNSTABLE_FLAGS -Zbuild-std=panic_abort,std)
