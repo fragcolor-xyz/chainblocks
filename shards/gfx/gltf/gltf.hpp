@@ -13,6 +13,8 @@ struct glTF {
   MeshTreeDrawable::Ptr root;
   std::unordered_map<std::string, Animation> animations;
   std::unordered_map<std::string, MaterialPtr> materials;
+  linalg::vec<float, 3> boundsMin = {0, 0, 0};
+  linalg::vec<float, 3> boundsMax = {0, 0, 0};
 
   glTF() = default;
 

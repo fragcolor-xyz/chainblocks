@@ -1,6 +1,7 @@
 #ifndef E452293C_6700_4675_8B6E_5293674E0A33
 #define E452293C_6700_4675_8B6E_5293674E0A33
 
+#include "shards/shards.h"
 #include <shards/common_types.hpp>
 #include <shards/core/foundation.hpp>
 #include <shards/core/object_type.hpp>
@@ -28,6 +29,9 @@ struct SHDrawable {
   Variant drawable;
   std::unordered_map<std::string, Animation> animations;
   std::unordered_map<std::string, MaterialPtr> materials;
+  linalg::vec<float, 3> boundsMin = {0, 0, 0};
+  linalg::vec<float, 3> boundsMax = {0, 0, 0};
+
   bool rootNodeWrapped{};
 
   void assign(const std::shared_ptr<IDrawable> &generic) {
