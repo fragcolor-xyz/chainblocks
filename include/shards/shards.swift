@@ -529,7 +529,7 @@ extension SHVar: CustomStringConvertible {
 
 class OwnedVar {
     var v: SHVar
-    internal var borrowed = false
+    var borrowed = false
 
     init() {
         v = SHVar()
@@ -635,6 +635,7 @@ class TableVar: OwnedVar, Sequence {
     override init(borrowing: SHVar) {
         super.init(borrowing: borrowing)
         borrowed = true
+        assert(borrowing.valueType == VarType.Table.asSHType())
     }
 
     func insertOrUpdate(key: SHVar, cloning: SHVar) {
@@ -725,6 +726,7 @@ class SeqVar: OwnedVar {
     override init(borrowing: SHVar) {
         super.init(borrowing: borrowing)
         borrowed = true
+        assert(borrowing.valueType == VarType.Seq.asSHType())
     }
 
     func resize(size: Int) {
