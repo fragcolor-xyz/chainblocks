@@ -1,0 +1,204 @@
+(def total-rounds 10)
+(def max-timer 5)
+
+(defshards load-resources []
+  (LoadImage "data/cats/cat01.png") (Push :Name .images)
+  (LoadImage "data/cats/cat02.png") (Push :Name .images)
+  (LoadImage "data/cats/cat03.png") (Push :Name .images))
+
+(defshards initialize-variables []
+  ;; Variables to reset each round 
+  true >= .new-round
+  max-timer >= .time-remaining
+  false >= .input-received
+
+  ;; Variables to reset each game 
+  0 >= .total-score
+  1 >= .current-round
+  false >= .game-over
+
+  ;; Other Shared Variables
+  0 >= .left-image-index
+  0 >= .right-image-index
+  (Count .images) >= .total-images
+  true >= .same-image)
+
+(defshards reset-round-variables []
+  false > .new-round
+  max-timer > .time-remaining
+  false > .input-received)
+
+(defshards reset-game-variables []
+  (reset-round-variables)
+  0 > .total-score
+  1 > .current-round
+  false > .game-over)
+
+(defshards initialize-round []
+  (RandomInt :Max .total-images) > .left-image-index
+  (RandomInt :Max .total-images) > .right-image-index
+
+  (If
+   :Predicate (-> .left-image-index (Is .right-image-index))
+   :Then (-> true > .same-image)
+   :Else (-> false > .same-image))
+
+  (reset-round-variables))
+
+(defwire end-round
+  (Setup 0 >= .new-round-number)
+
+  .current-round (Math.Add 1)
+  > .new-round-number
+
+  (If
+   :Predicate
+   (-> .new-round-number (IsMore total-rounds))
+   :Then
+   (-> true > .game-over)
+   :Else
+   (->
+    .new-round-number > .current-round
+    true > .new-round)))
+
+(defshards check-answer [yes-input]
+  (When
+   :Predicate (-> .input-received (Is false))
+   :Action
+   (->
+    (When
+     :Predicate (-> .same-image (Is yes-input))
+     :Action (-> (Math.Inc .total-score)))
+
+    true > .input-received
+    (When
+     :Predicate (-> .game-over (IsNot true))
+     :Action (-> nil (Step end-round))))))
+
+(defshards timer-tick []
+  (When
+   :Predicate (-> .game-over (Is false))
+   :Action
+   (->
+    (Math.Dec .time-remaining)
+    (When
+     :Predicate (-> .time-remaining (IsLess 0))
+     :Action (-> nil (Step end-round))))))
+
+(defshards main-game-ui []
+  (UI.BottomPanel
+   :Contents (-> "Are they the same image? Press the UP arrow if YES, and the DOWN arrow if NO." (UI.Label)))
+
+  (UI.TopPanel
+   :Contents
+   (->
+    (UI.Horizontal
+     :Contents
+     (->
+      "Score: " (UI.Label)
+      .total-score (ToString) (UI.Label)
+      (UI.Separator)
+      "Round: " (UI.Label)
+      .current-round (ToString) (UI.Label)
+      (UI.Separator)
+      "Time Left: " (UI.Label)
+      .time-remaining (ToString) (UI.Label)))))
+
+  (UI.CentralPanel
+   :Contents
+   (->
+    (UI.Horizontal
+     :Contents
+     (->
+      (UI.Area
+       :Position (float2 -250.0, 0.0)
+       :Anchor Anchor.Center
+       :Contents
+       (-> .images (Take .left-image-index) (UI.Image)))
+      (UI.Area
+       :Position (float2 250.0, 0.0)
+       :Anchor Anchor.Center
+       :Contents
+       (-> .images (Take .right-image-index) (UI.Image))))))))
+
+(defshards game-over-ui []
+  (UI.CentralPanel
+   :Contents
+   (->
+    (UI.Area
+     :Position (float2 0.0, 0.0)
+     :Anchor Anchor.Center
+     :Contents
+     (->
+      "GAME OVER" (UI.Label)
+      (UI.Horizontal
+       :Contents
+       (->
+        "Final Score: " (UI.Label)
+        .total-score (ToString) (UI.Label)
+        "/"  (UI.Label)
+        total-rounds (ToString) (UI.Label)))
+
+      (UI.Button
+       :Label "Play Again!"
+       :Action (-> (reset-game-variables))))))))
+
+(defloop ui-loop
+  (GFX.MainWindow
+   :Title "Yes-No Game"
+   :Width 1280 :Height 768
+   :Contents
+   (->
+    (Setup
+     (GFX.DrawQueue) >= .ui-draw-queue
+     (GFX.UIPass .ui-draw-queue) >> .render-steps)
+    (| .ui-draw-queue (GFX.ClearQueue))
+
+    (If
+     :Predicate (-> .game-over)
+     :Then
+     (-> (UI .ui-draw-queue (game-over-ui)))
+     :Else
+     (-> (UI .ui-draw-queue (main-game-ui))))
+
+    (GFX.Render :Steps .render-steps)
+
+    (Inputs.KeyDown
+     :Key "up"
+     :Action (-> (check-answer true)))
+
+    (Inputs.KeyDown
+     :Key "down"
+     :Action (-> (check-answer false))))))
+
+(defloop logic-loop
+  (Once
+   :Action (-> (timer-tick))
+   :Every 1.0)
+
+  (WhenNot
+   :Predicate (-> .game-over)
+   :Action
+   (->
+    (When
+     :Predicate (-> .new-round)
+     :Action (-> (initialize-round))))))
+
+(defshards initialize-round []
+  (RandomInt :Max .total-images) > .left-image-index
+  (RandomInt :Max .total-images) > .right-image-index
+
+  (If
+   :Predicate (-> .left-image-index (Is .right-image-index))
+   :Then (-> true > .same-image)
+   :Else (-> false > .same-image))
+
+  (reset-round-variables))
+
+(defloop game-loop
+  (Setup (load-resources) (initialize-variables))
+  (Branch [ui-loop, logic-loop]))
+
+(defmesh main)
+(schedule main game-loop)
+(run main (/ 1.0 60.0))

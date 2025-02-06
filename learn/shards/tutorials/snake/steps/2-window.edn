@@ -1,0 +1,7 @@
+(defloop main-wire ;; (1)
+  (GFX.MainWindow  ;; (2)
+   :Title "Snake game" :Width 480 :Height 360))
+
+(defmesh root)
+(schedule root main-wire)
+(run root (/ 1.0 60))

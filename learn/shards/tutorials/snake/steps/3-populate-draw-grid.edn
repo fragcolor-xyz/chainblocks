@@ -1,0 +1,97 @@
+(def grid-cols 12)
+(def grid-rows 10)
+(def empty-grid
+  [0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0 0 0 0 0])
+
+(defshards get-index []
+  (| (Take 0) >= .x)
+  (| (Take 1) >= .y)
+  .y (Math.Multiply grid-cols) (Math.Add .x))
+
+(defshards populate-grid [fruit snake]
+  ; saves the input into a variable
+  >= .tmp-grid
+
+  ; first the snake tail and body
+  snake (Take 0) (get-index) >= .tail-index
+  [.tail-index 4] (Assoc .tmp-grid)
+  snake (Slice 1 -1)
+  (ForEach
+   (-> (get-index) >= .limb-index
+       [.limb-index 3] (Assoc .tmp-grid)))
+
+  ; then the fruit
+  fruit (get-index) >= .fruit-index
+  [.fruit-index 1] (Assoc .tmp-grid)
+
+  ; finally the snake head
+  snake (RTake 0) (get-index) >= .head-index
+  [.head-index 2] (Assoc .tmp-grid)
+
+  ; return the populated grid
+  .tmp-grid)
+
+(def cell-size 18)
+(def x-offset 48)
+(def y-offset 36)
+(defn render-cells [n]
+  (if
+   (= n -1)
+    nil
+    (->
+     (| (int2
+         (% n grid-cols)
+         (/ n grid-cols))
+        (ToFloat2)
+        (Math.Multiply (float2 cell-size))
+        (Math.Add (float2 x-offset y-offset)) > .position)
+     (| (Take n)
+        (UI.Area
+         :Position .position
+         :Contents
+         (-> (Match
+              [0 (-> ".") ; empty
+               1 (-> "F") ; fruit
+               2 (-> "H") ; head
+               3 (-> "B") ; body
+               4 (-> "T") ; tail
+               ]false)
+             (UI.Label))))
+     (render-cells (- n 1)))))
+
+(defloop main-wire
+  ; logic
+  [(int2 1 2) (int2 2 2) (int2 3 2) (int2 3 3) (int2 4 3)] >= .snake
+  (int2 6 7) >= .fruit
+  empty-grid (populate-grid .fruit .snake) >= .grid
+  ; window
+  (GFX.MainWindow
+   :Title "Snake game" :Width 480 :Height 360
+   :Contents
+   (->
+    (Setup
+     (GFX.DrawQueue) >= .ui-draw-queue
+     (GFX.UIPass .ui-draw-queue) >> .render-steps)
+    .ui-draw-queue (GFX.ClearQueue)
+
+    (UI
+     .ui-draw-queue
+     (->
+      .grid
+      (Setup (float2 0) >= .position)
+      (render-cells (- (* grid-cols grid-rows) 1))))
+
+    (GFX.Render :Steps .render-steps))))
+
+(defmesh root)
+(schedule root main-wire)
+(run root (/ 1.0 60))
